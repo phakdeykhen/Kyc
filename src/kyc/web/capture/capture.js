@@ -16,23 +16,99 @@ const TEXT = {
   USE_HIGHER_RESOLUTION: "Use a higher-resolution camera or photo.",
   CAPTURE_OTHER_SIDE: "That image was already used for another side. Turn the document over.",
   RETAKE_PHOTO: "Please take the photo again.",
+  CENTER_FACE: "Center your face inside the oval.",
+  REMOVE_OCCLUSION: "Remove anything covering your face and keep both eyes visible.",
+  FACE_CAMERA: "Look straight at the camera with your head upright.",
+  ONE_FACE_ONLY: "Only your face should be visible in the photo.",
+  SHOW_FACE: "Make sure your whole face is visible in the photo.",
+  RETAKE_SELFIE: "Please take another selfie.",
+  RECAPTURE_DOCUMENT: "Retake your document photo so its portrait is clear and unobstructed.",
+  REDUCE_LIGHT: "Move out of direct bright light.",
+  EVEN_LIGHTING: "Use even light across your face and avoid strong shadows.",
 };
 const SCORE_LABELS = {
   blur_score: "Sharpness", glare_score: "No glare", brightness_score: "Exposure", shadow_score: "Even light",
   document_coverage: "Coverage", perspective_score: "Alignment", resolution_score: "Resolution", overall_quality: "Overall",
 };
-const state = { apiKey: "", orgId: "", session: null, sides: [], current: null, stream: null, busy: false };
+const state = { apiKey: "", orgId: "", session: null, sides: [], current: null, stream: null, busy: false,
+  mode: "setup", cameraVersion: 0, pollTimer: null, polling: false };
 const $ = (id) => document.getElementById(id);
+const cameraElement = (id) => $(state.mode === "selfie" ? `selfie-${id}` : id);
 
 function headers() {
   return { "X-API-Key": state.apiKey, "X-Organization-ID": state.orgId };
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
-  let body = null;
-  try { body = await response.json(); } catch (error) { body = null; }
-  return { ok: response.ok, status: response.status, body };
+  try {
+    const response = await fetch(path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
+    let body = null;
+    try { body = await response.json(); } catch (error) { body = null; }
+    return { ok: response.ok, status: response.status, body };
+  } catch (error) {
+    return { ok: false, status: 0, body: { detail: "Connection failed. Check your connection and try again." } };
+  }
+}
+
+function updateButtons() {
+  $("shoot").disabled = state.busy || state.mode !== "document" || !state.current || !state.stream;
+  $("file").disabled = state.busy || state.mode !== "document" || !state.current;
+  const maySubmitSelfie = !state.busy && state.mode === "selfie" && $("biometric-consent").checked;
+  $("selfie-shoot").disabled = !maySubmitSelfie || !state.stream;
+  $("selfie-file").disabled = !maySubmitSelfie;
+  $("resume-session").disabled = state.busy || state.polling;
+  $("session-form").querySelector('button[type="submit"]').disabled = state.busy || state.polling;
+  $("refresh-session").disabled = state.polling || state.busy;
+}
+
+function stopCamera() {
+  state.cameraVersion++;
+  if (state.stream) state.stream.getTracks().forEach((track) => track.stop());
+  state.stream = null;
+  $("video").srcObject = null;
+  $("selfie-video").srcObject = null;
+  updateButtons();
+}
+
+function stopPolling() {
+  if (state.pollTimer) clearTimeout(state.pollTimer);
+  state.pollTimer = null;
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  $("capture").hidden = mode !== "document";
+  $("selfie").hidden = mode !== "selfie";
+  $("processing").hidden = mode !== "processing";
+  updateButtons();
+}
+
+function readCredentials() {
+  if (!$("api-key").reportValidity() || !$("org-id").reportValidity()) return false;
+  state.apiKey = $("api-key").value.trim();
+  state.orgId = $("org-id").value.trim();
+  return true;
+}
+
+function resetSession() {
+  stopPolling();
+  stopCamera();
+  state.current = null;
+  state.session = null;
+  $("biometric-consent").checked = false;
+  $("result").hidden = true;
+  setMode("setup");
+}
+
+function sessionInfo() {
+  $("session-info").hidden = false;
+  $("session-info").textContent = `Session ${state.session.session_id} · expires ${new Date(state.session.expires_at).toLocaleTimeString()}`;
+}
+
+function comparisonVerdict(comparison) {
+  if (comparison && comparison.result === "PASS") return "Selfie accepted · face comparison passed";
+  if (comparison && comparison.result === "FAIL") return "Selfie accepted · face comparison did not pass";
+  return "Selfie accepted · comparison needs review";
 }
 
 function renderSides(progress) {
@@ -49,8 +125,10 @@ function renderSides(progress) {
 
 async function startSession(event) {
   event.preventDefault();
-  state.apiKey = $("api-key").value.trim();
-  state.orgId = $("org-id").value.trim();
+  if (state.busy || state.polling || !readCredentials()) return;
+  resetSession();
+  state.busy = true;
+  updateButtons();
   const documentType = $("doc-type").value;
   const created = await api("/v1/kyc/sessions", {
     method: "POST",
@@ -58,46 +136,144 @@ async function startSession(event) {
     body: JSON.stringify({ user_id: $("user-ref").value.trim(), country: $("country").value.trim().toUpperCase(),
                            expected_document_type: documentType, verification_level: "DOCUMENT_FACE_LIVENESS" }),
   });
+  state.busy = false;
+  updateButtons();
   if (!created.ok) return showError(created);
   state.session = created.body;
+  sessionInfo();
+  await prepareDocument(documentType);
+}
+
+async function prepareDocument(documentType = state.session.expected_document_type) {
+  const session = state.session;
   const types = await api("/v1/document-types");
+  if (session !== state.session) return;
   const entry = types.ok && types.body.document_types.find((item) => item.type === documentType);
-  state.sides = entry ? entry.required_sides : ["FRONT", "BACK"];
+  state.sides = entry ? entry.required_sides : (documentType.includes("PASSPORT") ? ["DATA_PAGE"] : ["FRONT", "BACK"]);
   state.current = state.sides[0];
   $("frame").style.setProperty("--doc-ratio", state.sides[0] === "DATA_PAGE" ? "1.42" : "1.586");
-  $("session-info").hidden = false;
-  $("session-info").textContent = `Session ${state.session.session_id} · expires ${new Date(state.session.expires_at).toLocaleTimeString()}`;
-  $("capture").hidden = false;
+  setMode("document");
   renderSides(null);
-  startCamera();
+  await startCamera();
+}
+
+async function resumeSession() {
+  if (state.busy || state.polling || !readCredentials()) return;
+  const id = $("existing-session-id").value.trim();
+  if (!id || !$("existing-session-id").reportValidity()) {
+    return showError({ status: 0, body: { detail: "Enter the existing session ID to continue." } });
+  }
+  resetSession();
+  state.busy = true;
+  updateButtons();
+  const result = await api(`/v1/kyc/${encodeURIComponent(id)}`);
+  state.busy = false;
+  updateButtons();
+  if (!result.ok) return showError(result);
+  state.session = result.body;
+  sessionInfo();
+  await followSession();
+}
+
+async function followSession() {
+  const session = state.session;
+  const status = state.session.status;
+  if (status === "SELFIE_REQUIRED") {
+    stopPolling();
+    if (state.mode !== "selfie") {
+      stopCamera();
+      state.current = "SELFIE";
+      $("biometric-consent").checked = false;
+      setMode("selfie");
+      $("next").textContent = "Your document is ready. Continue with your selfie.";
+      await startCamera();
+    }
+  } else if (status === "DOCUMENT_PROCESSING") {
+    stopCamera();
+    setMode("processing");
+    $("processing-info").textContent = "Please wait while your document is processed.";
+    state.pollTimer = setTimeout(refreshSession, 2000);
+  } else if (status === "CREATED" || status === "DOCUMENT_REQUIRED") {
+    stopPolling();
+    await prepareDocument();
+  } else {
+    stopPolling();
+    stopCamera();
+    state.current = null;
+    setMode("done");
+    const result = await api(`/v1/kyc/${state.session.session_id}/result`);
+    if (session !== state.session) return;
+    if (!result.ok) return showError(result);
+    $("result").hidden = false;
+    $("verdict").className = "verdict retry";
+    $("verdict").textContent = status === "EXPIRED" ? "Session expired"
+      : result.body.face_comparison ? comparisonVerdict(result.body.face_comparison) : "Capture submitted";
+    $("instructions").replaceChildren();
+    $("scores").replaceChildren();
+    $("next").textContent = "Additional verification or review is still required before an identity decision.";
+  }
+}
+
+async function refreshSession() {
+  stopPolling();
+  if (state.polling || !state.session) return;
+  if (Date.parse(state.session.expires_at) <= Date.now()) {
+    stopCamera();
+    setMode("done");
+    return showError({ status: 410, body: { detail: "This session has expired. Create a new session to continue." } });
+  }
+  state.polling = true;
+  updateButtons();
+  const result = await api(`/v1/kyc/${state.session.session_id}`);
+  state.polling = false;
+  updateButtons();
+  if (!result.ok) {
+    $("processing-info").textContent = "Progress could not be checked. Use Check progress to try again.";
+    return showError(result);
+  }
+  state.session = result.body;
+  sessionInfo();
+  await followSession();
 }
 
 async function startCamera() {
+  stopCamera();
+  const version = state.cameraVersion;
+  const isSelfie = state.mode === "selfie";
+  const video = cameraElement("video"), hint = cameraElement("hint");
+  hint.textContent = "Starting camera…";
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    $("hint").textContent = "No camera available here. Use “Upload a photo”.";
+    hint.textContent = isSelfie ? "No camera available here. Consent, then upload a selfie." : "No camera available here. Use Upload a photo.";
     return;
   }
   try {
-    state.stream = await navigator.mediaDevices.getUserMedia({
-      audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1440 } },
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false, video: { facingMode: { ideal: isSelfie ? "user" : "environment" }, width: { ideal: 1920 }, height: { ideal: 1440 } },
     });
-    $("video").srcObject = state.stream;
-    await $("video").play();
-    $("shoot").disabled = false;
-    requestAnimationFrame(liveHints);
+    if (version !== state.cameraVersion) {
+      stream.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    state.stream = stream;
+    video.srcObject = stream;
+    await video.play();
+    updateButtons();
+    requestAnimationFrame((time) => liveHints(time, version));
   } catch (error) {
-    $("hint").textContent = "Camera permission was not granted. Use “Upload a photo”.";
+    if (version !== state.cameraVersion) return;
+    stopCamera();
+    hint.textContent = isSelfie ? "Camera unavailable. Consent, then upload a selfie." : "Camera unavailable. Use Upload a photo.";
   }
 }
 
 // Cheap on-device pre-check: exposure and sharpness inside the frame, about four times a second.
 const probe = document.createElement("canvas");
 let lastProbe = 0;
-function liveHints(time) {
-  if (!state.stream || !state.current) return;
-  if (time - lastProbe > 250) {
+function liveHints(time, version) {
+  if (!state.stream || !state.current || version !== state.cameraVersion) return;
+  const video = cameraElement("video");
+  if (time - lastProbe > 250 && video.videoWidth && video.videoHeight) {
     lastProbe = time;
-    const video = $("video");
     const width = 240, height = Math.round(240 * (video.videoHeight / video.videoWidth || 0.75));
     probe.width = width; probe.height = height;
     const context = probe.getContext("2d", { willReadFrequently: true });
@@ -121,18 +297,19 @@ function liveHints(time) {
     }
     const sharpness = lapSq / n - (lapSum / n) ** 2;
     // Exposure and focus only; whether a document is in frame is decided server-side.
-    let hint = "Light and focus OK. Fit the document in the frame and take the photo.";
+    let hint = state.mode === "selfie" ? "Light and focus OK. Center your face in the oval and look at the camera." : "Light and focus OK. Fit the document in the frame and take the photo.";
     if (mean < 60) hint = TEXT.MORE_LIGHT;
     else if (mean > 225) hint = TEXT.LESS_LIGHT;
     else if (sharpness < 40) hint = TEXT.HOLD_STILL;
-    $("hint").textContent = hint;
-    $("frame").classList.toggle("good", hint.startsWith("Light and focus OK"));
+    cameraElement("hint").textContent = hint;
+    cameraElement("frame").classList.toggle("good", hint.startsWith("Light and focus OK"));
   }
-  requestAnimationFrame(liveHints);
+  requestAnimationFrame((nextTime) => liveHints(nextTime, version));
 }
 
 function grabFrame() {
-  const video = $("video");
+  const video = cameraElement("video");
+  if (!video.videoWidth || !video.videoHeight) return Promise.resolve(null);
   const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth; canvas.height = video.videoHeight;
   canvas.getContext("2d").drawImage(video, 0, 0);
@@ -140,18 +317,63 @@ function grabFrame() {
 }
 
 async function submit(blob) {
-  if (state.busy || !state.current || !blob) return;
+  if (state.busy || state.mode !== "document" || !state.current || !blob) return;
   state.busy = true;
-  $("shoot").disabled = true;
+  updateButtons();
   $("hint").textContent = "Checking quality…";
   const form = new FormData();
   form.append("side", state.current);
   form.append("file", blob, "capture.jpg");
   const result = await api(`/v1/kyc/${state.session.session_id}/documents`, { method: "POST", body: form });
   state.busy = false;
-  $("shoot").disabled = !state.stream;
+  updateButtons();
   if (!result.ok) return showError(result);
   showResult(result.body);
+  if (!state.current) await refreshSession();
+}
+
+async function submitSelfie(blob) {
+  if (state.busy || state.mode !== "selfie" || !blob) return;
+  if (!$("biometric-consent").checked) {
+    return showError({ status: 0, body: { detail: "Consent to biometric processing is required before submitting a selfie." } });
+  }
+  state.busy = true;
+  updateButtons();
+  $("selfie-hint").textContent = "Checking your selfie…";
+  const form = new FormData();
+  form.append("biometric_consent", "true");
+  form.append("file", blob, "selfie.jpg");
+  const result = await api(`/v1/kyc/${state.session.session_id}/selfie`, { method: "POST", body: form });
+  state.busy = false;
+  updateButtons();
+  if (!result.ok) return showError(result);
+  const body = result.body, accepted = body.capture_status === "ACCEPTED";
+  $("result").hidden = false;
+  const comparisonResult = body.comparison && body.comparison.result;
+  $("verdict").className = `verdict ${accepted && comparisonResult === "PASS" ? "ok" : "retry"}`;
+  $("verdict").textContent = accepted ? comparisonVerdict(body.comparison) : "Please retake your selfie";
+  $("instructions").replaceChildren(...body.instructions.map((code) => {
+    const item = document.createElement("li");
+    if (code === "MOVE_CLOSER") item.textContent = "Move closer so your face is clearly visible.";
+    else if (code === "MOVE_BACK") item.textContent = "Move back so your whole face fits inside the oval.";
+    else item.textContent = TEXT[code] || "Please take another clear photo with your whole face visible.";
+    return item;
+  }));
+  $("scores").replaceChildren();
+  $("selfie-hint").textContent = accepted ? "Selfie submitted." : "Adjust your position or lighting and try again.";
+  $("next").textContent = accepted ? "Face comparison submitted. Additional verification or review is still required."
+    : `${body.attempts_remaining} attempts left. Consent remains selected for your next photo.`;
+  if (body.status === "DOCUMENT_REQUIRED") {
+    $("verdict").textContent = "Please retake your document photo";
+    $("next").textContent = "The portrait on your document could not be used. Please provide a clearer document photo.";
+    stopCamera();
+    await refreshSession();
+  }
+  if (accepted) {
+    stopCamera();
+    state.current = null;
+    setMode("done");
+  }
 }
 
 function showResult(body) {
@@ -161,7 +383,7 @@ function showResult(body) {
   $("verdict").textContent = accepted ? `${body.side.replace("_", " ")} accepted` : `Please retake the ${body.side.replace("_", " ")}`;
   $("instructions").replaceChildren(...body.instructions.map((code) => {
     const item = document.createElement("li");
-    item.textContent = TEXT[code] || code;
+    item.textContent = TEXT[code] || "Please take another clear document photo.";
     return item;
   }));
   $("scores").replaceChildren(...Object.entries(SCORE_LABELS).flatMap(([key, label]) => {
@@ -185,9 +407,7 @@ function showResult(body) {
     ? `Next: capture the ${state.current.replace("_", " ")}. ${body.attempts_remaining} attempts left.`
     : `All sides accepted. Session status: ${body.status}. The document engine takes over from here.`;
   if (!state.current) {
-    $("shoot").disabled = true;
-    if (state.stream) state.stream.getTracks().forEach((track) => track.stop());
-    state.stream = null;
+    stopCamera();
     $("hint").textContent = "Capture complete.";
   }
 }
@@ -200,12 +420,25 @@ function showError(result) {
   $("instructions").replaceChildren();
   $("scores").replaceChildren();
   $("next").textContent = "";
+  if (state.mode === "selfie" || state.mode === "document") {
+    cameraElement("hint").textContent = "Submission could not be completed. Check the message below and try again.";
+  }
 }
 
 $("session-form").addEventListener("submit", startSession);
+$("resume-session").addEventListener("click", resumeSession);
+$("refresh-session").addEventListener("click", refreshSession);
+$("biometric-consent").addEventListener("change", updateButtons);
 $("shoot").addEventListener("click", async () => submit(await grabFrame()));
+$("selfie-shoot").addEventListener("click", async () => submitSelfie(await grabFrame()));
 $("file").addEventListener("change", (event) => {
   const [file] = event.target.files;
   event.target.value = "";
   if (file) submit(file);
 });
+$("selfie-file").addEventListener("change", (event) => {
+  const [file] = event.target.files;
+  event.target.value = "";
+  if (file) submitSelfie(file);
+});
+window.addEventListener("pagehide", () => { stopPolling(); stopCamera(); });

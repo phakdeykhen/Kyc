@@ -16,6 +16,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
 code { font-family: ui-monospace, Menlo, monospace; font-size: 0.9em; }
 .bar { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
@@ -33,6 +34,7 @@ button, .file { font: 600 0.95rem system-ui, sans-serif; border-radius: 8px; pad
 .primary { background: var(--accent); color: var(--surface); }
 .secondary { background: transparent; color: var(--accent); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
+.file:has(input:disabled) { opacity: 0.5; cursor: not-allowed; }
 button:focus-visible, .file:focus-within, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .file input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .file { position: relative; display: inline-block; }
@@ -42,6 +44,10 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .frame { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .frame span { width: 82%; aspect-ratio: var(--doc-ratio, 1.586); border: 3px solid rgba(255, 255, 255, 0.9); border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45); max-height: 86%; }
 .frame.good span { border-color: #6cc58f; }
+.selfie-stage video { transform: scaleX(-1); }
+.face-frame span { width: 43%; height: 76%; aspect-ratio: auto; border-radius: 50%; }
+.consent { display: flex; align-items: flex-start; gap: 10px; color: var(--ink); }
+.consent input { margin: 3px 0 0; flex: 0 0 auto; width: 18px; height: 18px; accent-color: var(--accent); }
 .hint { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 8px 12px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 0.9rem; text-align: center; }
 .sides { list-style: none; display: flex; gap: 8px; margin: 0; padding: 0; flex-wrap: wrap; }
 .sides li { font-size: 0.8rem; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
@@ -59,4 +65,6 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
 @media (max-width: 480px) {
   .actions { grid-template-columns: 1fr; }
   .scores { grid-template-columns: 1fr; }
+  .face-frame span { width: 52%; }
+  .bar { align-items: flex-start; }
 }

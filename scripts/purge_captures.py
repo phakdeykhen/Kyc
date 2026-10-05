@@ -26,5 +26,7 @@ factory = sessionmaker(engine, expire_on_commit=False)
 for organization_id in organizations:
     report = purge_organization(factory, store, organization_id)
     print(f"{organization_id}: {report.expired_images} expired images, "
-          f"{report.expired_documents} expired documents, {report.deleted_objects} objects deleted")
+          f"{report.expired_documents} expired documents, {report.expired_selfies} expired selfies, "
+          f"{report.expired_templates} expired templates, {report.expired_face_checks} expired face checks, "
+          f"{report.deleted_objects} objects deleted")
 engine.dispose()

@@ -78,7 +78,8 @@ class DocumentProcessingTests(CaptureAPICase):
                                               "date_of_birth": "1990-03-15", "sex": "F", "nationality": "KH"})
         self.assertEqual(result["checks"], {"document_quality": "PASS", "document_classification": "PASS",
                                             "document_data": "PASS", "expiry": "PASS", "mrz": "PASS",
-                                            "mrz_consistency": "PASS", "barcode": "UNAVAILABLE"})
+                                            "mrz_consistency": "PASS", "barcode": "UNAVAILABLE",
+                                            "document_portrait": "UNAVAILABLE"})
         self.assertEqual(result["review_flags"], [])
         self.assertIsNone(result["decision"])  # extraction never decides
 

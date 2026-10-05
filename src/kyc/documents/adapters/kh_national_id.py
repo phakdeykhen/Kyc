@@ -34,6 +34,7 @@ LAYOUT = CardLayout(
     mrz_regions={"BACK": (0.0, 0.45, 1.0, 1.0)},
     mrz_document_code="ID",
     mrz_issuing_state="KHM",
+    portrait_regions={"FRONT": (0.0, 0.15, 0.27, 0.83)},
 )
 
 

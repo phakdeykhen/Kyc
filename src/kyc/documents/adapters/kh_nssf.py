@@ -38,6 +38,7 @@ LAYOUT = CardLayout(
     important_fields=("full_name", "date_of_birth", "sex", "issue_date"),
     multiline={"employer": 1},
     expiry_printed=False,
+    portrait_regions={"FRONT": (0.0, 0.15, 0.27, 0.83)},
 )
 
 

@@ -105,6 +105,7 @@ class CardLayout:
     viz_regions: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)  # side → OCR region
     mrz_document_code: str | None = None                     # e.g. "ID" or "P" (first MRZ characters)
     mrz_issuing_state: str | None = None                     # e.g. "KHM"
+    portrait_regions: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)
 
 
 def _similar(a: str, b: str) -> float:

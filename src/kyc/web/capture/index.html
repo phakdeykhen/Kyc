@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Document Capture</title>
+  <title>Identity Capture</title>
   <link rel="stylesheet" href="capture.css">
 </head>
 <body>
   <header class="bar">
-    <strong>Document capture</strong>
-    <span class="tag">Development client · Phase 2</span>
+    <strong>Identity capture</strong>
+    <span class="tag">Development client</span>
   </header>
 
   <main class="layout">
@@ -35,8 +35,35 @@
         </div>
         <label>Your user reference <input id="user-ref" value="capture-demo-user" required maxlength="128"></label>
         <button type="submit" class="primary">Create session</button>
+        <label>Existing session ID <input id="existing-session-id" placeholder="Session UUID" spellcheck="false" pattern="[0-9a-fA-F-]{36}"></label>
+        <button type="button" class="secondary" id="resume-session">Continue existing session</button>
       </form>
       <p id="session-info" class="muted" hidden></p>
+    </section>
+
+    <section class="panel" id="selfie" aria-labelledby="selfie-title" hidden>
+      <h1 id="selfie-title">3. Capture your face</h1>
+      <p class="muted">Use a recent photo of yourself. Face the camera, keep both eyes visible, remove anything covering your face, and use even light.</p>
+      <div class="stage selfie-stage">
+        <video id="selfie-video" playsinline muted></video>
+        <div class="frame face-frame" id="selfie-frame" aria-hidden="true"><span></span></div>
+        <p class="hint" id="selfie-hint" role="status">Starting camera…</p>
+      </div>
+      <label class="consent">
+        <input type="checkbox" id="biometric-consent">
+        <span>I consent to processing my face photo and creating encrypted biometric templates to compare my selfie with my identity document. The photo and templates are subject to this session's retention policy.</span>
+      </label>
+      <div class="actions">
+        <button type="button" class="primary" id="selfie-shoot" disabled>Take selfie</button>
+        <label class="secondary file" id="selfie-upload-label">Upload a selfie<input type="file" id="selfie-file" accept="image/jpeg,image/png,image/webp" disabled></label>
+      </div>
+      <p class="muted small">The outline helps you position your face. Photo quality and face comparison are checked after submission.</p>
+    </section>
+
+    <section class="panel" id="processing" aria-labelledby="processing-title" hidden>
+      <h1 id="processing-title">Checking your document</h1>
+      <p id="processing-info" class="muted" role="status">Please wait while your document is processed.</p>
+      <button type="button" class="secondary" id="refresh-session">Check progress</button>
     </section>
 
     <section class="panel" id="capture" aria-labelledby="capture-title" hidden>
@@ -56,7 +83,7 @@
 
     <section class="panel" id="result" aria-labelledby="result-title" hidden>
       <h1 id="result-title">Result</h1>
-      <div id="verdict" class="verdict"></div>
+      <div id="verdict" class="verdict" role="status"></div>
       <ul id="instructions" class="instructions"></ul>
       <dl id="scores" class="scores"></dl>
       <p id="next" class="muted"></p>

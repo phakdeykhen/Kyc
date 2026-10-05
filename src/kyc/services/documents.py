@@ -138,6 +138,7 @@ class DocumentProcessor:
                 read = read + read_mrz_lines(self.ocr, prepared, region)
             lines[side] = read
 
+        capture_sides = {side: side for side in sides}
         classifications = {side: adapter.classify(lines[side], side) for side in sides}
         notes: list[str] = []
         if "FRONT" in classifications and "BACK" in classifications and \
@@ -145,6 +146,7 @@ class DocumentProcessor:
             # The person uploaded the sides the wrong way round; use them as they really are.
             lines["FRONT"], lines["BACK"] = lines["BACK"], lines["FRONT"]
             classifications["FRONT"], classifications["BACK"] = classifications["BACK"], classifications["FRONT"]
+            capture_sides["FRONT"], capture_sides["BACK"] = "BACK", "FRONT"
             notes.append("SIDES_SWAPPED")
         primary = classifications[sides[0]]
         if primary.document_type not in (adapter.document_type,):
@@ -171,7 +173,7 @@ class DocumentProcessor:
                                                           for side, item in classifications.items()}, "notes": notes}))
         self._store_fields(db, record, document, extracted)
         document.classification_confidence = confidence
-        document.side_classification = {side: {"side": item.document_side, "confidence": item.confidence,
+        document.side_classification = {side: {"side": item.document_side, "capture_side": capture_sides[side], "confidence": item.confidence,
                                                "document_located": located[side]} for side, item in classifications.items()}
         document.extraction_version = f"{adapter.version}; {self.ocr.engine_version}"
         document.processed_at = datetime.now(timezone.utc)
@@ -245,4 +247,3 @@ def pending_sessions(factory: sessionmaker, organization_id: UUID) -> list[UUID]
         set_tenant(db, organization_id)
         return list(db.scalars(sa.select(KYCSession.id).where(KYCSession.organization_id == organization_id,
                                                               KYCSession.status == SessionStatus.DOCUMENT_PROCESSING)))
-

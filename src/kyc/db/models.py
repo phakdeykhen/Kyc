@@ -181,15 +181,56 @@ class NFCResult(SessionArtifact, Base):
     __table_args__ = document_constraints(__tablename__)
 
 
+class SelfieCapture(SessionArtifact, Base):
+    __tablename__ = "selfie_captures"
+    encrypted_object_ref: Mapped[str] = mapped_column(sa.String(1024))
+    key_version: Mapped[str] = mapped_column(sa.String(256))
+    media_type: Mapped[str] = mapped_column(sa.String(40))
+    sha256: Mapped[str] = mapped_column(sa.String(64))
+    quality_scores: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
+    quality_policy_version: Mapped[str] = mapped_column(sa.String(80))
+    delete_after: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = artifact_constraints(__tablename__,
+        sa.UniqueConstraint("organization_id", "session_id", name="uq_selfie_captures_session"),
+        sa.Index("ix_selfie_captures_org_delete_after", "organization_id", "delete_after"),
+        sa.CheckConstraint("length(sha256) = 64", name="sha256_length"),
+    )
+
+
+class FaceQualityCheck(SessionArtifact, Base):
+    __tablename__ = "face_quality_checks"
+    source: Mapped[str] = mapped_column(sa.String(32))
+    result: Mapped[CheckResult] = mapped_column(enum_type(CheckResult))
+    evidence_metadata: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
+    delete_after: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = artifact_constraints(__tablename__,
+        sa.CheckConstraint("source IN ('DOCUMENT_PORTRAIT', 'LIVE_SELFIE')", name="face_quality_source"),
+        sa.Index("ix_face_quality_checks_session_source", "organization_id", "session_id", "source", "created_at"),
+        sa.Index("ix_face_quality_checks_org_delete_after", "organization_id", "delete_after"),
+    )
+
+
 class BiometricTemplate(SessionArtifact, Base):
     __tablename__ = "biometric_templates"
     source: Mapped[str] = mapped_column(sa.String(32))
     model_name: Mapped[str] = mapped_column(sa.String(120))
     model_version: Mapped[str] = mapped_column(sa.String(120))
+    model_sha256: Mapped[str] = mapped_column(sa.String(64), server_default="0" * 64)
+    embedding_dimension: Mapped[int] = mapped_column(sa.Integer, server_default="128")
+    document_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
     template_ciphertext: Mapped[bytes] = mapped_column(sa.LargeBinary)
     key_version: Mapped[str] = mapped_column(sa.String(256))
     delete_after: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
-    __table_args__ = artifact_constraints(__tablename__, sa.CheckConstraint("source IN ('DOCUMENT_PORTRAIT', 'CHIP_PORTRAIT', 'LIVE_SELFIE')", name="template_source"))
+    __table_args__ = artifact_constraints(__tablename__,
+        sa.CheckConstraint("source IN ('DOCUMENT_PORTRAIT', 'CHIP_PORTRAIT', 'LIVE_SELFIE')", name="template_source"),
+        sa.CheckConstraint("length(model_sha256) = 64", name="model_sha256_length"),
+        sa.CheckConstraint("embedding_dimension BETWEEN 1 AND 4096", name="embedding_dimension"),
+        sa.ForeignKeyConstraint(["organization_id", "session_id", "document_id"],
+            ["identity_documents.organization_id", "identity_documents.session_id", "identity_documents.id"],
+            ondelete="CASCADE", name="fk_biometric_templates_document"),
+        sa.Index("ix_biometric_templates_org_delete_after", "organization_id", "delete_after"),
+        sa.Index("ix_biometric_templates_reference", "organization_id", "session_id", "source", "document_id"),
+    )
 
 
 class FaceComparison(SessionArtifact, Base):
@@ -198,10 +239,16 @@ class FaceComparison(SessionArtifact, Base):
     live_template_id: Mapped[UUID] = mapped_column(sa.Uuid)
     model_name: Mapped[str] = mapped_column(sa.String(120))
     model_version: Mapped[str] = mapped_column(sa.String(120))
+    model_sha256: Mapped[str] = mapped_column(sa.String(64), server_default="0" * 64)
+    comparison_metric: Mapped[str] = mapped_column(sa.String(40), server_default="COSINE_SIMILARITY")
+    evidence_metadata: Mapped[dict] = mapped_column(JSON_VALUE, default=dict, server_default="{}")
     threshold_policy_version: Mapped[str] = mapped_column(sa.String(120))
     comparison_score: Mapped[float] = mapped_column(sa.Float)
     result: Mapped[CheckResult] = mapped_column(enum_type(CheckResult))
     __table_args__ = artifact_constraints(__tablename__,
+        sa.CheckConstraint("comparison_metric = 'COSINE_SIMILARITY'", name="comparison_metric"),
+        sa.CheckConstraint("comparison_score BETWEEN -1 AND 1", name="cosine_score_range"),
+        sa.CheckConstraint("length(model_sha256) = 64", name="model_sha256_length"),
         sa.ForeignKeyConstraint(["organization_id", "session_id", "reference_template_id"], ["biometric_templates.organization_id", "biometric_templates.session_id", "biometric_templates.id"], ondelete="CASCADE", name="fk_face_comparisons_reference_template"),
         sa.ForeignKeyConstraint(["organization_id", "session_id", "live_template_id"], ["biometric_templates.organization_id", "biometric_templates.session_id", "biometric_templates.id"], ondelete="CASCADE", name="fk_face_comparisons_live_template"),
         sa.Index("ix_face_comparisons_reference_scope", "organization_id", "session_id", "reference_template_id"),

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "universal-kyc-platform"
-version = "0.5.0"
-description = "Multi-country identity verification platform (Phases 1-5)"
+version = "0.9.0"
+description = "Identity verification with document OCR, MRZ, face quality and 1:1 biometrics"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1",
@@ -19,6 +19,7 @@ dependencies = [
   "numpy>=2.1,<3",
   "pillow>=11,<13",
   "cryptography>=44,<47",
+  "opencv-python-headless>=4.10,<5",
 ]
 
 [tool.setuptools.packages.find]

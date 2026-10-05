@@ -4,11 +4,12 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile, status
 
 from kyc.api.dependencies import Database, Tenant
-from kyc.api.schemas import COUNTRY_CODES, CaptureError, CaptureResponse, DocumentSide, SessionCreate, SessionResponse, SessionResult
+from kyc.api.schemas import COUNTRY_CODES, CaptureError, CaptureResponse, DocumentSide, SessionCreate, SessionResponse, SessionResult, SelfieResponse
 from kyc.documents.adapters import adapter_for
 from kyc.documents.requirements import requirement_for
 from kyc.domain.enums import DocumentType
 from kyc.services.captures import CaptureLimits, submit_capture
+from kyc.services.biometrics import SelfieLimits, submit_selfie
 from kyc.services.results import build_result
 from kyc.services.sessions import create_session, get_session, respond
 
@@ -79,6 +80,26 @@ def upload_front(session_id: UUID, request: Request, tenant: Tenant, db: Databas
 def upload_back(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
                 file: Annotated[UploadFile, File()]):
     return _capture(session_id, "BACK", file, request, tenant, db, background)
+
+
+@router.post("/kyc/{session_id}/selfie", response_model=SelfieResponse, responses={
+    409: {"model": CaptureError, "description": "Session is not accepting selfies."},
+    413: {"description": "Upload exceeds the size limit."},
+    422: {"description": "Consent is required, or image is unreadable."},
+    429: {"model": CaptureError, "description": "Selfie attempt limit reached."},
+    503: {"description": "Models, encrypted storage, or document portrait unavailable."},
+})
+def upload_selfie(session_id: UUID, request: Request, tenant: Tenant, db: Database,
+                  file: Annotated[UploadFile, File()], biometric_consent: Annotated[bool, Form()]):
+    """Assess one selfie and compare it only to this session's document portrait."""
+    state, settings = request.app.state, request.app.state.settings
+    data = file.file.read(settings.max_selfie_bytes + 1)
+    limits = SelfieLimits(settings.max_selfie_bytes, settings.max_selfie_pixels,
+                          settings.max_selfie_attempts, settings.max_capture_pixels)
+    return submit_selfie(db, tenant, session_id, data, state.face_engine, state.capture_store,
+                         state.biometric_cipher, state.face_match_policy, limits, request.state.request_id,
+                         biometric_consent=biometric_consent,
+                         consent_policy_version=settings.biometric_consent_policy_version)
 
 
 @router.get("/document-types")

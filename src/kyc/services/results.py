@@ -1,18 +1,18 @@
 """Client-facing session result. Masks the document number; never returns raw OCR or templates."""
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from kyc.api.schemas import ResultDocument, ResultIdentity, ResultMRZ, SessionResult
+from kyc.api.schemas import FaceComparisonSummary, ResultDocument, ResultIdentity, ResultMRZ, SessionResult
 from kyc.core.crypto import FieldCipher
-from kyc.db.models import DocumentCheck, DocumentField, IdentityDocument, KYCSession, MRZResult
+from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceComparison, FaceQualityCheck, IdentityDocument, KYCSession, MRZResult
 from kyc.domain.enums import CheckResult
 from kyc.services.captures import side_progress
 
 SEVERITY = {CheckResult.FAIL: 3, CheckResult.REVIEW: 2, CheckResult.PASS: 1, CheckResult.NOT_APPLICABLE: 0}
-CHECK_GROUPS = {"CLASSIFICATION": "document_classification", "EXPIRY": "expiry", "MRZ": "mrz",
+CHECK_GROUPS = {"CLASSIFICATION": "document_classification", "EXPIRY": "expiry", "MRZ": "mrz", "PORTRAIT": "document_portrait",
                 "MRZ_CONSISTENCY": "mrz_consistency", "BARCODE": "barcode"}
 DATA_CHECKS = {"REQUIRED_FIELDS", "DOCUMENT_NUMBER_FORMAT", "NATIONAL_ID_NUMBER_FORMAT", "DATE_CONSISTENCY",
                "OCR_CONFIDENCE", "SCRIPT_CONSISTENCY"}
@@ -26,6 +26,43 @@ def mask(value: str | None) -> str | None:
 
 def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) -> SessionResult:
     checks: dict[str, str] = {}
+    flags: list[str] = []
+    now = datetime.now(timezone.utc)
+    current_document = db.scalar(sa.select(IdentityDocument).where(
+        IdentityDocument.organization_id == record.organization_id,
+        IdentityDocument.session_id == record.id, IdentityDocument.processed_at.is_not(None)))
+    for source, key in (("LIVE_SELFIE", "face_quality"), ("DOCUMENT_PORTRAIT", "portrait_quality")):
+        query = sa.select(FaceQualityCheck).where(
+            FaceQualityCheck.organization_id == record.organization_id,
+            FaceQualityCheck.session_id == record.id, FaceQualityCheck.source == source,
+            FaceQualityCheck.delete_after > now)
+        if current_document is not None:
+            query = query.where(FaceQualityCheck.created_at >= current_document.processed_at)
+        quality = db.scalar(query.order_by(FaceQualityCheck.created_at.desc()).limit(1))
+        if quality is not None:
+            checks[key] = quality.result.value
+            if quality.result in (CheckResult.REVIEW, CheckResult.FAIL):
+                flags.extend(quality.evidence_metadata.get("reason_codes", []))
+                unverified_codes = {"EYES_VISIBLE": "FACE_EYE_VISIBILITY_UNVERIFIED",
+                                    "SEVERE_OCCLUSION": "FACE_OCCLUSION_UNVERIFIED"}
+                flags.extend(unverified_codes[item] for item in quality.evidence_metadata.get("unverified_checks", [])
+                             if item in unverified_codes)
+    reference = sa.orm.aliased(BiometricTemplate)
+    live = sa.orm.aliased(BiometricTemplate)
+    comparison = db.scalar(sa.select(FaceComparison).join(reference, FaceComparison.reference_template_id == reference.id)
+        .join(live, FaceComparison.live_template_id == live.id).where(
+            FaceComparison.organization_id == record.organization_id, FaceComparison.session_id == record.id,
+            reference.organization_id == record.organization_id, live.organization_id == record.organization_id,
+            reference.delete_after > now, live.delete_after > now)
+        .order_by(FaceComparison.created_at.desc()).limit(1))
+    summary = None
+    if comparison is not None:
+        checks["face_match"] = comparison.result.value
+        flags.extend(comparison.evidence_metadata.get("reason_codes", []))
+        summary = FaceComparisonSummary(score=comparison.comparison_score, metric=comparison.comparison_metric,
+            result=comparison.result, policy_version=comparison.threshold_policy_version,
+            model_name=comparison.model_name, model_version=comparison.model_version,
+            calibrated=bool(comparison.evidence_metadata.get("calibrated", False)))
     if all(state == "ACCEPTED" for state in side_progress(db, record).values()) or record.status.value not in {"CREATED", "DOCUMENT_REQUIRED"}:
         if db.scalar(sa.select(sa.func.count()).select_from(DocumentCheck).where(
                 DocumentCheck.organization_id == record.organization_id, DocumentCheck.session_id == record.id,
@@ -35,12 +72,12 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) ->
                                                            IdentityDocument.session_id == record.id,
                                                            IdentityDocument.processed_at.is_not(None)))
     if document is None or cipher is None:
-        return SessionResult(session_id=record.id, status=record.status, checks=checks)
+        return SessionResult(session_id=record.id, status=record.status, checks=checks,
+                             face_comparison=summary, review_flags=sorted(set(flags)))
 
     rows = db.scalars(sa.select(DocumentCheck).where(DocumentCheck.organization_id == record.organization_id,
                                                      DocumentCheck.document_id == document.id,
                                                      DocumentCheck.created_at >= document.processed_at)).all()
-    flags: list[str] = []
     data_result = None
     for row in rows:
         if row.check_type in CHECK_GROUPS:
@@ -65,7 +102,7 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) ->
                                              MRZResult.session_id == record.id,
                                              MRZResult.document_id == document.id))
     return SessionResult(
-        session_id=record.id, status=record.status, checks=checks, review_flags=sorted(set(flags)),
+        session_id=record.id, status=record.status, checks=checks, review_flags=sorted(set(flags)), face_comparison=summary,
         document=ResultDocument(country=document.issuing_country, type=document.document_type,
                                 document_number_masked=mask(values.get("document_number")), expiry_status=expiry_status),
         identity=ResultIdentity(full_name=values.get("full_name"), full_name_local=values.get("full_name_local"),

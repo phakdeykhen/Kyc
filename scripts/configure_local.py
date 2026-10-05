@@ -22,6 +22,11 @@ if target.exists():
             handle.write("PII_ENCRYPTION_KEYS=pii-v1:" + base64.b64encode(secrets.token_bytes(32)).decode() + "\n")
             handle.write("PII_HMAC_KEY=" + base64.b64encode(secrets.token_bytes(32)).decode() + "\n")
         print("Appended generated PII field keys to .env; no secrets were printed.")
+    if "BIOMETRIC_ENCRYPTION_KEYS=" not in target.read_text():
+        with target.open("a") as handle:
+            handle.write("BIOMETRIC_ENCRYPTION_KEYS=bio-v1:" + base64.b64encode(secrets.token_bytes(32)).decode() + "\n")
+            handle.write("FACE_MODELS_DIR=var/models\n")
+        print("Appended a separate biometric encryption key to .env; no secrets were printed.")
 else:
     app_password = secrets.token_urlsafe(32)
     migration_password = secrets.token_urlsafe(32)
@@ -40,6 +45,8 @@ else:
         "CAPTURE_STORAGE_DIR": "var/captures",
         "PII_ENCRYPTION_KEYS": "pii-v1:" + base64.b64encode(secrets.token_bytes(32)).decode(),
         "PII_HMAC_KEY": base64.b64encode(secrets.token_bytes(32)).decode(),
+        "BIOMETRIC_ENCRYPTION_KEYS": "bio-v1:" + base64.b64encode(secrets.token_bytes(32)).decode(),
+        "FACE_MODELS_DIR": "var/models",
     }
     descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w") as handle:

@@ -32,11 +32,13 @@ with engine.begin() as connection:
     connection.execute(sa.text("GRANT SELECT, INSERT ON audit_logs TO kyc_app"))
     # Phase 2 capture pipeline; DELETE serves recapture replacement and retention purges.
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON identity_documents, document_images TO kyc_app"))
-    connection.execute(sa.text("GRANT SELECT, INSERT ON document_checks TO kyc_app"))
+    connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON document_checks TO kyc_app"))
     # Phase 3 extraction writes encrypted fields and processing metadata on the document.
     connection.execute(sa.text("GRANT UPDATE ON identity_documents TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON document_fields TO kyc_app"))
     # Phase 5 MRZ engine results.
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON mrz_results TO kyc_app"))
+    connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON selfie_captures, face_quality_checks, biometric_templates, face_comparisons TO kyc_app"))
+    connection.execute(sa.text("GRANT SELECT, INSERT ON consents TO kyc_app"))
 engine.dispose()
-print("Migrations through Phase 5 applied and local organization provisioned.")
+print("Migrations through phases 1–5 and 8–9 applied and local organization provisioned.")

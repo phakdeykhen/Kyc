@@ -11,7 +11,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 
-from kyc.db.models import DocumentImage, IdentityDocument
+from kyc.db.models import BiometricTemplate, DocumentImage, FaceQualityCheck, IdentityDocument, SelfieCapture
 from kyc.db.session import set_tenant
 from kyc.storage.captures import CaptureStore
 
@@ -24,6 +24,9 @@ class PurgeReport:
     expired_images: int
     expired_documents: int
     deleted_objects: int
+    expired_selfies: int = 0
+    expired_templates: int = 0
+    expired_face_checks: int = 0
 
 
 def purge_organization(factory: sessionmaker, store: CaptureStore, organization_id: UUID,
@@ -39,9 +42,18 @@ def purge_organization(factory: sessionmaker, store: CaptureStore, organization_
                                                                  IdentityDocument.delete_after <= now)).all()
         for document in documents:
             db.delete(document)  # cascades to images, fields and checks
+        counts = []
+        for model in (SelfieCapture, BiometricTemplate, FaceQualityCheck):
+            rows = db.scalars(sa.select(model).where(model.organization_id == organization_id,
+                                                    model.delete_after <= now)).all()
+            counts.append(len(rows))
+            for row in rows:
+                db.delete(row)
         db.flush()
         live = set(db.scalars(sa.select(DocumentImage.encrypted_object_ref)
                               .where(DocumentImage.organization_id == organization_id)).all())
+        live.update(db.scalars(sa.select(SelfieCapture.encrypted_object_ref)
+                               .where(SelfieCapture.organization_id == organization_id)).all())
     deleted = 0
     for ref in store.list_refs(organization_id):
         modified = store.modified_at(ref)
@@ -49,4 +61,4 @@ def purge_organization(factory: sessionmaker, store: CaptureStore, organization_
             continue
         store.delete(ref)
         deleted += 1
-    return PurgeReport(len(expired), len(documents), deleted)
+    return PurgeReport(len(expired), len(documents), deleted, *counts)

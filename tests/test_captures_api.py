@@ -232,7 +232,7 @@ class CaptureAPITests(CaptureAPICase):
     async def test_capture_page_is_served_with_a_strict_policy(self):
         code, body, headers = await call(self.app, "/capture/")
         self.assertEqual(code, 200)
-        self.assertIn(b"Document capture", body)
+        self.assertIn(b"Identity capture", body)
         self.assertIn("default-src 'self'", headers["content-security-policy"])
         self.assertIn("camera=(self)", headers["permissions-policy"])
 

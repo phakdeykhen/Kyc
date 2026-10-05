@@ -1,4 +1,4 @@
-# Universal Identity Platform — Phases 1–5
+# Universal Identity Platform — Phases 1–5 and 8–9
 
 Phase 1 implements the architecture contracts, a 17-table PostgreSQL schema with
 tenant policies, a frozen Alembic migration, and the KYC session state machine.
@@ -27,9 +27,16 @@ metadata. The national ID's back MRZ now uses the same engine. Passing checks me
 the reading is consistent; they do not establish authenticity or a final decision.
 Phase 6's international passport visual-zone adapter has not started.
 
+Phases 8–9 add CPU face detection, selfie quality recapture, aligned face embeddings,
+and 1:1 comparison against the accepted document portrait. Selfie submission requires
+explicit biometric consent. Face photos and templates are encrypted with separate
+keyrings and retention deadlines. The default comparison policy is uncalibrated and
+always returns `REVIEW`; its cosine score is not an identity probability. Liveness
+and the final risk decision remain later stages. Phases 6 and 7 are still not started.
+
 See the design docs ([Phase 1](docs/architecture-phase1.md), [Phase 2](docs/architecture-phase2.md),
 [Phase 3](docs/architecture-phase3.md), [Phase 4](docs/architecture-phase4.md),
-[Phase 5](docs/architecture-phase5.md))
+[Phase 5](docs/architecture-phase5.md), [Phases 8–9](docs/architecture-phase8-9.md))
 and [build progress](BUILD_PROGRESS.md).
 The original requirements are preserved in [Document.md](Document.md).
 
@@ -52,7 +59,8 @@ The original requirements are preserved in [Document.md](Document.md).
 │   └── versions/
 │       ├── 0001_phase1.py          frozen schema and RLS policies
 │       ├── 0002_phase2.py          capture metadata, one image per side
-│       └── 0003_phase3.py          field provenance and processing metadata
+│       ├── 0003_phase3.py          field provenance and processing metadata
+│       └── 0004_phase8_9.py        biometric consent, capture and template metadata
 ├── src/kyc/
 │   ├── main.py                    FastAPI factory and health endpoints
 │   ├── api/                      routes, schemas, tenant dependencies
@@ -73,15 +81,21 @@ The original requirements are preserved in [Document.md](Document.md).
 │   ├── ocr/tesseract.py          Khmer/Latin OCR engine (Phase 3)
 │   ├── mrz/{parser,reader}.py    TD1/TD2/TD3 parsing, dedicated MRZ OCR (Phase 5)
 │   ├── core/crypto.py            keyrings and encrypted PII fields (Phase 3)
-│   └── web/capture/              development camera client at /capture (Phase 2)
+│   ├── biometrics/               YuNet quality, SFace alignment, embeddings and cosine comparison
+│   ├── storage/biometrics.py     independently keyed encrypted biometric templates
+│   ├── services/biometrics.py    consented selfie and reference-portrait orchestration
+│   └── web/capture/              document + consented selfie camera client at /capture
 ├── scripts/
 │   ├── configure_local.py        generates a private local .env
+│   ├── download_face_models.py   pinned model/license provisioning and verification
+│   ├── test_capture_client.cjs    dependency-free capture-flow smoke checks
 │   ├── bootstrap_local.py        migrates, provisions, and grants rights
 │   ├── purge_captures.py         deletes expired captures and orphaned ciphertext
 │   └── process_documents.py      processes or retries sessions in DOCUMENT_PROCESSING
 ├── infra/postgres-init.sh         restricted application database role
 ├── tests/                        state, ASGI API, schema, and migration tests
-├── requests/phase{1..5}.postman.json  runnable API checks
+├── requests/phase{1..5}.postman.json  document API checks
+├── requests/phase8-9.postman.json  consented face-quality and comparison checks
 ├── artifacts/                    generated OpenAPI, PostgreSQL SQL, test report
 └── prototypes/local-review/       earlier reference prototype, outside Phase 1
 ```
@@ -95,13 +109,14 @@ Requirements: Python 3.12+ for the setup script and Docker with Compose.
 
 ```sh
 python3 scripts/configure_local.py
+python3 scripts/download_face_models.py --destination var/models
 docker compose up -d postgres
 docker compose run --rm migrate
 docker compose up -d api
 ```
 
 If you already have an older `.env`, run `python3 scripts/configure_local.py` once.
-It appends any missing capture and PII keys and leaves your existing secrets unchanged.
+It appends any missing capture, PII and biometric keys and leaves your existing secrets unchanged.
 The Docker image installs Tesseract with the Khmer models. When running Python
 directly, install them yourself (macOS: `brew install tesseract tesseract-lang`).
 
@@ -125,16 +140,21 @@ Use PostgreSQL with the `kyc_migrator` and `kyc_app` roles created by
 python3.13 -m venv .venv
 .venv/bin/python -m pip install -r requirements.lock
 .venv/bin/python scripts/configure_local.py
+.venv/bin/python scripts/download_face_models.py --destination var/models
 PYTHONPATH=src .venv/bin/python scripts/bootstrap_local.py
 PYTHONPATH=src .venv/bin/python -m uvicorn kyc.main:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 Schema changes run as an explicit migration operation. The API uses only the
 restricted database role. An API start does not create tables or organizations.
-Phase 5 keeps schema revision `0003_phase3`; rerun the bootstrap command above for
-existing installations to grant `kyc_app` access to the existing `mrz_results` table.
-Alembic alone does not apply these role grants. No dependency, environment or
-Docker configuration changes are required for Phase 5.
+Phases 8–9 require schema revision `0004_phase8_9`. Rerun the bootstrap command above
+for existing installations to apply migrations and refresh the restricted-role
+grants for face artifacts and MRZ results. Alembic alone does not apply role grants.
+The face-model provisioner downloads a pinned OpenCV Zoo bundle, verifies SHA-256
+digests and keeps both license notices. The API uses local model files and never
+downloads weights during a request. Run the provisioner again with `--verify-only`
+to check installed files without network access. Missing or corrupt models make
+selfie processing unavailable (HTTP 503).
 
 ## Environment variables
 
@@ -158,6 +178,15 @@ Docker configuration changes are required for Phase 5.
 | `PII_HMAC_KEY` | base64 32-byte key for document-number lookup hashes; set together with `PII_ENCRYPTION_KEYS` |
 | `TESSERACT_CMD`, `OCR_LANGUAGES`, `OCR_TIMEOUT_SECONDS` | OCR engine; defaults `tesseract`, `khm,eng`, 20 s |
 | `DOCUMENT_PROCESSING_MODE` | `inline` (after the last side is accepted) or `deferred` (worker script) |
+| `BIOMETRIC_ENCRYPTION_KEYS` | Independent AES-256-GCM keyring for face templates; same versioned format as capture keys |
+| `FACE_MODELS_DIR` | Local pinned YuNet/SFace ONNX models; default `var/models` |
+| `MAX_SELFIE_BYTES`, `MAX_SELFIE_PIXELS` | Upload/decoded limits; defaults 5 MiB and 12 million pixels |
+| `MAX_SELFIE_ATTEMPTS` | Selfie attempts per session; default 10 |
+| `BIOMETRIC_CONSENT_POLICY_VERSION` | Recorded consent-policy version; default `BIOMETRIC-CONSENT-2026.10.1` |
+| `FACE_MATCH_POLICY_VERSION` | Version recorded with each comparison; default `SFACE-COSINE-UNCALIBRATED-2026.10.1` |
+| `FACE_MATCH_CALIBRATED` | Default `false`: all comparisons return `REVIEW` |
+| `FACE_MATCH_PASS_THRESHOLD`, `FACE_MATCH_FAIL_THRESHOLD` | Operator policy settings, defaults 0.363/0.20; inactive for automatic PASS/FAIL while uncalibrated |
+| `FACE_MATCH_CALIBRATION_REFERENCE` | Required evidence reference with a distinct policy version when calibrated mode is enabled; setting it does not validate the model |
 | `TEST_DATABASE_URL` | Optional isolated live test database, name ending `_test` |
 | `REDIS_URL` | Reserved cache setting; integration is not implemented in Phase 1 |
 | `GCP_PROJECT_ID`, `GCS_CAPTURE_BUCKET`, `GCS_BIOMETRIC_BUCKET`, `PUBSUB_TOPIC` | Reserved GCP integration settings |
@@ -169,7 +198,8 @@ placeholder `.env.example` public; never publish a populated `.env`.
 
 ```sh
 PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
-PYTHONPATH=src .venv/bin/python -m alembic upgrade 0002_phase2:0003_phase3 --sql > artifacts/phase3-postgresql.sql
+node scripts/test_capture_client.cjs
+PYTHONPATH=src .venv/bin/python -m alembic upgrade 0003_phase3:0004_phase8_9 --sql > artifacts/phase8-9-postgresql.sql
 ```
 
 Fast tests execute the real FastAPI ASGI application and transactional service
@@ -317,12 +347,43 @@ adjust `passport_country` for the generic session, and select a file in each
 Earlier phase collections remain available for the card workflows. Never export a
 collection with real credentials.
 
+### Selfie quality and 1:1 comparison
+
+After the document reaches `SELFIE_REQUIRED`, submit a clear, consented selfie:
+
+```sh
+curl --fail --silent --show-error "http://127.0.0.1:8000/v1/kyc/$KYC_SESSION_ID/selfie" \
+  -H "X-API-Key: $DEVELOPMENT_API_KEY" \
+  -H "X-Organization-ID: $DEVELOPMENT_ORGANIZATION_ID" \
+  -F biometric_consent=true -F file=@selfie.jpg
+```
+
+Missing or false consent returns 422 before face processing. Quality recapture
+returns actionable `instructions`; choose a new photo and submit again. An unusable
+document portrait returns `DOCUMENT_REQUIRED` and needs new document photos.
+An accepted selfie includes `comparison` with cosine score, result, policy and model
+provenance; default uncalibrated comparisons return `REVIEW`. `/result` reports
+`face_comparison`, `checks.face_match`, capture-quality review reasons and
+`decision: null`. Templates and internal thresholds are never returned.
+
+For `DOCUMENT_FACE_LIVENESS`, accepted submission moves to `LIVENESS_REQUIRED`;
+liveness remains unimplemented in Phase 10. `DOCUMENT_FACE` moves to `PROCESSING`
+while the later risk engine remains pending. A face comparison does not establish
+liveness or document authenticity. Use the
+[Phases 8–9 Postman collection](requests/phase8-9.postman.json) for consent and
+response checks. At `/capture/`, create a session or enter an existing ready-session
+UUID; consent gates front-camera capture and selfie upload.
+
+Schedule `scripts/purge_captures.py` to remove expired face photos, templates and
+quality evidence. Organization capture/template retention settings both default
+to 24 hours. Expired templates also remove their dependent comparisons.
+
 ## Security concerns and next phase
 
 The development credential is not production tenant authentication. Captures are
 encrypted and retention-limited, but local keys live in `.env`. Production needs
-Secret Manager/KMS and CMEK storage (Phases 17/19). Consent is not yet required
-before capture. The quality thresholds are uncalibrated heuristics, and the gate never
+Secret Manager/KMS and CMEK storage (Phases 17/19). Biometric consent is required
+before selfie processing; earlier document capture has no consent gate yet. The quality thresholds are uncalibrated heuristics, and the gate never
 judges authenticity. No biometric templates are returned by the public API. Migration
 credentials must not be given to the API deployment. See
 [Phase 2 security concerns](docs/architecture-phase2.md#4-security-concerns).
@@ -337,5 +398,8 @@ validity, digit outcomes and field-consistency metadata. See
 for unconfirmed passport layout assumptions, date-century heuristics and unsupported
 MRZ deviations. The Phase 5 suite passed 175/175 tests with live PostgreSQL; MRZ tenant
 RLS and restricted-role real-OCR passport workflows passed. See
-[PostgreSQL passport evidence](artifacts/phase5-postgres-e2e.json). Per `Document.md`, work stops
-after Phase 5; Phase 6 requires separate approval.
+[PostgreSQL passport evidence](artifacts/phase5-postgres-e2e.json). The user authorized
+Phases 8–9 after Phase 5. Phase 6's visual passport adapter and Phase 7's QR/barcode engine
+remain separate, unstarted work. Face-quality usability does not prove visible eyes,
+absence of occlusion, document authenticity or liveness. See
+[Phases 8–9 limitations](docs/architecture-phase8-9.md#security-and-limits).

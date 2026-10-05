@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from kyc.domain.enums import DocumentType, SessionStatus, VerificationLevel
+from kyc.domain.enums import CheckResult, DocumentType, SessionStatus, VerificationLevel
 
 # ISO 3166-1 alpha-2. Core validation is country-neutral; adapters stay separate.
 COUNTRY_CODES = frozenset("""
@@ -86,12 +86,23 @@ class ResultMRZ(BaseModel):
     field_consistency: dict[str, Literal["MATCH", "MISMATCH", "MRZ_ONLY", "VIZ_ONLY"]]
 
 
+class FaceComparisonSummary(BaseModel):
+    score: float = Field(ge=-1, le=1, allow_inf_nan=False, description="Cosine similarity; not an identity probability.")
+    metric: Literal["COSINE_SIMILARITY"]
+    result: CheckResult
+    policy_version: str
+    model_name: str
+    model_version: str
+    calibrated: bool
+
+
 class SessionResult(BaseModel):
     session_id: UUID
     status: SessionStatus
     document: ResultDocument | None = None
     identity: ResultIdentity | None = None
     mrz: ResultMRZ | None = None
+    face_comparison: FaceComparisonSummary | None = None
     checks: dict[str, str] = Field(default_factory=dict)
     review_flags: list[str] = Field(default_factory=list, description="Reason codes that a reviewer or the risk engine must consider.")
     decision: None = Field(default=None, description="Set by the risk engine (Phase 13); never by extraction alone.")
@@ -138,3 +149,15 @@ class CaptureError(BaseModel):
     detail: str
     reason_code: str
     attempts_remaining: int | None = None
+
+
+class SelfieResponse(BaseModel):
+    session_id: UUID
+    status: SessionStatus
+    capture_status: Literal["ACCEPTED", "RECAPTURE"]
+    quality: dict[str, float | int | str | list[str]]
+    reason_codes: list[str]
+    instructions: list[str]
+    next_step: str
+    attempts_remaining: int
+    comparison: FaceComparisonSummary | None = None

@@ -50,3 +50,16 @@ def prepare_side(pixels: np.ndarray, aspect: float, engine: HeuristicDocumentQua
 
 def rotate_half_turn(image: Image.Image) -> Image.Image:
     return image.rotate(180)
+
+
+def prepare_portrait_side(pixels: np.ndarray, aspect: float,
+                          engine: HeuristicDocumentQualityEngine | None = None) -> tuple[Image.Image, bool]:
+    """Geometry-only color rectification for biometric reference extraction.
+
+    OCR contrast normalization and sharpening must never enter the face embedding
+    path. The original orientation-corrected capture remains encrypted as evidence.
+    """
+    engine = engine or HeuristicDocumentQualityEngine()
+    image = Image.fromarray(pixels).convert("RGB")
+    corners = engine.locate_corners(pixels)
+    return (rectify(image, corners, aspect), True) if corners is not None else (image, False)

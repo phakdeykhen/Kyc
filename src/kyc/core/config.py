@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from kyc.core.crypto import decode_key, parse_keyring
@@ -32,12 +32,29 @@ class Settings(BaseSettings):
     ocr_languages: str = "khm,eng"
     ocr_timeout_seconds: float = Field(default=20.0, ge=1, le=120)
     document_processing_mode: Literal["inline", "deferred"] = "inline"
+    # Phases 8-9. Model files are installed explicitly; the API never downloads weights.
+    biometric_encryption_keys: SecretStr | None = None
+    face_models_dir: Path = Path("var/models")
+    max_selfie_bytes: int = Field(default=5 * 1024 * 1024, ge=100_000, le=25 * 1024 * 1024)
+    max_selfie_pixels: int = Field(default=12_000_000, ge=1_000_000, le=40_000_000)
+    max_selfie_attempts: int = Field(default=10, ge=1, le=50)
+    biometric_consent_policy_version: str = Field(default="BIOMETRIC-CONSENT-2026.10.1", min_length=1, max_length=80)
+    face_match_policy_version: str = Field(default="SFACE-COSINE-UNCALIBRATED-2026.10.1", min_length=1, max_length=120)
+    face_match_calibrated: bool = False
+    face_match_calibration_reference: str | None = Field(default=None, min_length=1, max_length=200)
+    face_match_pass_threshold: float = Field(default=0.363, ge=-1, le=1, allow_inf_nan=False)
+    face_match_fail_threshold: float = Field(default=0.20, ge=-1, le=1, allow_inf_nan=False)
     # Deployment interfaces reserved for later approved phases.
     redis_url: SecretStr | None = None
     gcp_project_id: str | None = None
     gcs_capture_bucket: str | None = None
     gcs_biometric_bucket: str | None = None
     pubsub_topic: str | None = None
+
+    @field_validator("face_match_calibration_reference", mode="before")
+    @classmethod
+    def normalize_calibration_reference(cls, value):
+        return (value.strip() or None) if isinstance(value, str) else value
 
     @model_validator(mode="after")
     def enforce_phase_one_boundary(self):
@@ -55,6 +72,18 @@ class Settings(BaseSettings):
         if self.pii_encryption_keys is not None:
             parse_keyring(self.pii_encryption_keys.get_secret_value())
             decode_key(self.pii_hmac_key.get_secret_value())
+        if self.biometric_encryption_keys is not None:
+            _, biometric_keys = parse_keyring(self.biometric_encryption_keys.get_secret_value())
+            for other in (self.capture_encryption_keys, self.pii_encryption_keys):
+                if other is not None:
+                    _, existing_keys = parse_keyring(other.get_secret_value())
+                    if set(biometric_keys.values()) & set(existing_keys.values()):
+                        raise ValueError("Biometric keys must be separate from capture and PII keys.")
+        if self.face_match_fail_threshold >= self.face_match_pass_threshold:
+            raise ValueError("Face match fail threshold must be lower than the pass threshold.")
+        if self.face_match_calibrated and (not self.face_match_calibration_reference
+                                         or "UNCALIBRATED" in self.face_match_policy_version.upper()):
+            raise ValueError("Calibrated face matching requires a calibration reference and a calibrated policy version.")
         return self
 
 

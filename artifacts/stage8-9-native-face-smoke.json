@@ -1,0 +1,36 @@
+{
+  "native_engine": true,
+  "face_count": 1,
+  "selfie_usable": true,
+  "selfie_reasons": [
+    "FACE_EYE_VISIBILITY_UNVERIFIED",
+    "FACE_OCCLUSION_UNVERIFIED"
+  ],
+  "reference_usable": true,
+  "reference_reasons": [
+    "FACE_EYE_VISIBILITY_UNVERIFIED",
+    "FACE_OCCLUSION_UNVERIFIED"
+  ],
+  "quality_scores": {
+    "detection_confidence": 0.908979,
+    "face_size": 1.0,
+    "centering": 0.882845,
+    "sharpness": 1.0,
+    "illumination": 0.987133,
+    "pose": 0.712546,
+    "landmark_geometry": 1.0
+  },
+  "embedding_dimension": 128,
+  "embedding_model": "OpenCV SFace",
+  "embedding_version": "2021dec",
+  "model_sha256": "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79",
+  "self_comparison_score": 1.0,
+  "self_comparison_decision": "REVIEW",
+  "comparison_reasons": [
+    "UNCALIBRATED_FACE_POLICY"
+  ],
+  "opencv_version": "4.14.0",
+  "fixture_source": "https://raw.githubusercontent.com/opencv/opencv/4.13.0/samples/data/lena.jpg",
+  "fixture_sha256": "7de7ed51a1594fff247f4cae2301eceacf5313d6011e37b4a4c8733f7bb72c07",
+  "scope": "Native CPU pipeline smoke only; not KYC identity accuracy or threshold calibration"
+}

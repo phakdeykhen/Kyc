@@ -43,6 +43,7 @@ LAYOUT = CardLayout(
     viz_regions={"DATA_PAGE": (0.26, 0.0, 1.0, 0.72)},
     mrz_document_code="P",
     mrz_issuing_state="KHM",
+    portrait_regions={"DATA_PAGE": (0.0, 0.13, 0.27, 0.72)},
     latin_name_from=("given_names", "surname"),
     latin_name_line=False,
     numeric_refinement=None,  # Latin numerals; the Khmer-digit re-read would damage them
