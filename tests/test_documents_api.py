@@ -8,7 +8,7 @@ from cryptography.exceptions import InvalidTag
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from kyc.db.models import AuditLog, DocumentCheck, DocumentField, DocumentImage, IdentityDocument, KYCSession, MRZResult
+from kyc.db.models import AuditLog, BarcodeResult, DocumentCheck, DocumentField, DocumentImage, IdentityDocument, KYCSession, MRZResult
 from kyc.ocr.tesseract import OCRUnavailable, TesseractOCREngine
 from kyc.services.documents import pending_sessions
 from tests import images
@@ -78,7 +78,7 @@ class DocumentProcessingTests(CaptureAPICase):
                                               "date_of_birth": "1990-03-15", "sex": "F", "nationality": "KH"})
         self.assertEqual(result["checks"], {"document_quality": "PASS", "document_classification": "PASS",
                                             "document_data": "PASS", "expiry": "PASS", "mrz": "PASS",
-                                            "mrz_consistency": "PASS", "barcode": "UNAVAILABLE",
+                                            "mrz_consistency": "PASS", "barcode": "NOT_APPLICABLE",
                                             "issuing_country": "PASS",
                                             "document_portrait": "UNAVAILABLE"})
         self.assertEqual(result["review_flags"], [])
@@ -395,6 +395,13 @@ class RealOCREndToEndTests(CaptureAPICase):
         code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
         self.assertEqual(result["document"]["type"], "KH_NSSF")
         self.assertEqual(result["document"]["document_number_masked"], "******5678")
+        # Phase 7: the QR on the back decodes and agrees with the printed front.
+        self.assertEqual(result["checks"]["barcode"], "PASS")
+        with Session(self.engine) as db:
+            stored = db.scalar(sa.select(BarcodeResult))
+        self.assertEqual((stored.symbology, stored.decoded, stored.format_valid), ("QR_CODE", True, True))
+        self.assertEqual(stored.data_consistency["fields"]["document_number"], "MATCH")
+        self.assertNotIn(b"CHAN", stored.payload_ciphertext)
         self.assertEqual(result["identity"]["full_name"], "CHAN DARA")
         self.assertEqual(result["identity"]["full_name_local"], "ចាន់ ដារ៉ា")
         self.assertEqual(result["identity"]["date_of_birth"], "1988-07-02")

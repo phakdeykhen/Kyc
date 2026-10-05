@@ -239,6 +239,17 @@ def kh_nssf_front(width=1600, **overrides):
     return image
 
 
+NSSF_QR_PAYLOAD = '{"member":"0012345678","name":"CHAN DARA","dob":"1988-07-02","issuer":"SPECIMEN"}'
+
+
+def qr_image(text, size, kind="QRCode"):
+    """A real, decodable barcode image (zxing-cpp writer) on a white quiet zone."""
+    import zxingcpp
+    code = zxingcpp.create_barcode(text, getattr(zxingcpp.BarcodeFormat, kind))
+    rendered = Image.fromarray(np.asarray(code.to_image(scale=8, add_quiet_zones=True))).convert("RGB")
+    return rendered.resize((size, round(size * rendered.height / rendered.width)), Image.Resampling.NEAREST)
+
+
 def kh_nssf_back(width=1600):
     from PIL import ImageFont
     height = round(width / CARD_RATIO)
@@ -247,12 +258,8 @@ def kh_nssf_back(width=1600):
     km = ImageFont.truetype(KHMER_FONT, 34, layout_engine=ImageFont.Layout.RAQM)
     for index, row in enumerate(("ចំណាំ៖ ប័ណ្ណនេះជាកម្មសិទ្ធិរបស់ ប.ស.ស", "សូមបង្ហាញប័ណ្ណនេះ នៅពេលទទួលសេវា")):
         draw.text((80, 120 + index * 80), row, font=km, fill=(20, 20, 20))
-    draw.rectangle((width - 420, height - 420, width - 80, height - 80), fill=(20, 20, 20))  # QR placeholder
-    for row in range(8):
-        for column in range(8):
-            if (row * 3 + column * 5) % 4 == 0:
-                draw.rectangle((width - 400 + column * 40, height - 400 + row * 40,
-                                width - 370 + column * 40, height - 370 + row * 40), fill=(240, 240, 240))
+    qr = qr_image(NSSF_QR_PAYLOAD, 330)
+    image.paste(qr, (width - 420, height - 420))
     return image
 
 

@@ -261,6 +261,10 @@ class HeuristicDocumentQualityEngine:
         scores["blur_score"] = round(_ramp(float(laplacian.var()), 0, p.blur_reference), 3)
         rgb = detail.astype(np.int16)
         saturated = (luminance >= 250) & ((rgb.max(axis=2) - rgb.min(axis=2)) < 24)
+        # Glare washes ink out; printed white beside dark ink (QR modules, text backgrounds) is not glare.
+        radius = max(2, round(0.02 * max(luminance.shape)))
+        dark_nearby = _box_sum(luminance < 100, radius) > 0
+        saturated &= ~dark_nearby
         scores["glare_score"] = round(1 - _ramp(float(saturated.mean()), 0, 0.05), 3)
         mean_luminance = float(luminance.mean())
         scores["brightness_score"] = round(min(_ramp(mean_luminance, 25, 70), 1 - _ramp(mean_luminance, 215, 252)), 3)

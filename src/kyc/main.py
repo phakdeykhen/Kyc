@@ -18,6 +18,7 @@ from kyc.core.config import Settings, get_settings
 from kyc.db.session import build_engine
 from kyc.core.crypto import FieldCipher, decode_key
 from kyc.engines.capture_quality import HeuristicDocumentQualityEngine
+from kyc.barcode.signatures import TrustStore
 from kyc.ocr.tesseract import TesseractOCREngine
 from kyc.services.documents import DocumentProcessor
 from kyc.storage.captures import LocalEncryptedCaptureStore, parse_keyring
@@ -44,7 +45,9 @@ def build_field_cipher(settings: Settings) -> FieldCipher | None:
 def build_document_processor(settings: Settings, factory, store, cipher) -> DocumentProcessor:
     ocr = TesseractOCREngine(settings.tesseract_cmd, settings.ocr_timeout_seconds)
     languages = tuple(item.strip() for item in settings.ocr_languages.split(",") if item.strip())
-    return DocumentProcessor(factory, store, cipher, ocr, languages, settings.max_capture_pixels)
+    processor = DocumentProcessor(factory, store, cipher, ocr, languages, settings.max_capture_pixels)
+    processor.trust_store = TrustStore.load(settings.barcode_trust_store)
+    return processor
 
 
 def build_capture_store(settings: Settings) -> LocalEncryptedCaptureStore | None:
@@ -88,7 +91,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
                 engine.dispose()
 
     application = FastAPI(title="Universal Identity Platform", version=__version__, lifespan=lifespan,
-                          description="KYC sessions, document extraction (Cambodian and international documents) and MRZ validation, face quality, and private 1:1 comparison (phases 1–6, 8–9).")
+                          description="KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, and private 1:1 comparison (phases 1–9).")
     application.state.settings = settings
 
     @application.middleware("http")
@@ -142,7 +145,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
 
     @application.get("/health/live", tags=["health"])
     def live():
-        return {"status": "ok", "phase": 9, "implemented_phases": [1, 2, 3, 4, 5, 6, 8, 9], "version": __version__}
+        return {"status": "ok", "phase": 9, "implemented_phases": [1, 2, 3, 4, 5, 6, 7, 8, 9], "version": __version__}
 
     @application.get("/health/ready", tags=["health"])
     def ready():

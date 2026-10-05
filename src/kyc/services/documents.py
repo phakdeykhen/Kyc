@@ -9,6 +9,7 @@ Outcomes:
 Raw OCR text and field values are PII: they never enter checks or audit logs.
 """
 
+import base64
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 import logging
@@ -19,7 +20,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from kyc.api.dependencies import TenantContext
 from kyc.core.crypto import FieldCipher
-from kyc.db.models import AuditLog, DocumentCheck, DocumentField, DocumentImage, IdentityDocument, KYCSession, MRZResult
+from kyc.db.models import AuditLog, BarcodeResult, DocumentCheck, DocumentField, DocumentImage, IdentityDocument, KYCSession, MRZResult
 from kyc.db.session import set_tenant
 from kyc.documents.adapters import adapter_for
 from kyc.documents.preprocess import prepare_side
@@ -31,6 +32,9 @@ from kyc.domain.state_machine import Event, TERMINAL_STATUSES
 from kyc.engines.capture_quality import HeuristicDocumentQualityEngine, decode_capture
 from kyc.engines.contracts import CheckEvidence
 from kyc.mrz.reader import read_mrz_lines
+from kyc.barcode import engine as barcode_engine
+from kyc.barcode.evaluate import assess as assess_barcodes
+from kyc.barcode.signatures import TrustStore
 from kyc.mrz import parser as mrz_parser
 from kyc.documents.iso3166 import ICAO_NON_STATE, to_alpha2
 from kyc.services.sessions import apply_event, aware
@@ -56,6 +60,7 @@ class DocumentProcessor:
         self.languages = languages
         self.max_pixels = max_pixels
         self.quality = HeuristicDocumentQualityEngine()
+        self.trust_store = TrustStore()
 
     def unavailable_reason(self) -> str | None:
         if self.store is None:
@@ -122,10 +127,12 @@ class DocumentProcessor:
 
         lines: dict[str, list[OCRLine]] = {}
         located: dict[str, bool] = {}
+        barcodes: dict[str, list] = {}
         for side in sides:
             image = images[side]
             data = self.store.get(image.encrypted_object_ref, record.organization_id, record.id, image.id)
             capture = decode_capture(data, max_bytes=len(data), max_pixels=self.max_pixels)
+            barcodes[side] = barcode_engine.decode(capture.pixels)
             prepared, located[side] = prepare_side(capture.pixels, aspect, self.quality)
             layout = getattr(adapter, "layout", None)
             viz = layout.viz_regions.get(side) if layout else None
@@ -167,6 +174,11 @@ class DocumentProcessor:
         if any(check.check_type == "REQUIRED_FIELDS" and check.result == CheckResult.FAIL for check in checks):
             return self._recapture(db, record, tenant, document, images, request_id, ("CRITICAL_FIELD_UNREADABLE",), classifications)
 
+        layout = getattr(adapter, "layout", None)
+        barcode_check, barcode_evidence = assess_barcodes(
+            {capture_sides.get(side, side): reads for side, reads in barcodes.items()}, extracted, self.trust_store,
+            expected=bool(layout and layout.barcode_expected))
+        checks = [check for check in checks if check.check_type != "BARCODE"] + [barcode_check]
         issuer = self._issuing_country_check(extracted, record.country)
         if issuer is not None:
             checks.append(issuer)
@@ -174,7 +186,9 @@ class DocumentProcessor:
                 # Evidence from a check-digit-valid MRZ replaces the client's claimed country.
                 document.issuing_country = issuer.details["issuing_country"]
         # The primary side identifies the card; a secondary side without cues is noted, not penalized.
-        confidence = primary.confidence
+        # The card is identified by its strongest correctly-placed side (e.g. a check-digit-valid back MRZ).
+        confidence = max([primary.confidence] + [item.confidence for side, item in list(classifications.items())[1:]
+                                                 if item.document_type == adapter.document_type and item.document_side == side])
         notes.extend(f"{side}_SIDE_UNVERIFIED" for side in sides[1:] if classifications[side].document_side == "UNKNOWN")
         classification_result = CheckResult.PASS if confidence >= adapter.policy.accept_classification else CheckResult.REVIEW
         checks.insert(0, CheckEvidence(classification_result,
@@ -200,6 +214,18 @@ class DocumentProcessor:
                              format=mrz_check.details["format"], mrz_valid=mrz_check.details["mrz_valid"],
                              check_digit_results=mrz_check.details["check_digit_results"],
                              field_consistency=consistency))
+        db.execute(sa.delete(BarcodeResult).where(BarcodeResult.organization_id == record.organization_id,
+                                                  BarcodeResult.session_id == record.id, BarcodeResult.document_id == document.id))
+        for item in barcode_evidence:
+            context = f"barcode/{record.organization_id}/{record.id}/{document.id}/{item.side}/{item.read.symbology}"
+            sealed, key_version = self.cipher.seal(base64.b64encode(item.read.payload).decode(), context)
+            db.add(BarcodeResult(organization_id=record.organization_id, session_id=record.id, document_id=document.id,
+                                 symbology=item.read.symbology, decoded=True, format_valid=item.parsed.format_valid,
+                                 signature_present=item.parsed.signature_present,
+                                 signature_valid=item.signature_valid if item.parsed.signature_present else None,
+                                 data_consistency={"format": item.parsed.format, "side": item.side,
+                                                   "signature_reason": item.signature_reason, "fields": item.consistency},
+                                 payload_ciphertext=sealed, key_version=key_version))
         for check in checks:
             db.add(DocumentCheck(organization_id=record.organization_id, session_id=record.id, document_id=document.id,
                                  check_type=check.check_type, result=check.result,

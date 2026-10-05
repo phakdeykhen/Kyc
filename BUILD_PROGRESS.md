@@ -1,8 +1,43 @@
 # Build progress — Universal Identity Platform
 
 Updated: 5 October 2026. The full requirements in `Document.md` control the build.
-Phases 2–5 were approved and are implemented. Work is paused at the Phase 5
-approval gate; Phase 6 has not started.
+Phases 2–7 were approved and are implemented (Phases 8–9 exist as a Codex checkpoint
+awaiting final validation). Work is paused at the Phase 7 approval gate.
+
+## Phase 7 implementation (5 October 2026)
+
+Implemented the QR/barcode engine (`kyc/barcode/`). zxing-cpp decodes QR, PDF417, Data
+Matrix, Aztec and linear codes from every captured side. Payloads are parsed as signed
+JWS, JSON, key=value, AAMVA PDF417 (North American driving licences) or ICAO Visible
+Digital Seals (detected; verification needs a CSCA trust list), otherwise as unstructured
+text. JWS signatures (ES256/ES384/RS256/PS256/EdDSA) are verified only against keys in
+`BARCODE_TRUST_STORE`; `alg: none` always fails. Decoded fields are compared with the
+printed document. The `BARCODE` check is PASS for a valid signature or consistent data,
+REVIEW for any disagreement, FAIL for a signature that does not verify, and
+NOT_APPLICABLE when no code exists. `barcode_results` stores symbology, format,
+signature state and per-field consistency, with the payload AES-GCM encrypted under the
+PII keyring. Design: [architecture-phase7.md](docs/architecture-phase7.md).
+
+### Phase 7 validation evidence
+
+- **264 tests: 264 passed, 0 skipped, 0 failures** with live PostgreSQL 18.6
+  ([artifacts/phase7-tests.txt](artifacts/phase7-tests.txt)).
+- Real decode: the photographed NSSF SPECIMEN back carries a real QR. The session
+  reaches `SELFIE_REQUIRED` with `barcode: PASS`, all three QR fields MATCH the
+  printed front, and the stored payload contains no plaintext.
+- Live PostgreSQL over HTTP as `kyc_app` after bootstrap: the NSSF QR flow, the foreign
+  passport and the foreign ID card all passed; one `barcode_results` row was persisted.
+- Found and fixed: the Phase 2 glare measure counted printed white beside dark ink (QR
+  modules, quiet zones) as glare, so a card with a QR was rejected; it now ignores
+  saturated pixels near ink, and the glare/overexposure fixtures are still rejected.
+  The AAMVA parser missed the number following the subfile marker. Generic cards
+  are now classified by their strongest correctly-placed side.
+
+### Phase 7 limits
+
+No official verification key or format is known for Cambodian document barcodes, so
+their codes can only be checked for consistency, not authenticity. VDS verification
+needs ICAO PKD/CSCA material. The NSSF QR payload is a fictional fixture format.
 
 ## Phase 6 implementation (5 October 2026)
 
@@ -21,7 +56,7 @@ documents, where any non-Cambodian wording remains a disagreement). Design:
 
 ### Phase 6 validation evidence
 
-- Full suite green after the change (see the Phase 7 entry for the final count).
+- Full suite green after the change; final count in the Phase 7 entry.
 - Real OCR on photographed synthetic SPECIMENs: the foreign passport's printed page and
   MRZ agree on number, birth date, sex, expiry and name; the foreign ID card (front labels
   + back TD1) agrees on all six fields, nationality included. Both reach `SELFIE_REQUIRED`.
@@ -287,7 +322,7 @@ does not claim production readiness or functioning verification engines.
 | 4 | Cambodia NSSF adapter | Complete; 109/109 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
 | 5 | Passport and MRZ engine | Complete; 175/175 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
 | 6 | International generic passport adapter | Complete; real-OCR end-to-end passed; Docker pending |
-| 7 | QR/barcode engine | In progress |
+| 7 | QR/barcode engine | Complete; 264/264 tests; real decode end-to-end and live PostgreSQL passed; Docker pending |
 | 8 | Face detection and quality | Implemented in a Codex checkpoint (`0d509c0`); final validation and docs pending |
 | 9 | Face embeddings and 1:1 comparison | Implemented in a Codex checkpoint (`0d509c0`); final validation and docs pending |
 | 10 | Liveness/anti-spoof integration | Not started |

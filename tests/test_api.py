@@ -142,7 +142,7 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
         code, body, _ = await call(self.app, "/health/live")
         self.assertEqual(code, 200)
         self.assertEqual(body["phase"], 9)
-        self.assertEqual(body["implemented_phases"], [1, 2, 3, 4, 5, 6, 8, 9])
+        self.assertEqual(body["implemented_phases"], [1, 2, 3, 4, 5, 6, 7, 8, 9])
         code, body, _ = await call(self.app, "/health/ready")
         self.assertEqual(code, 503)  # create_all is not a migration deployment.
         code, body, _ = await call(self.app, "/v1/document-types", headers=self.headers)

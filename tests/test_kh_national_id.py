@@ -101,8 +101,8 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(results[name], CheckResult.PASS, name)
         self.assertEqual(results["MRZ"], CheckResult.PASS)  # check digits valid: consistent, not "authentic"
         self.assertEqual(results["MRZ_CONSISTENCY"], CheckResult.PASS)
-        for name in ("BARCODE", "PORTRAIT"):
-            self.assertEqual(results[name], CheckResult.UNAVAILABLE)
+        self.assertEqual(results["BARCODE"], CheckResult.NOT_APPLICABLE)  # Phase 7: engine ran, no code on this card
+        self.assertEqual(results["PORTRAIT"], CheckResult.UNAVAILABLE)
 
     def test_wrapped_value_takes_the_weakest_line_confidence(self):
         document = self.adapter.extract_fields({"FRONT": front_lines(address_conf=0.5), "BACK": BACK})

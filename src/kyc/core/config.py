@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     ocr_languages: str = "khm,eng"
     ocr_timeout_seconds: float = Field(default=20.0, ge=1, le=120)
     document_processing_mode: Literal["inline", "deferred"] = "inline"
+    # Phase 7: JSON file of key id → PEM public key for signed barcode payloads (JWS). None → nothing verifiable.
+    barcode_trust_store: Path | None = None
     # Phases 8-9. Model files are installed explicitly; the API never downloads weights.
     biometric_encryption_keys: SecretStr | None = None
     face_models_dir: Path = Path("var/models")

@@ -106,6 +106,7 @@ class CardLayout:
     mrz_document_code: str | None = None                     # e.g. "ID" or "P" (first MRZ characters)
     mrz_issuing_state: str | None = None                     # e.g. "KHM"
     ocr_languages: tuple[str, ...] | None = None              # visual-zone OCR models; None → service default
+    barcode_expected: bool = False                            # True: a missing barcode is a REVIEW signal
     portrait_regions: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)
 
 
@@ -516,7 +517,7 @@ class KhmerLabelAdapter:
                                     check_type="SCRIPT_CONSISTENCY", details={"fields": mixed}))
 
         checks.extend(self._mrz_checks(document, today))
-        checks.append(self.parse_barcode(b""))
+        checks.append(self.parse_barcode(b""))  # replaced by barcode.evaluate when the service decodes codes
         checks.append(CheckEvidence(CheckResult.UNAVAILABLE, ("PORTRAIT_ENGINE_PHASE_8",), check_type="PORTRAIT"))
         return checks
 
@@ -598,10 +599,21 @@ class KhmerLabelAdapter:
                              tuple(reasons) or ("MRZ_CHECK_DIGITS_VALID",), check_type="MRZ", details=details)
 
     def parse_barcode(self, payload: bytes) -> CheckEvidence:
-        return CheckEvidence(CheckResult.UNAVAILABLE, ("BARCODE_ENGINE_PHASE_7",), check_type="BARCODE")
+        """Format and signature evidence for one payload; consistency needs the document (barcode.evaluate)."""
+        from kyc.barcode.payload import parse
+        from kyc.barcode.signatures import TrustStore, verify
+
+        if not payload:
+            return CheckEvidence(CheckResult.NOT_APPLICABLE, ("NO_BARCODE_PAYLOAD",), check_type="BARCODE")
+        parsed = parse(payload, payload.decode("utf-8", errors="replace"))
+        valid, reason = verify(parsed, TrustStore())
+        result = CheckResult.FAIL if valid is False else CheckResult.REVIEW if parsed.format_valid is False else CheckResult.PASS
+        return CheckEvidence(result, (reason if valid is not None else f"BARCODE_FORMAT_{parsed.format}",), check_type="BARCODE",
+                             details={"format": parsed.format, "format_valid": parsed.format_valid,
+                                      "signature_present": parsed.signature_present, "signature_valid": valid})
 
     def parse_qr(self, payload: bytes) -> CheckEvidence:
-        return CheckEvidence(CheckResult.UNAVAILABLE, ("QR_ENGINE_PHASE_7",), check_type="QR")
+        return self.parse_barcode(payload)
 
     def get_security_checks(self) -> tuple[str, ...]:
         return ("REQUIRED_FIELDS", *(rule.check_type for rule in self.layout.numbers), "DATE_CONSISTENCY", "EXPIRY",

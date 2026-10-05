@@ -25,7 +25,13 @@ Phase 5 adds Cambodia passport visual fields, a TD1/TD2/TD3 MRZ engine, and
 compares visual fields with the MRZ, encrypts MRZ text and records consistency
 metadata. The national ID's back MRZ now uses the same engine. Passing checks mean
 the reading is consistent; they do not establish authenticity or a final decision.
-Phase 6's international passport visual-zone adapter has not started.
+Phase 6 adds international document support: the printed data page of any country's
+passport (cross-checked with its MRZ), generic national ID and residence cards (TD1/TD2
+MRZ plus labelled fronts), and an `issuing_country` check of the MRZ issuer against the
+session country. Phase 7 adds the QR/barcode engine: codes on every side are decoded,
+parsed (JWS, JSON, key=value, AAMVA PDF417, ICAO VDS), compared with the printed fields,
+and verified cryptographically only against keys in `BARCODE_TRUST_STORE`. See
+[Phase 6](docs/architecture-phase6.md) and [Phase 7](docs/architecture-phase7.md).
 
 Phases 8–9 add CPU face detection, selfie quality recapture, aligned face embeddings,
 and 1:1 comparison against the accepted document portrait. Selfie submission requires

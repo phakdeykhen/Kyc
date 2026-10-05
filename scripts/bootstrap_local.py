@@ -38,6 +38,8 @@ with engine.begin() as connection:
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON document_fields TO kyc_app"))
     # Phase 5 MRZ engine results.
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON mrz_results TO kyc_app"))
+    # Phase 7 barcode results (payload encrypted under the PII keyring).
+    connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON barcode_results TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON selfie_captures, face_quality_checks, biometric_templates, face_comparisons TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT ON consents TO kyc_app"))
 engine.dispose()
