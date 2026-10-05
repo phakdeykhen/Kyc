@@ -199,6 +199,14 @@ check consent, existing-session continuation, selfie/document recapture, process
 polls, safe comparison messaging and failure recovery. It does not validate a physical
 camera, rendered CSS or browser permission behavior.
 
+### Full-pipeline validation
+
+The [full-pipeline run](../artifacts/stage8-9-full-pipeline-e2e.json) took a photographed
+document through OCR, portrait extraction, a consented selfie and the native comparison in
+one session on PostgreSQL as `kyc_app`. Same-person scores were 0.69–0.84 and a
+different-person score 0.22, all `REVIEW` under the uncalibrated policy. Generic passport
+and ID adapters now declare portrait regions (ICAO TD3 zone V; ID-1 front left).
+
 ## Security and limits
 
 - Face similarity does not prove liveness. A printed image, replay, screen photo or

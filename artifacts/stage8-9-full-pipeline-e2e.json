@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-05",
+  "scope": "First run of the complete chain in one session: photographed document → capture gate → OCR/MRZ → document portrait → consented selfie → native YuNet/SFace templates → 1:1 comparison",
+  "database": "PostgreSQL 18.6, API as restricted kyc_app (NOBYPASSRLS) after bootstrap",
+  "engines": {"ocr": "Tesseract 5.5.3", "detector": "OpenCV YuNet 2023mar", "recognizer": "OpenCV SFace 2021dec", "opencv": "4.14.0"},
+  "fixtures": "Synthetic SPECIMEN documents with OpenCV public sample faces (lena.jpg, messi5.jpg) pasted into the portrait area; images not committed",
+  "policy": "SFACE-COSINE-UNCALIBRATED-2026.10.1 (pass 0.363 / fail 0.20, uncalibrated → every comparison stays REVIEW)",
+  "flows": [
+    {"document": "KH_NATIONAL_ID", "selfie": "same person", "after_document": "SELFIE_REQUIRED", "after_selfie": "LIVENESS_REQUIRED",
+     "cosine_similarity": 0.691, "face_match": "REVIEW", "templates_stored": ["DOCUMENT_PORTRAIT", "LIVE_SELFIE"], "decision": null},
+    {"document": "KH_NATIONAL_ID", "selfie": "different person", "after_selfie": "LIVENESS_REQUIRED",
+     "cosine_similarity": 0.224, "face_match": "REVIEW", "decision": null},
+    {"document": "KH_NATIONAL_ID", "selfie": "different person, small face", "after_selfie": "SELFIE_REQUIRED",
+     "capture_status": "RECAPTURE", "reason_codes": ["FACE_TOO_SMALL", "FACE_TOO_FAR"], "instructions": ["MOVE_CLOSER"]},
+    {"document": "KH_NATIONAL_ID", "selfie": "consent refused", "http_status": 422, "reason_code": "BIOMETRIC_CONSENT_REQUIRED"},
+    {"document": "PASSPORT (foreign)", "selfie": "same person", "after_selfie": "LIVENESS_REQUIRED", "cosine_similarity": 0.795, "face_match": "REVIEW"},
+    {"document": "NATIONAL_ID (foreign)", "selfie": "same person", "after_selfie": "LIVENESS_REQUIRED", "cosine_similarity": 0.844, "face_match": "REVIEW"}
+  ],
+  "observations": [
+    "Same-person scores (0.69-0.84) and the different-person score (0.22) are clearly separated on these two samples; two identities are not a calibration set.",
+    "With the uncalibrated policy a different person also proceeds to LIVENESS_REQUIRED with face_match REVIEW; the risk engine (Phase 13) must not pass such sessions.",
+    "Templates are AES-GCM ciphertext (about 2.9 KB each); no template or similarity percentage is returned as identity proof."
+  ]
+}

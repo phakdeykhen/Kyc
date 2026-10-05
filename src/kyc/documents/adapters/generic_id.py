@@ -47,6 +47,8 @@ BASE = CardLayout(
     nationality=None,
     numeric_refinement=None,
     ocr_languages=("eng",),
+    # Most ID-1 cards print the portrait on the left of the front; the service falls back to the whole side.
+    portrait_regions={"FRONT": (0.0, 0.10, 0.33, 0.95)},
 )
 # ICAO TD1/TD2 document codes for identity cards and residence documents start with I, A or C.
 CARD_CODES = ("I", "A", "C")

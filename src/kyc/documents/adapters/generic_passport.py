@@ -39,6 +39,7 @@ LAYOUT = replace(
     latin_name_from=("given_names", "surname"),
     # ICAO 9303 TD3: portrait on the left of the data page, MRZ at the bottom.
     viz_regions={"DATA_PAGE": (0.26, 0.0, 1.0, 0.72)},
+    portrait_regions={"DATA_PAGE": (0.0, 0.13, 0.27, 0.72)},  # ICAO TD3 zone V (left of the data page)
     ocr_languages=("eng",),
 )
 

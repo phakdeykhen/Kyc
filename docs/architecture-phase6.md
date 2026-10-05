@@ -27,6 +27,8 @@ zone and covers identity and residence cards from countries without a dedicated 
   A passport MRZ, or nothing readable, is `DOCUMENT_TYPE_MISMATCH` / `DOCUMENT_NOT_RECOGNIZED`
   (recapture). A front in a script we don't read (classification 0.4, REVIEW) can still
   be carried by a valid back MRZ.
+* **Portraits (added during Phase 8–9 validation).** Passport pages declare the ICAO TD3
+  portrait zone; generic cards the left of the front. The face service falls back to the whole side.
 * **Nationality.** Compared only when printed as a code; demonyms are `NOT_COMPARED`. On
   Cambodian documents, any non-Cambodian wording remains a disagreement.
 

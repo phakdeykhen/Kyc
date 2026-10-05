@@ -52,6 +52,26 @@ installed locally and never fetched by a request. Design:
   passed. Artifacts: [OpenAPI](artifacts/openapi-stage8-9.json),
   [migration SQL](artifacts/stage8-9-postgresql.sql).
 
+### Independent full-pipeline validation (Claude, 5 October 2026)
+
+Codex's live PostgreSQL test seeded the document reference and excluded OCR. The complete
+chain was then run in one session over HTTP as restricted `kyc_app` with real Tesseract and
+real YuNet/SFace: a photographed SPECIMEN card carrying a public OpenCV sample face went
+through capture → OCR/MRZ → portrait template → consented selfie → 1:1 comparison
+([evidence](artifacts/stage8-9-full-pipeline-e2e.json)).
+
+- Same person: cosine 0.691 (KH ID), 0.795 (foreign passport), 0.844 (foreign ID card);
+  different person: 0.224. Every result stays `REVIEW` under the uncalibrated policy, the
+  session moves to `LIVENESS_REQUIRED` and `decision` stays null.
+- A small face is recaptured with `MOVE_CLOSER`; a selfie without consent is refused (422).
+- Gap fixed: the Phase 6 generic passport/ID adapters had no portrait regions and relied
+  on the whole-page fallback; they now declare the ICAO TD3 portrait zone and the ID-1
+  front-left area.
+- Suite after these changes: **264/264 passed, 0 skipped**, live PostgreSQL included
+  ([transcript](artifacts/stage8-9-tests.txt)).
+- Important for Phase 13: with the uncalibrated policy, a *different* person also proceeds
+  with `face_match: REVIEW`. The risk engine must never pass a session on that basis.
+
 ### Phases 8–9 limits
 
 The default uncalibrated comparison always returns REVIEW. Cosine similarity is not
@@ -379,8 +399,8 @@ does not claim production readiness or functioning verification engines.
 | 5 | Passport and MRZ engine | Complete; 175/175 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
 | 6 | International generic passport adapter | Complete; real-OCR end-to-end passed; Docker pending |
 | 7 | QR/barcode engine | Complete; 264/264 tests; real decode end-to-end and live PostgreSQL passed; Docker pending |
-| 8 | Face detection and quality | Complete; native inference and live PostgreSQL verified; quality limitations documented |
-| 9 | Face embeddings and 1:1 comparison | Complete; 264/264 tests; encrypted native PostgreSQL flow passed; uncalibrated REVIEW |
+| 8 | Face detection and quality | Complete; native inference, live PostgreSQL and full document→selfie pipeline verified |
+| 9 | Face embeddings and 1:1 comparison | Complete; 264/264 tests; full pipeline E2E (same 0.69–0.84 vs different 0.22); uncalibrated REVIEW |
 | 10 | Liveness/anti-spoof integration | Waiting for approval |
 | 11 | ePassport NFC mobile architecture | Not started |
 | 12 | Cross-checks and fraud signals | Not started |

@@ -1207,7 +1207,7 @@ validation passed. Phase 10 has not started.
 | 6 | International generic passport adapter | Complete; real-OCR end-to-end passed; Docker pending |
 | 7 | QR/barcode engine | Complete; 264/264 tests; live PostgreSQL passed; Docker pending |
 | 8 | Face detection + quality | Complete; native inference and tenant isolation verified; quality limits documented |
-| 9 | Face embeddings + 1:1 comparison | Complete; 264/264 tests; encrypted native PostgreSQL flow passed; default REVIEW |
+| 9 | Face embeddings + 1:1 comparison | Complete; 264/264 tests; full document→selfie pipeline verified; default REVIEW |
 | 10 | Liveness / anti-spoof integration | Waiting for approval |
 | 11 | ePassport NFC mobile architecture | Not started |
 | 12 | Cross-check + fraud signals | Not started |
