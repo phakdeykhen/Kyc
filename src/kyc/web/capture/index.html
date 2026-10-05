@@ -60,6 +60,20 @@
       <p class="muted small">The outline helps you position your face. Photo quality and face comparison are checked after submission.</p>
     </section>
 
+    <section class="panel" id="liveness" aria-labelledby="liveness-title" hidden>
+      <h1 id="liveness-title">4. Show that you are present</h1>
+      <p class="muted">You will be asked to move your head in a few directions, in a random order. Follow each instruction on screen. Photos from this step are checked and then discarded.</p>
+      <div class="stage selfie-stage">
+        <video id="liveness-video" playsinline muted></video>
+        <div class="frame face-frame" id="liveness-frame" aria-hidden="true"><span></span></div>
+        <p class="hint" id="liveness-hint" role="status">Starting camera…</p>
+      </div>
+      <p class="liveness-step" id="liveness-step" aria-live="assertive"></p>
+      <div class="actions">
+        <button type="button" class="primary" id="liveness-start" disabled>Start</button>
+      </div>
+    </section>
+
     <section class="panel" id="processing" aria-labelledby="processing-title" hidden>
       <h1 id="processing-title">Checking your document</h1>
       <p id="processing-info" class="muted" role="status">Please wait while your document is processed.</p>

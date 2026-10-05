@@ -1,8 +1,45 @@
 # Build progress — Universal Identity Platform
 
 Updated: 5 October 2026. The full requirements in `Document.md` control the build.
-Phases 1–9 are implemented. The user authorized face detection/quality and embeddings/
-1:1 matching together; their final validation is complete. Phase 10 has not started.
+Phases 1–10 are implemented. Work is paused at the Phase 10 approval gate; Phase 11
+(ePassport NFC) has not started.
+
+## Phase 10 implementation (5 October 2026)
+
+Implemented active liveness. The server issues a single-use, random head-movement
+challenge (frontal baseline + three distinct moves, 24 sequences, 256-bit nonce stored
+only as a hash, 120 s TTL). The client returns 4–12 raw frames tagged with step indices.
+Each move is verified with an affine-invariant 3D test on YuNet landmarks: flat faces
+keep the nose's eye/mouth-frame coordinates; real heads move them. Flat-face presentations
+and single-image replays FAIL. Every frame must still be the selfie's person (SFace
+continuity). Incomplete challenges are retryable within an attempt limit. Frames are
+never stored; `liveness_checks` keeps outcomes, metrics, coverage and the nonce hash.
+The policy is uncalibrated, so the best result is REVIEW. The capture page gained the
+movement step. Migration `0005_phase10` adds `liveness_challenges` (forced RLS).
+Design: [architecture-phase10.md](docs/architecture-phase10.md).
+
+### Phase 10 validation evidence
+
+- **281 tests: 281 passed, 0 skipped, 0 failures** with live PostgreSQL 18.6
+  ([artifacts/phase10-tests.txt](artifacts/phase10-tests.txt)); the client simulation
+  also covers challenge, retry and finish.
+- Geometry checked against a projected 3D head: real ±20° turns move the nose coordinate
+  ±0.16, while a flat photo tilted up to 45° at close range moves it at most 0.053.
+  Invariance holds exactly under 50 random affine transforms.
+- Real YuNet on a real face photo, moved, rotated, scaled and tilted like a handheld
+  printout: 0 of 3 moves completed, never accepted.
+- Live PostgreSQL over HTTP as `kyc_app`: photographed ID → OCR → selfie → liveness. Two
+  photo-attack attempts were recorded and not accepted, the session stayed in
+  `LIVENESS_REQUIRED`, a reused challenge got 409, the third challenge got 429, and no
+  frames were retained.
+- The live RLS test now covers `liveness_challenges` and `liveness_checks`.
+
+### Phase 10 limits
+
+Uncalibrated thresholds; no device attestation (real-time deep-fake injection is not
+defeated); 3D masks and AI-generated media are not detected; no passive model. A genuine
+moving head was simulated with 3D landmarks, not filmed.
+
 
 ## Phases 8–9 implementation (5 October 2026)
 
@@ -401,8 +438,8 @@ does not claim production readiness or functioning verification engines.
 | 7 | QR/barcode engine | Complete; 264/264 tests; real decode end-to-end and live PostgreSQL passed; Docker pending |
 | 8 | Face detection and quality | Complete; native inference, live PostgreSQL and full document→selfie pipeline verified |
 | 9 | Face embeddings and 1:1 comparison | Complete; 264/264 tests; full pipeline E2E (same 0.69–0.84 vs different 0.22); uncalibrated REVIEW |
-| 10 | Liveness/anti-spoof integration | Waiting for approval |
-| 11 | ePassport NFC mobile architecture | Not started |
+| 10 | Liveness/anti-spoof integration | Complete; 281/281 tests; real photo attack blocked; live PostgreSQL passed; uncalibrated REVIEW |
+| 11 | ePassport NFC mobile architecture | Waiting for approval |
 | 12 | Cross-checks and fraud signals | Not started |
 | 13 | Deterministic risk engine | Not started |
 | 14 | Authorized manual review dashboard | Not started |

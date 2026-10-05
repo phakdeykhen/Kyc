@@ -26,15 +26,21 @@ const TEXT = {
   RECAPTURE_DOCUMENT_WITH_CLEAR_PORTRAIT: "Retake your document photo so its portrait is clear and unobstructed.",
   REDUCE_LIGHT: "Move out of direct bright light.",
   EVEN_LIGHTING: "Use even light across your face and avoid strong shadows.",
+  FOLLOW_EACH_INSTRUCTION: "Follow each instruction as it appears: move your head clearly, then hold still.",
+  ONLY_YOU_IN_FRAME: "Make sure only your face is in view.",
+  LOOK_STRAIGHT: "Start by looking straight at the camera.",
 };
 const SCORE_LABELS = {
   blur_score: "Sharpness", glare_score: "No glare", brightness_score: "Exposure", shadow_score: "Even light",
   document_coverage: "Coverage", perspective_score: "Alignment", resolution_score: "Resolution", overall_quality: "Overall",
 };
 const state = { apiKey: "", orgId: "", session: null, sides: [], current: null, stream: null, busy: false,
-  mode: "setup", cameraVersion: 0, pollTimer: null, polling: false };
+  mode: "setup", cameraVersion: 0, pollTimer: null, polling: false, stepDelayMs: 1600 };
 const $ = (id) => document.getElementById(id);
-const cameraElement = (id) => $(state.mode === "selfie" ? `selfie-${id}` : id);
+const CAMERA_PREFIX = { selfie: "selfie-", liveness: "liveness-" };
+const cameraElement = (id) => $(`${CAMERA_PREFIX[state.mode] || ""}${id}`);
+const frontCamera = () => state.mode === "selfie" || state.mode === "liveness";
+const wait = (ms) => (ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve());
 
 function headers() {
   return { "X-API-Key": state.apiKey, "X-Organization-ID": state.orgId };
@@ -57,6 +63,7 @@ function updateButtons() {
   const maySubmitSelfie = !state.busy && state.mode === "selfie" && $("biometric-consent").checked;
   $("selfie-shoot").disabled = !maySubmitSelfie || !state.stream;
   $("selfie-file").disabled = !maySubmitSelfie;
+  $("liveness-start").disabled = state.busy || state.mode !== "liveness" || !state.stream;
   $("resume-session").disabled = state.busy || state.polling;
   $("session-form").querySelector('button[type="submit"]').disabled = state.busy || state.polling;
   $("refresh-session").disabled = state.polling || state.busy;
@@ -68,6 +75,7 @@ function stopCamera() {
   state.stream = null;
   $("video").srcObject = null;
   $("selfie-video").srcObject = null;
+  $("liveness-video").srcObject = null;
   updateButtons();
 }
 
@@ -80,6 +88,7 @@ function setMode(mode) {
   state.mode = mode;
   $("capture").hidden = mode !== "document";
   $("selfie").hidden = mode !== "selfie";
+  $("liveness").hidden = mode !== "liveness";
   $("processing").hidden = mode !== "processing";
   updateButtons();
 }
@@ -189,6 +198,16 @@ async function followSession() {
       $("next").textContent = "Your document is ready. Continue with your selfie.";
       await startCamera();
     }
+  } else if (status === "LIVENESS_REQUIRED") {
+    stopPolling();
+    if (state.mode !== "liveness") {
+      stopCamera();
+      state.current = "LIVENESS";
+      setMode("liveness");
+      $("liveness-step").textContent = "";
+      $("next").textContent = "Selfie done. Next, a short movement check shows that you are present.";
+      await startCamera();
+    }
   } else if (status === "DOCUMENT_PROCESSING") {
     stopCamera();
     setMode("processing");
@@ -240,7 +259,7 @@ async function refreshSession() {
 async function startCamera() {
   stopCamera();
   const version = state.cameraVersion;
-  const isSelfie = state.mode === "selfie";
+  const isSelfie = frontCamera();
   const video = cameraElement("video"), hint = cameraElement("hint");
   hint.textContent = "Starting camera…";
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -298,7 +317,8 @@ function liveHints(time, version) {
     }
     const sharpness = lapSq / n - (lapSum / n) ** 2;
     // Exposure and focus only; whether a document is in frame is decided server-side.
-    let hint = state.mode === "selfie" ? "Light and focus OK. Center your face in the oval and look at the camera." : "Light and focus OK. Fit the document in the frame and take the photo.";
+    let hint = state.mode === "liveness" ? "Light and focus OK. Press Start, then follow each instruction."
+      : state.mode === "selfie" ? "Light and focus OK. Center your face in the oval and look at the camera." : "Light and focus OK. Fit the document in the frame and take the photo.";
     if (mean < 60) hint = TEXT.MORE_LIGHT;
     else if (mean > 225) hint = TEXT.LESS_LIGHT;
     else if (sharpness < 40) hint = TEXT.HOLD_STILL;
@@ -373,7 +393,72 @@ async function submitSelfie(blob) {
   if (accepted) {
     stopCamera();
     state.current = null;
+    if (body.status === "LIVENESS_REQUIRED") {
+      // Keep the comparison verdict visible; refreshing moves the page on to the liveness step.
+      await refreshSession();
+    } else {
+      setMode("done");
+    }
+  }
+}
+
+// Active liveness: the server picks a random sequence; raw (unmirrored) frames go back with each step index.
+async function runLiveness() {
+  if (state.busy || state.mode !== "liveness" || !state.stream) return;
+  state.busy = true;
+  updateButtons();
+  const id = state.session.session_id;
+  const issued = await api(`/v1/kyc/${id}/liveness/challenge`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  if (!issued.ok) {
+    state.busy = false;
+    updateButtons();
+    return showError(issued);
+  }
+  const frames = [], steps = [];
+  for (const step of issued.body.steps) {
+    $("liveness-step").textContent = step.instruction;
+    await wait(step.index === 0 ? Math.min(900, state.stepDelayMs) : state.stepDelayMs);
+    for (let shot = 0; shot < 2; shot++) {
+      const blob = await grabFrame();
+      if (blob) { frames.push(blob); steps.push(step.index); }
+      await wait(state.stepDelayMs ? 250 : 0);
+    }
+  }
+  $("liveness-step").textContent = "Checking…";
+  const form = new FormData();
+  form.append("challenge_id", issued.body.challenge_id);
+  form.append("nonce", issued.body.nonce);
+  form.append("frame_steps", steps.join(","));
+  frames.forEach((blob, index) => form.append("frames", blob, `frame-${index}.jpg`));
+  const result = await api(`/v1/kyc/${id}/liveness`, { method: "POST", body: form });
+  state.busy = false;
+  updateButtons();
+  if (!result.ok) return showError(result);
+  showLiveness(result.body);
+}
+
+function showLiveness(body) {
+  $("result").hidden = false;
+  const retry = body.retry_allowed && body.status === "LIVENESS_REQUIRED";
+  $("verdict").className = `verdict ${body.result === "PASS" ? "ok" : "retry"}`;
+  $("verdict").textContent = retry ? "Please try the movement check again"
+    : body.result === "FAIL" ? "The movement check did not pass"
+    : body.result === "PASS" ? "Movement check passed" : "Movement check recorded · needs review";
+  $("instructions").replaceChildren(...(body.instructions || []).map((code) => {
+    const item = document.createElement("li");
+    item.textContent = TEXT[code] || "Follow each instruction on screen.";
+    return item;
+  }));
+  $("scores").replaceChildren();
+  $("liveness-step").textContent = retry ? "Press Start to try again." : "";
+  if (retry) {
+    $("next").textContent = `${body.attempts_remaining} attempts left.`;
+  } else {
+    stopCamera();
+    state.current = null;
     setMode("done");
+    $("next").textContent = "Your capture is complete. Additional checks or review are still required before an identity decision.";
   }
 }
 
@@ -421,7 +506,7 @@ function showError(result) {
   $("instructions").replaceChildren();
   $("scores").replaceChildren();
   $("next").textContent = "";
-  if (state.mode === "selfie" || state.mode === "document") {
+  if (state.mode === "selfie" || state.mode === "document" || state.mode === "liveness") {
     cameraElement("hint").textContent = "Submission could not be completed. Check the message below and try again.";
   }
 }
@@ -432,6 +517,7 @@ $("refresh-session").addEventListener("click", refreshSession);
 $("biometric-consent").addEventListener("change", updateButtons);
 $("shoot").addEventListener("click", async () => submit(await grabFrame()));
 $("selfie-shoot").addEventListener("click", async () => submitSelfie(await grabFrame()));
+$("liveness-start").addEventListener("click", runLiveness);
 $("file").addEventListener("change", (event) => {
   const [file] = event.target.files;
   event.target.value = "";

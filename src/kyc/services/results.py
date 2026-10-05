@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from kyc.api.schemas import FaceComparisonSummary, ResultDocument, ResultIdentity, ResultMRZ, SessionResult
 from kyc.core.crypto import FieldCipher
-from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceComparison, FaceQualityCheck, IdentityDocument, KYCSession, MRZResult
+from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceComparison, FaceQualityCheck, IdentityDocument, KYCSession, LivenessCheck, MRZResult
 from kyc.domain.enums import CheckResult
 from kyc.services.captures import side_progress
 
@@ -47,6 +47,15 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) ->
                                     "SEVERE_OCCLUSION": "FACE_OCCLUSION_UNVERIFIED"}
                 flags.extend(unverified_codes[item] for item in quality.evidence_metadata.get("unverified_checks", [])
                              if item in unverified_codes)
+    # Retry-only attempts (challenge not completed) are not results; report the latest final one.
+    liveness = next((row for row in db.scalars(sa.select(LivenessCheck).where(
+        LivenessCheck.organization_id == record.organization_id, LivenessCheck.session_id == record.id)
+        .order_by(LivenessCheck.created_at.desc())) if not row.evidence_metadata.get("retryable")), None)
+    if liveness is not None:
+        checks["liveness"] = liveness.result.value
+        if liveness.result in (CheckResult.REVIEW, CheckResult.FAIL):
+            flags.extend(f"LIVENESS_{code}" if not code.startswith("LIVENESS") else code
+                         for code in liveness.evidence_metadata.get("reason_codes", []))
     reference = sa.orm.aliased(BiometricTemplate)
     live = sa.orm.aliased(BiometricTemplate)
     comparison = db.scalar(sa.select(FaceComparison).join(reference, FaceComparison.reference_template_id == reference.id)

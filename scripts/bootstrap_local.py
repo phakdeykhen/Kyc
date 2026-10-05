@@ -40,7 +40,10 @@ with engine.begin() as connection:
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON mrz_results TO kyc_app"))
     # Phase 7 barcode results (payload encrypted under the PII keyring).
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON barcode_results TO kyc_app"))
+    # Phase 10 liveness: challenges are marked used (UPDATE); checks hold evidence only.
+    connection.execute(sa.text("GRANT SELECT, INSERT, UPDATE, DELETE ON liveness_challenges TO kyc_app"))
+    connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON liveness_checks TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON selfie_captures, face_quality_checks, biometric_templates, face_comparisons TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT ON consents TO kyc_app"))
 engine.dispose()
-print("Migrations through phases 1–5 and 8–9 applied and local organization provisioned.")
+print("Migrations through phase 10 applied and local organization provisioned.")

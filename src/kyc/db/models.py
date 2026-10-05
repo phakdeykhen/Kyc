@@ -266,7 +266,22 @@ class LivenessCheck(SessionArtifact, Base):
     model_version: Mapped[str] = mapped_column(sa.String(120))
     challenge_hash: Mapped[str | None] = mapped_column(sa.String(64))
     evidence_reference: Mapped[str | None] = mapped_column(sa.String(1024))
+    evidence_metadata: Mapped[dict] = mapped_column(JSON_VALUE, default=dict, server_default="{}")
     __table_args__ = artifact_constraints(__tablename__, sa.CheckConstraint("method IN ('PASSIVE_LIVENESS', 'ACTIVE_LIVENESS')", name="liveness_method"), sa.CheckConstraint("score IS NULL OR score BETWEEN 0 AND 1", name="score_range"))
+
+
+class LivenessChallenge(SessionArtifact, Base):
+    """Single-use active challenge. Only the nonce hash is stored; the nonce goes to the client once."""
+
+    __tablename__ = "liveness_challenges"
+    steps: Mapped[list] = mapped_column(JSON_VALUE)
+    nonce_hash: Mapped[str] = mapped_column(sa.String(64))
+    policy_version: Mapped[str] = mapped_column(sa.String(80))
+    expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = artifact_constraints(__tablename__,
+        sa.CheckConstraint("length(nonce_hash) = 64", name="nonce_hash_length"),
+        sa.Index("ix_liveness_challenges_session_created", "organization_id", "session_id", "created_at"))
 
 
 class FraudSignal(SessionArtifact, Base):

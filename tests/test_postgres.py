@@ -91,6 +91,16 @@ class PostgreSQLIsolationTests(unittest.TestCase):
                        threshold_policy_version, comparison_score, result)
                       VALUES (:id, :org, :session, :reference, :live, 'PostgreSQL test model', 'test-v1',
                               :sha, 'COSINE_SIMILARITY', '{}', 'uncalibrated-test-v1', 0.0, 'REVIEW')"""),
+                    # Phase 10: single-use challenges (only a nonce hash) and liveness evidence.
+                    "liveness_challenges": sa.text("""INSERT INTO liveness_challenges
+                      (id, organization_id, session_id, steps, nonce_hash, policy_version, expires_at)
+                      VALUES (:id, :org, :session, '["LOOK_STRAIGHT","TURN_LEFT"]', :sha, 'liveness-test-v1',
+                              now() + interval '2 minutes')"""),
+                    "liveness_checks": sa.text("""INSERT INTO liveness_checks
+                      (id, organization_id, session_id, method, result, score, model_name, model_version,
+                       challenge_hash, evidence_metadata)
+                      VALUES (:id, :org, :session, 'ACTIVE_LIVENESS', 'REVIEW', 1.0, 'test geometry', 'test-v1',
+                              :sha, '{}')"""),
                     "consents": sa.text("""INSERT INTO consents
                       (id, organization_id, session_id, user_id, scope, policy_version, granted)
                       VALUES (:id, :org, :session, 'postgres-test', 'BIOMETRIC_PROCESSING', 'consent-test-v1', true)"""),

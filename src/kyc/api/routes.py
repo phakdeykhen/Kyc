@@ -10,6 +10,7 @@ from kyc.documents.requirements import requirement_for
 from kyc.domain.enums import DocumentType
 from kyc.services.captures import CaptureLimits, submit_capture
 from kyc.services.biometrics import SelfieLimits, submit_selfie
+from kyc.services.liveness import LivenessLimits, issue_challenge, submit_liveness
 from kyc.services.results import build_result
 from kyc.services.sessions import create_session, get_session, respond
 
@@ -100,6 +101,48 @@ def upload_selfie(session_id: UUID, request: Request, tenant: Tenant, db: Databa
                          state.biometric_cipher, state.face_match_policy, limits, request.state.request_id,
                          biometric_consent=biometric_consent,
                          consent_policy_version=settings.biometric_consent_policy_version)
+
+
+def _liveness_limits(settings) -> LivenessLimits:
+    per_frame = min(settings.max_selfie_bytes, settings.max_liveness_bytes)
+    return LivenessLimits(settings.liveness_challenge_ttl_seconds, settings.max_liveness_attempts, per_frame,
+                          settings.max_selfie_pixels)
+
+
+@router.post("/kyc/{session_id}/liveness/challenge", responses={
+    409: {"model": CaptureError, "description": "Session is not waiting for liveness."},
+    429: {"model": CaptureError, "description": "Liveness attempt limit reached."},
+})
+def liveness_challenge(session_id: UUID, request: Request, tenant: Tenant, db: Database):
+    """Issue a single-use, randomly ordered head-movement challenge (expires quickly)."""
+    state = request.app.state
+    return issue_challenge(db, tenant, session_id, _liveness_limits(state.settings), state.liveness_policy,
+                           request.state.request_id)
+
+
+@router.post("/kyc/{session_id}/liveness", responses={
+    409: {"model": CaptureError, "description": "Challenge unknown, used or expired, or session not waiting for liveness."},
+    413: {"description": "Upload exceeds the size limit."},
+    422: {"description": "Frames unreadable or not matched to steps."},
+    503: {"description": "Face models unavailable."},
+})
+def upload_liveness(session_id: UUID, request: Request, tenant: Tenant, db: Database,
+                    challenge_id: Annotated[UUID, Form()], nonce: Annotated[str, Form(max_length=128)],
+                    frame_steps: Annotated[str, Form(max_length=200, description="Comma-separated step index per frame")],
+                    frames: Annotated[list[UploadFile], File(description="Raw (unmirrored) camera frames")]):
+    """Verify the challenge from 4–12 frames. Frames are assessed in memory and never stored."""
+    state, settings = request.app.state, request.app.state.settings
+    limits = _liveness_limits(settings)
+    try:
+        steps = [int(value) for value in frame_steps.split(",") if value.strip()]
+    except ValueError:
+        raise HTTPException(422, detail="frame_steps must be comma-separated integers.") from None
+    if len(frames) > state.liveness_policy.max_frames:
+        raise HTTPException(422, detail="Too many frames.")
+    data = [upload.file.read(limits.max_frame_bytes + 1) for upload in frames]
+    return submit_liveness(db, tenant, session_id, challenge_id, nonce, data, steps, state.face_engine,
+                           state.biometric_cipher, state.face_match_policy, state.liveness_policy, limits,
+                           request.state.request_id)
 
 
 @router.get("/document-types")

@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     max_selfie_bytes: int = Field(default=5 * 1024 * 1024, ge=100_000, le=25 * 1024 * 1024)
     max_selfie_pixels: int = Field(default=12_000_000, ge=1_000_000, le=40_000_000)
     max_selfie_attempts: int = Field(default=10, ge=1, le=50)
+    # Phase 10 active liveness. The policy stays uncalibrated (REVIEW at best) until validated on attack data.
+    liveness_challenge_ttl_seconds: int = Field(default=120, ge=30, le=600)
+    max_liveness_attempts: int = Field(default=5, ge=1, le=20)
+    max_liveness_bytes: int = Field(default=16 * 1024 * 1024, ge=500_000, le=64 * 1024 * 1024)
+    liveness_policy_version: str = Field(default="ACTIVE-GEOMETRY-2026.10.1", min_length=1, max_length=80)
+    liveness_calibrated: bool = False
     biometric_consent_policy_version: str = Field(default="BIOMETRIC-CONSENT-2026.10.1", min_length=1, max_length=80)
     face_match_policy_version: str = Field(default="SFACE-COSINE-UNCALIBRATED-2026.10.1", min_length=1, max_length=120)
     face_match_calibrated: bool = False

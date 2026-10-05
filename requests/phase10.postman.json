@@ -1,0 +1,564 @@
+{
+ "info": {
+  "name": "Universal KYC — through Phase 10",
+  "description": "Run document setup, poll Read session until SELFIE_REQUIRED, then run consent checks and selfie upload. The default workflow uses KH_PASSPORT DATA_PAGE. For an existing ready session set session_id and skip document setup. Choose local consented specimen files manually. Quality recapture requires a new photograph; reference recapture returns DOCUMENT_REQUIRED. Model files and independent capture/PII/biometric keys must be provisioned. Default uncalibrated comparison is REVIEW, never identity probability, liveness or a final verification decision. Keep credentials and personal-file paths private. Phase 10: request a liveness challenge, then upload 4–12 raw camera frames (field 'frames', repeated) with 'frame_steps' giving each frame's step index, plus the challenge_id and nonce. Each challenge is single-use and expires after 120 s.",
+  "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+ },
+ "variable": [
+  {
+   "key": "base_url",
+   "value": "http://127.0.0.1:8000"
+  },
+  {
+   "key": "api_key",
+   "value": ""
+  },
+  {
+   "key": "organization_id",
+   "value": ""
+  },
+  {
+   "key": "country",
+   "value": "KH"
+  },
+  {
+   "key": "document_type",
+   "value": "KH_PASSPORT"
+  },
+  {
+   "key": "document_side",
+   "value": "DATA_PAGE"
+  },
+  {
+   "key": "session_id",
+   "value": ""
+  },
+  {
+   "key": "challenge_id",
+   "value": ""
+  },
+  {
+   "key": "challenge_nonce",
+   "value": ""
+  }
+ ],
+ "item": [
+  {
+   "name": "Create document + face + liveness session",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/sessions",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "sessions"
+     ]
+    },
+    "description": "For an existing SELFIE_REQUIRED session, set session_id and skip this request.",
+    "body": {
+     "mode": "raw",
+     "raw": "{\n  \"user_id\": \"postman-face-specimen\",\n  \"country\": \"{{country}}\",\n  \"expected_document_type\": \"{{document_type}}\",\n  \"verification_level\": \"DOCUMENT_FACE_LIVENESS\"\n}",
+     "options": {
+      "raw": {
+       "language": "json"
+      }
+     }
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Created\", () => pm.response.to.have.status(201));",
+       "if (pm.response.code === 201) pm.collectionVariables.set(\"session_id\", pm.response.json().session_id);",
+       "pm.test(\"Initial status\", () => pm.expect(pm.response.json().status).to.eql(\"CREATED\"));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Upload accepted document side",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}/documents",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}",
+      "documents"
+     ]
+    },
+    "description": "Choose a full, clear local data-page specimen. If using a card, submit FRONT then BACK. Repeat on RECAPTURE. Do not continue until document processing reaches SELFIE_REQUIRED.",
+    "body": {
+     "mode": "formdata",
+     "formdata": [
+      {
+       "key": "side",
+       "value": "{{document_side}}",
+       "type": "text"
+      },
+      {
+       "key": "file",
+       "type": "file",
+       "src": ""
+      }
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Document capture assessed\", () => pm.response.to.have.status(200));",
+       "pm.test(\"Document quality result\", () => pm.expect([\"ACCEPTED\", \"RECAPTURE\"]).to.include(pm.response.json().capture_status));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Read session — repeat until SELFIE_REQUIRED",
+   "request": {
+    "method": "GET",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}"
+     ]
+    },
+    "description": "In deferred mode run scripts/process_documents.py. A DOCUMENT_REQUIRED response needs new document photos. Select a ready session before running the following requests."
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Session found\", () => pm.response.to.have.status(200));",
+       "pm.test(\"Tenant bound\", () => pm.expect(pm.response.json().organization_id).to.eql(pm.collectionVariables.get(\"organization_id\")));",
+       "pm.test(\"Ready for face stage\", () => pm.expect(pm.response.json().status).to.eql(\"SELFIE_REQUIRED\"));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Reject missing biometric consent",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}/selfie",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}",
+      "selfie"
+     ]
+    },
+    "description": "Choose a selfie file but omit biometric_consent. Processing must reject the request.",
+    "body": {
+     "mode": "formdata",
+     "formdata": [
+      {
+       "key": "file",
+       "type": "file",
+       "src": ""
+      }
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Consent required\", () => pm.response.to.have.status(422));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Reject false biometric consent",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}/selfie",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}",
+      "selfie"
+     ]
+    },
+    "description": "Choose a selfie file. This request must not create face templates or consume a quality attempt.",
+    "body": {
+     "mode": "formdata",
+     "formdata": [
+      {
+       "key": "biometric_consent",
+       "value": "false",
+       "type": "text"
+      },
+      {
+       "key": "file",
+       "type": "file",
+       "src": ""
+      }
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"False consent rejected\", () => pm.response.to.have.status(422));",
+       "pm.test(\"Explicit consent reason\", () => pm.expect(pm.response.json().reason_code).to.eql(\"BIOMETRIC_CONSENT_REQUIRED\"));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Submit consented selfie",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}/selfie",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}",
+      "selfie"
+     ]
+    },
+    "description": "Use a consented local face photo with one centered, sharp, evenly lit face. RECAPTURE: follow instructions and choose another photo. DOCUMENT_REQUIRED: return to document capture. ACCEPTED: comparison metadata is not liveness or a final identity decision.",
+    "body": {
+     "mode": "formdata",
+     "formdata": [
+      {
+       "key": "biometric_consent",
+       "value": "true",
+       "type": "text"
+      },
+      {
+       "key": "file",
+       "type": "file",
+       "src": ""
+      }
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Selfie capture assessed\", () => pm.response.to.have.status(200));",
+       "const body = pm.response.json();",
+       "pm.test(\"Quality gate result\", () => { pm.expect([\"ACCEPTED\", \"RECAPTURE\"]).to.include(body.capture_status); pm.expect(body.quality).to.have.property(\"policy_version\"); pm.expect(body.instructions).to.be.an(\"array\"); pm.expect(body.attempts_remaining).to.be.a(\"number\"); });",
+       "pm.test(\"Accepted handoff retains later verification\", () => { if (body.capture_status === \"ACCEPTED\") { pm.expect(body.status).to.eql(\"LIVENESS_REQUIRED\"); pm.expect(body.next_step).to.eql(\"CAPTURE_LIVENESS\"); pm.expect(body.comparison.metric).to.eql(\"COSINE_SIMILARITY\"); pm.expect(body.comparison.score).to.be.within(-1, 1); pm.expect([\"PASS\", \"REVIEW\", \"FAIL\"]).to.include(body.comparison.result); } });",
+       "pm.test(\"Uncalibrated policy always reviews\", () => { if (body.comparison && body.comparison.calibrated === false) pm.expect(body.comparison.result).to.eql(\"REVIEW\"); });",
+       "pm.test(\"Rejected captures have no comparison\", () => { if (body.capture_status === \"RECAPTURE\") pm.expect(body.comparison).to.eql(null); });",
+       "function checkPublic(value) { if (!value || typeof value !== \"object\") return; Object.entries(value).forEach(([key, child]) => { pm.expect([\"vector\", \"embedding\", \"template\", \"ciphertext\", \"template_encrypted\", \"landmarks\", \"pass_threshold\", \"fail_threshold\"], \"sensitive field \" + key).not.to.include(key); checkPublic(child); }); }",
+       "pm.test(\"No biometric vectors, ciphertext or thresholds\", () => checkPublic(pm.response.json()));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Read public result",
+   "request": {
+    "method": "GET",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}/result",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}",
+      "result"
+     ]
+    },
+    "description": "Inspect face_match, review reasons and comparison provenance. No biometric vectors, internal thresholds, raw face crops or asserted liveness should be exposed."
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Result found\", () => pm.response.to.have.status(200));",
+       "const body = pm.response.json();",
+       "pm.test(\"Final risk decision remains null\", () => pm.expect(body.decision).to.eql(null));",
+       "pm.test(\"Liveness remains unasserted\", () => pm.expect(body.checks.liveness).not.to.eql(\"PASS\"));",
+       "pm.test(\"Accepted face stage has a comparison check\", () => { if (body.status === \"LIVENESS_REQUIRED\") pm.expect([\"PASS\", \"REVIEW\", \"FAIL\"]).to.include(body.checks.face_match); });",
+       "function checkPublic(value) { if (!value || typeof value !== \"object\") return; Object.entries(value).forEach(([key, child]) => { pm.expect([\"vector\", \"embedding\", \"template\", \"ciphertext\", \"template_encrypted\", \"landmarks\", \"pass_threshold\", \"fail_threshold\"], \"sensitive field \" + key).not.to.include(key); checkPublic(child); }); }",
+       "pm.test(\"No biometric vectors, ciphertext or thresholds\", () => checkPublic(pm.response.json()));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Liveness challenge",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}/liveness/challenge",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}",
+      "liveness",
+      "challenge"
+     ]
+    },
+    "body": {
+     "mode": "raw",
+     "raw": "{}"
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Issued\", () => pm.response.to.have.status(200));",
+       "const body = pm.response.json();",
+       "pm.collectionVariables.set(\"challenge_id\", body.challenge_id);",
+       "pm.collectionVariables.set(\"challenge_nonce\", body.nonce);",
+       "pm.test(\"Starts with a frontal baseline and three movements\", () => { pm.expect(body.steps.length).to.eql(4); pm.expect(body.steps[0].step).to.eql(\"LOOK_STRAIGHT\"); });"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Liveness frames",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}/liveness",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}",
+      "liveness"
+     ]
+    },
+    "body": {
+     "mode": "formdata",
+     "formdata": [
+      {
+       "key": "challenge_id",
+       "value": "{{challenge_id}}",
+       "type": "text"
+      },
+      {
+       "key": "nonce",
+       "value": "{{challenge_nonce}}",
+       "type": "text"
+      },
+      {
+       "key": "frame_steps",
+       "value": "0,1,2,3",
+       "type": "text"
+      },
+      {
+       "key": "frames",
+       "type": "file",
+       "src": ""
+      },
+      {
+       "key": "frames",
+       "type": "file",
+       "src": ""
+      },
+      {
+       "key": "frames",
+       "type": "file",
+       "src": ""
+      },
+      {
+       "key": "frames",
+       "type": "file",
+       "src": ""
+      }
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Assessed\", () => pm.expect([200, 409, 422]).to.include(pm.response.code));",
+       "if (pm.response.code === 200) { const body = pm.response.json(); pm.test(\"Never a decision\", () => pm.expect([\"PASS\",\"REVIEW\",\"FAIL\"]).to.include(body.result)); pm.test(\"Thresholds are not exposed\", () => pm.expect(JSON.stringify(body)).to.not.include(\"movement\")); }"
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}

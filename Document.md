@@ -1208,8 +1208,8 @@ validation passed. Phase 10 has not started.
 | 7 | QR/barcode engine | Complete; 264/264 tests; live PostgreSQL passed; Docker pending |
 | 8 | Face detection + quality | Complete; native inference and tenant isolation verified; quality limits documented |
 | 9 | Face embeddings + 1:1 comparison | Complete; 264/264 tests; full document→selfie pipeline verified; default REVIEW |
-| 10 | Liveness / anti-spoof integration | Waiting for approval |
-| 11 | ePassport NFC mobile architecture | Not started |
+| 10 | Liveness / anti-spoof integration | Complete; 281/281 tests; photo attacks blocked; uncalibrated REVIEW |
+| 11 | ePassport NFC mobile architecture | Waiting for approval |
 | 12 | Cross-check + fraud signals | Not started |
 | 13 | Risk engine | Not started |
 | 14 | Manual review dashboard | Not started |

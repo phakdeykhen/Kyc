@@ -75,15 +75,40 @@ const enqueue = (body, status = 200) => queue.push({ body, status });
   elements['biometric-consent'].checked = true;
   run('updateButtons()');
   enqueue({ capture_status: 'ACCEPTED', status: 'LIVENESS_REQUIRED', instructions: [], attempts_remaining: 7, comparison: { score: .9, metric: 'COSINE_SIMILARITY', result: 'REVIEW', calibrated: false } });
+  enqueue(session('LIVENESS_REQUIRED'));
   await run('submitSelfie(new Blob(["face"], {type: "image/jpeg"}))');
+  assert.equal(run('state.mode'), 'liveness', 'Accepted selfie continues to liveness');
+  assert.equal(cameraRequests.at(-1).video.facingMode.ideal, 'user');
+  assert.equal(elements['selfie-file'].disabled, true);
+  assert.equal(elements['liveness-start'].disabled, false);
+  assert.equal(elements.scores.children.length, 0, 'No similarity percentage displayed');
+  assert.match(elements.verdict.textContent, /comparison needs review/);
+  // Liveness: random steps from the server, two raw frames per step, nonce echoed back.
+  run('state.stepDelayMs = 0');
+  const challenge = { challenge_id: '11111111-1111-4111-8111-111111111111', nonce: 'n'.repeat(43),
+    steps: [{ index: 0, step: 'LOOK_STRAIGHT', instruction: 'Look straight at the camera.' },
+            { index: 1, step: 'TURN_RIGHT', instruction: 'Slowly turn your head to your right.' },
+            { index: 2, step: 'LOOK_DOWN', instruction: 'Tilt your head down slightly.' },
+            { index: 3, step: 'TURN_LEFT', instruction: 'Slowly turn your head to your left.' }] };
+  enqueue(challenge);
+  enqueue({ status: 'LIVENESS_REQUIRED', result: 'REVIEW', retry_allowed: true, attempts_remaining: 3,
+            instructions: ['FOLLOW_EACH_INSTRUCTION'], reason_codes: ['CHALLENGE_NOT_COMPLETED'] });
+  await run('runLiveness()');
+  const upload = requests.at(-1).options.body;
+  assert.equal(upload.get('nonce'), challenge.nonce);
+  assert.equal(upload.get('frame_steps'), '0,0,1,1,2,2,3,3');
+  assert.equal(upload.getAll('frames').length, 8);
+  assert.equal(run('state.mode'), 'liveness', 'Retry keeps the liveness step open');
+  assert.match(elements.verdict.textContent, /try the movement check again/);
+  enqueue(challenge);
+  enqueue({ status: 'PROCESSING', result: 'REVIEW', retry_allowed: false, attempts_remaining: 2, instructions: [], score: 1 });
+  await run('runLiveness()');
   assert.equal(run('state.mode'), 'done');
   assert.equal(run('state.stream'), null);
-  assert.equal(elements['selfie-file'].disabled, true);
-  assert.equal(elements.scores.children.length, 0, 'No similarity percentage displayed');
-  assert.match(elements.next.textContent, /review/);
-  assert.match(elements.verdict.textContent, /comparison needs review/);
-  assert.ok(stopped >= 3, 'Camera tracks stop at stage handoffs');
-  enqueue(session('LIVENESS_REQUIRED'));
+  assert.match(elements.verdict.textContent, /needs review/);
+  assert.equal(elements.scores.children.length, 0, 'No liveness score displayed');
+  assert.ok(stopped >= 4, 'Camera tracks stop at stage handoffs');
+  enqueue(session('PROCESSING'));
   enqueue({ status: 'LIVENESS_REQUIRED', face_comparison: { result: 'REVIEW', score: .9 }, decision: null });
   await run('resumeSession()');
   assert.match(elements.verdict.textContent, /comparison needs review/, 'Resumed result preserves review');
@@ -104,5 +129,5 @@ const enqueue = (body, status = 200) => queue.push({ body, status });
   assert.match(elements['selfie-hint'].textContent, /could not be completed/);
   assert.equal(queue.length, 0);
   context.window.pagehide();
-  console.log('Capture UI smoke passed: consent, resume, recapture, document handoff/polling, cameras, review, unavailable engine, stopped streams and no probability.');
+  console.log('Capture UI smoke passed: consent, resume, recapture, document handoff/polling, cameras, review, liveness challenge/retry/finish, unavailable engine, stopped streams and no probability.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

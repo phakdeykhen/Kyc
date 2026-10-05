@@ -33,6 +33,12 @@ parsed (JWS, JSON, key=value, AAMVA PDF417, ICAO VDS), compared with the printed
 and verified cryptographically only against keys in `BARCODE_TRUST_STORE`. See
 [Phase 6](docs/architecture-phase6.md) and [Phase 7](docs/architecture-phase7.md).
 
+Phase 10 adds active liveness: after the selfie, the person follows a random,
+single-use sequence of head movements. Each movement is verified with 3D facial
+geometry, which a printed or on-screen photo cannot reproduce, and the person must
+stay the same throughout. Frames are never stored, and the uncalibrated policy
+returns REVIEW at best. See [Phase 10](docs/architecture-phase10.md).
+
 Phases 8–9 add CPU face detection, selfie quality recapture, aligned face embeddings,
 and 1:1 comparison against the accepted document portrait. Selfie submission requires
 explicit biometric consent. Face photos and templates are encrypted with separate
