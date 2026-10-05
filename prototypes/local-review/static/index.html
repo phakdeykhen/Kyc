@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A local workspace for customer intake, document checks, and KYC case review.">
+  <meta name="theme-color" content="#111d32">
+  <title>KYC Workspace — Customer verification</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to case queue</a>
+  <aside class="sidebar" aria-label="Workspace navigation">
+    <a class="brand" href="/" aria-label="KYC Workspace home">
+      <span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v6c0 5-8 9-8 9S4 17 4 12V6z"/><path d="m8 12 3 3 5-6"/></svg></span>
+      <span>KYC<span class="brand-subtitle">WORKSPACE</span></span>
+    </a>
+    <div class="nav-label">OPERATIONS</div>
+    <nav>
+      <button class="nav-item active" data-view="queue" aria-current="page"><span data-icon="grid"></span>Review queue<span id="nav-count" class="nav-count">—</span></button>
+      <button class="nav-item" data-view="activity"><span data-icon="history"></span>Activity log</button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="workspace-label"><span data-icon="monitor"></span><div><strong>Local workspace</strong><span>Single operator · demo</span></div></div>
+      <div class="sidebar-note">Sample records are fictional.<br>Changes stay on this computer.</div>
+    </div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar">
+      <div class="breadcrumb">Operations<span>/</span><strong id="breadcrumb-title">Customer verification</strong></div>
+      <div class="topbar-meta"><span class="demo-label">LOCAL DEMO</span><span id="today"></span></div>
+    </header>
+    <main id="main" tabindex="-1">
+      <div class="page-heading">
+        <div><div class="eyebrow">CUSTOMER OPERATIONS</div><h1 id="page-title">Customer verification</h1><p id="page-subtitle">Review documents and resolve customer cases.</p></div>
+        <button class="button primary" id="add-customer"><span data-icon="plus"></span>Add customer</button>
+      </div>
+      <div id="load-error" class="error-banner" role="alert" hidden></div>
+      <section id="queue-view" aria-label="Customer review queue">
+        <div class="stats" id="stats" aria-label="Case summary"><div class="loading-panel">Loading your workspace…</div></div>
+        <div class="queue-layout">
+          <section class="panel case-panel" aria-labelledby="queue-title">
+            <div class="panel-heading"><div class="heading-group"><h2 id="queue-title">Customer cases</h2><span class="count-badge" id="case-count">0</span></div><button class="button ghost small" id="refresh"><span data-icon="refresh"></span>Refresh</button></div>
+            <div class="filters" role="group" aria-label="Filter cases by status">
+              <button class="filter active" data-filter="all" aria-pressed="true">All cases</button>
+              <button class="filter" data-filter="under_review" aria-pressed="false">Under review</button>
+              <button class="filter" data-filter="needs_information" aria-pressed="false">Needs information</button>
+              <button class="filter" data-filter="approved" aria-pressed="false">Approved</button>
+              <button class="filter" data-filter="rejected" aria-pressed="false">Rejected</button>
+            </div>
+            <div class="table-toolbar">
+              <label class="search"><span data-icon="search"></span><input type="search" id="search" placeholder="Search name, email, or case ID" aria-label="Search customer cases"></label>
+              <label class="risk-filter"><span>Risk</span><select id="risk-filter" aria-label="Filter by risk level"><option value="all">All levels</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+            </div>
+            <div class="table-scroll"><table><thead><tr><th scope="col">Customer</th><th scope="col">Risk</th><th scope="col">Documents</th><th scope="col">Status</th><th scope="col">Received</th></tr></thead><tbody id="cases-body"></tbody></table></div>
+            <div id="empty-state" class="empty-state" hidden><span data-icon="search"></span><h3>No cases found</h3><p>Try another search or add a customer.</p><button class="button secondary" id="clear-filters">Clear filters</button></div>
+            <div class="table-footer"><span id="results-count" aria-live="polite">Loading cases…</span><span><span data-icon="lock"></span>Saved on this computer</span></div>
+          </section>
+          <aside class="queue-aside">
+            <section class="panel review-guide"><div class="guide-icon" data-icon="shield"></div><h2>Every check counts</h2><p>Complete the document checks before approving a customer.</p><ol><li><span>1</span>Confirm customer details</li><li><span>2</span>Check identity and address</li><li><span>3</span>Record a review decision</li></ol></section>
+            <section class="panel recent-panel" aria-labelledby="recent-title"><div class="panel-heading"><h2 id="recent-title">Recent activity</h2><span data-icon="history"></span></div><div id="recent-activity"></div><button class="activity-link" data-view="activity">View activity log</button></section>
+          </aside>
+        </div>
+      </section>
+      <section id="activity-view" class="panel" aria-labelledby="activity-title" hidden><div class="panel-heading"><div><h2 id="activity-title">Review history</h2><p class="secondary-text">Latest 100 changes in this workspace.</p></div><button class="button ghost small" id="refresh-activity"><span data-icon="refresh"></span>Refresh</button></div><div id="activity-list" class="activity-list"></div></section>
+    </main>
+    <footer class="page-footer"><span>KYC Workspace</span><span>Manual review · local prototype</span></footer>
+  </div>
+
+  <dialog id="create-dialog" class="create-dialog" aria-labelledby="create-title">
+    <form id="create-form">
+      <div class="dialog-heading"><div><span class="eyebrow">CUSTOMER INTAKE</span><h2 id="create-title">Add a customer</h2></div><button type="button" class="icon-button" data-close="create-dialog" aria-label="Close customer form"><span data-icon="close"></span></button></div>
+      <div class="dialog-body">
+        <p class="dialog-description">Create a case, then upload the documents for review.</p>
+        <div id="create-error" class="form-error" role="alert" hidden></div>
+        <div class="form-grid">
+          <label class="full-width">Full name or business name<span class="required">*</span><input name="full_name" required maxlength="120" autocomplete="name" placeholder="Customer name"></label>
+          <label>Email address<span class="required">*</span><input name="email" type="email" required maxlength="254" autocomplete="email" placeholder="name@example.com"></label>
+          <label>Phone number<input name="phone" type="tel" maxlength="40" autocomplete="tel" placeholder="Optional"></label>
+          <label>Country<span class="required">*</span><select name="country" required><option value="">Choose country</option><option>Cambodia</option><option>Singapore</option><option>Thailand</option><option>Vietnam</option><option>Malaysia</option><option>Laos</option><option>Indonesia</option><option>Philippines</option><option>United States</option><option>Other</option></select></label>
+          <label>Customer type<select name="customer_type"><option value="individual">Individual</option><option value="business">Business</option></select></label>
+          <label class="full-width">Assigned risk level<select name="risk_level"><option value="medium">Medium</option><option value="low">Low</option><option value="high">High</option></select><span class="field-hint">Set by the reviewer; no automated risk scoring.</span></label>
+          <label class="full-width">Purpose of the account<textarea name="purpose" rows="2" maxlength="500" placeholder="Optional onboarding context"></textarea></label>
+        </div>
+      </div>
+      <div class="dialog-footer"><button type="button" class="button secondary" data-close="create-dialog">Cancel</button><button type="submit" class="button primary" id="create-submit">Create case</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="detail-dialog" class="detail-dialog" aria-labelledby="detail-title"><div id="detail-content"></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

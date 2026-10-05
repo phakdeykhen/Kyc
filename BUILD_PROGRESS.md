@@ -1,0 +1,196 @@
+# Build progress — Universal Identity Platform
+
+Updated: 5 October 2026. The full requirements in `Document.md` control the build.
+Phases 2 and 3 were approved and are implemented. Work is paused at the Phase 3
+approval gate; Phase 4 has not started.
+
+## Phase 3 implementation (5 October 2026)
+
+Implemented the Cambodia National ID adapter and the document engine. The pipeline
+decrypts captures, corrects perspective from the Phase 2 quadrilateral, normalizes the
+image, and runs Tesseract 5 Khmer+Latin OCR with word boxes. A constrained Khmer-digit
+re-read follows, then per-side classification (including swapped sides), label-anchored
+fuzzy extraction of all card fields with provenance, and validation (required fields,
+number format, date consistency, expiry, OCR confidence, script consistency). MRZ,
+barcode and portrait report UNAVAILABLE. Fields are AES-GCM encrypted under a separate
+PII keyring, with an HMAC document-number lookup. The engine handles recapture with
+capture clearing, background processing after commit, a retry worker, and a masked
+result with identity and review flags. Also delivered: migration `0003_phase3`, grants,
+Docker image with Tesseract Khmer models, env keys, and Postman. Design:
+[architecture-phase3.md](docs/architecture-phase3.md).
+
+### Phase 3 validation evidence
+
+- **91 tests: 91 passed, 0 skipped, 0 failures** with live PostgreSQL 18.6
+  ([artifacts/phase3-tests.txt](artifacts/phase3-tests.txt)).
+- **Real OCR end to end.** A fictional specimen card was rendered with macOS Khmer fonts,
+  photographed onto a background, uploaded through the API and read by Tesseract 5.5.3.
+  The session reached `SELFIE_REQUIRED`. The Khmer name, Latin name, birth date, sex,
+  place of birth and address were correct, and the number was masked `*****3040`.
+  The issue date the OCR could not read reliably was flagged (`LOW_OCR_CONFIDENCE`,
+  `MIXED_DIGIT_SCRIPTS`), not silently accepted.
+- **Live PostgreSQL over HTTP** as the restricted `kyc_app` role, after
+  `bootstrap_local.py`: the same flow passed, a plain card without ID text went back to
+  `DOCUMENT_REQUIRED` (`DOCUMENT_NOT_RECOGNIZED`), and the database holds no plaintext
+  names in `document_fields`.
+- Tests also confirm: fields are tenant/field-bound (wrong context fails); audit and
+  check records contain no PII; expired cards are accepted as evidence with `expiry: FAIL`
+  and `decision: null`; type mismatch, unreadable critical fields, two fronts, and
+  swapped sides behave as designed; `PASSPORT` waits honestly with no adapter; OCR
+  failure leaves the session for the worker, which then completes it; a foreign tenant's
+  session is unreachable.
+- The live test exposed a missing database default on a new NOT NULL column, which was
+  fixed before sign-off.
+
+### Phase 3 limits
+
+The label set, 9-digit number, Khmer numerals and `IDKHM` back marker are layout
+assumptions that need confirmation against official specimens and consented real cards.
+Accuracy has been measured only on one synthetic card. Policies are uncalibrated. MRZ
+parsing (Phase 5), barcode (Phase 7) and portrait extraction (Phase 8) are not built.
+The result endpoint is not yet permission-scoped (Phase 15). Docker is still unexecuted
+on this machine.
+
+## Phase 2 record (5 October 2026)
+
+Implemented document capture and the quality pipeline. There are three upload
+endpoints (`/documents`, `/documents/front`, `/documents/back`). A safe image
+decoder enforces a format allowlist and pixel cap, applies EXIF orientation and
+drops metadata. A deterministic heuristic quality engine scores blur, glare,
+brightness, shadow, coverage, perspective, resolution and overall quality, with
+reason codes and user instructions. AES-256-GCM capture storage binds each object
+to its tenant, session and object and supports key rotation. Required sides come
+per document type. The session drives `CREATED → DOCUMENT_REQUIRED →
+DOCUMENT_PROCESSING`, with attempt limits, a body-size gate, retention purge and
+orphan sweep, migration `0002_phase2`, a development camera client at `/capture`,
+a Postman collection, and grants. Design: [architecture-phase2.md](docs/architecture-phase2.md).
+
+### Phase 2 validation evidence
+
+- **63 tests: 63 passed, 0 skipped, 0 failures**, on Python 3.13.15 (transcript:
+  [artifacts/phase2-tests.txt](artifacts/phase2-tests.txt)).
+- The quality gate accepts clean card, passport, rotated, PNG and quality-70 JPEG
+  fixtures. It requests recapture with the correct instruction for blur, darkness,
+  overexposure, glare, shadow, too far, too close, cropped, two documents,
+  perspective, low resolution, wrong shape and blank frames. Fixtures are synthetic
+  and non-personal.
+- **Live PostgreSQL 18.6** (a temporary local cluster) was used. The RLS test now
+  passes, including Phase 2 tables: a restricted role cannot read another tenant's
+  `document_images` or write `identity_documents` under another tenant's ID.
+- **End-to-end over HTTP.** `bootstrap_local.py` ran against live PostgreSQL, then
+  uvicorn served the API as the restricted `kyc_app` role. curl covered: blurry
+  front → RECAPTURE (`HOLD_STILL`); good front → ACCEPTED; back via the generic
+  endpoint → `DOCUMENT_PROCESSING`; result `document_quality: PASS`, `decision: null`;
+  upload after hand-off → 409; side replacement under the DELETE grant; foreign
+  organization → 403. The stored files start with the `KYC1` envelope, contain no
+  JPEG markers and have mode 0600.
+- The capture page was smoke-tested in Chrome: session creation and file upload
+  showed the RECAPTURE instruction, with no console errors.
+- The migration ran upgrade → metadata comparison → downgrade → upgrade; PostgreSQL
+  SQL: [artifacts/phase2-postgresql.sql](artifacts/phase2-postgresql.sql). OpenAPI:
+  [artifacts/openapi-phase2.json](artifacts/openapi-phase2.json).
+
+### Phase 2 limits
+
+Docker is still not installed, so the image build and Compose run remain unexecuted.
+Quality thresholds (`DOC-CAPTURE-HEURISTIC-2026.10.1`) are uncalibrated and tuned on
+synthetic images only. Consent is not yet enforced before capture. GCS storage and a
+scheduled purge are deployment work. No document is classified or read; sessions wait
+in `DOCUMENT_PROCESSING`.
+
+## Phase 1 record (4 October 2026)
+
+## Phase 1 implementation
+
+Implemented the FastAPI service foundation, canonical identity/OCR contracts,
+independent document/biometric/liveness/fraud/risk interfaces, KYC state machine,
+and seventeen-table PostgreSQL schema. Created a frozen Alembic migration,
+transactional session creation/read/expiry, access and transition auditing,
+credential-bound tenant context, composite ownership constraints, and forced
+PostgreSQL row policies.
+
+Created a non-root Docker image, local Compose database/API/migration services,
+environment template and private credential generator, setup/architecture guides,
+OpenAPI artifact, PostgreSQL SQL artifact, curl examples, and a nine-request
+Postman collection with assertions.
+
+## Validation evidence
+
+- Python **3.13.15**, satisfying the requested Python 3.12+ baseline.
+- **29 tests collected: 28 passed, 1 skipped, 0 failures, 0 errors.**
+- Tests exercise the real FastAPI application through in-process ASGI and an
+  isolated SQLite test database; no listening socket is required.
+- Verified UUID4 sessions, tenant-bound credentials, foreign-session invisibility,
+  payload validation, no client status overrides, transactional expiry, access
+  auditing, terminal-state immutability, and required-evidence guards.
+- Verified database rejection of cross-tenant/cross-session evidence links and
+  ciphertext fields without key versions.
+- Ran frozen migration upgrade → metadata comparison → downgrade → upgrade.
+- Compiled PostgreSQL migration SQL containing UUID, TIMESTAMPTZ, JSONB, and all
+  **17 forced tenant policies** with read/write scope expressions.
+- Python compilation, shell syntax, and generated JSON parsing passed.
+
+Reports:
+
+- [Test transcript](artifacts/phase1-tests.txt)
+- [Validation summary](artifacts/phase1-validation.json)
+- [PostgreSQL migration SQL](artifacts/phase1-postgresql.sql)
+- [OpenAPI schema](artifacts/openapi-phase1.json)
+
+## Checks that remain pending outside this runner
+
+The live PostgreSQL isolation test was skipped because no dedicated test database
+was available. Starting an isolated PostgreSQL cluster failed when the restricted
+environment denied shared-memory allocation. RLS was compiled and inspected but
+has not been demonstrated on a running PostgreSQL server here.
+
+Docker is not installed in this environment, so container build, Compose startup,
+and the provisioning/grant scripts have not been executed. The local runner also
+denied binding a web-server port, so no service is currently running.
+
+Package downloads could not resolve PyPI. The core Python 3.13 packages were
+loaded from existing local caches; MarkupSafe's pure Python fallback was used for
+migration rendering. The PostgreSQL driver remains uninstalled in the local
+virtual environment. Use the pinned `requirements.lock` installation from the
+README on a normal machine or in Docker before live PostgreSQL validation.
+
+These constraints are reported separately from the passing local tests. No GCP
+resources, real customer captures, or biometric records were created. Phase 1
+does not claim production readiness or functioning verification engines.
+
+## Phase tracker
+
+| Phase | Deliverable | Status |
+| --- | --- | --- |
+| 1 | Architecture, database schema, KYC session state machine | Complete; live PostgreSQL RLS verified 5 Oct; Docker pending |
+| 2 | Camera/document upload and quality pipeline | Complete; live PostgreSQL E2E passed; Docker pending |
+| 3 | Cambodia National ID adapter | Complete; 91/91 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
+| 4 | Cambodia NSSF adapter | Waiting for approval |
+| 5 | Passport and MRZ engine | Not started |
+| 6 | International generic passport adapter | Not started |
+| 7 | QR/barcode engine | Not started |
+| 8 | Face detection and quality | Not started |
+| 9 | Face embeddings and 1:1 comparison | Not started |
+| 10 | Liveness/anti-spoof integration | Not started |
+| 11 | ePassport NFC mobile architecture | Not started |
+| 12 | Cross-checks and fraud signals | Not started |
+| 13 | Deterministic risk engine | Not started |
+| 14 | Authorized manual review dashboard | Not started |
+| 15 | Multi-tenant API and credential provisioning | Not started |
+| 16 | Signed webhooks and SDKs | Not started |
+| 17 | Security/privacy hardening | Not started |
+| 18 | Load/performance testing | Not started |
+| 19 | GCP production deployment | Not started |
+| 20 | Additional country/document adapters | Not started |
+
+## Approval requirement
+
+`Document.md`, section 31, states: **“Stop and wait for approval before next
+phase.”** Phase 4 will begin only after that approval.
+
+## Earlier reference work
+
+The first local review prototype was built while the document was empty. When the
+full specification became available, that work was preserved in
+`prototypes/local-review/` and the requested FastAPI/PostgreSQL platform was
+started at the workspace root. It is not counted as completion of Phase 14.

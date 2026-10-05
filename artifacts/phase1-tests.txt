@@ -1,0 +1,34 @@
+test_configuration_errors_omit_secret_values (test_api.ConfigurationTests.test_configuration_errors_omit_secret_values) ... ok
+test_production_and_sqlite_development_are_rejected (test_api.ConfigurationTests.test_production_and_sqlite_development_are_rejected) ... ok
+test_short_credential_is_rejected (test_api.ConfigurationTests.test_short_credential_is_rejected) ... ok
+test_audit_metadata_omits_identity_fields (test_api.SessionAPITests.test_audit_metadata_omits_identity_fields) ... ok
+test_create_fetch_and_pending_result (test_api.SessionAPITests.test_create_fetch_and_pending_result) ... ok
+test_credentials_and_organization_binding (test_api.SessionAPITests.test_credentials_and_organization_binding) ... ok
+test_cross_tenant_session_is_not_visible (test_api.SessionAPITests.test_cross_tenant_session_is_not_visible) ... ok
+test_expiry_is_persisted_and_audited_once (test_api.SessionAPITests.test_expiry_is_persisted_and_audited_once) ... ok
+test_health_and_inventory_are_honest (test_api.SessionAPITests.test_health_and_inventory_are_honest) ... ok
+test_invalid_payload_and_client_status_assertions (test_api.SessionAPITests.test_invalid_payload_and_client_status_assertions) ... ok
+test_no_public_transition_endpoint (test_api.SessionAPITests.test_no_public_transition_endpoint) ... ok
+test_readiness_requires_the_expected_migration (test_api.SessionAPITests.test_readiness_requires_the_expected_migration) ... ok
+test_verified_terminal_session_does_not_expire (test_api.SessionAPITests.test_verified_terminal_session_does_not_expire) ... ok
+test_migration_and_database_enforced_tenant_isolation (test_postgres.PostgreSQLIsolationTests.test_migration_and_database_enforced_tenant_isolation) ... skipped 'TEST_DATABASE_URL is not set; live PostgreSQL is unavailable in this runner.'
+test_all_requested_tables_exist (test_schema.SchemaTests.test_all_requested_tables_exist) ... ok
+test_ciphertext_requires_a_key_version (test_schema.SchemaTests.test_ciphertext_requires_a_key_version) ... ok
+test_cross_session_document_link_fails (test_schema.SchemaTests.test_cross_session_document_link_fails) ... ok
+test_cross_tenant_artifact_link_fails_at_database_layer (test_schema.SchemaTests.test_cross_tenant_artifact_link_fails_at_database_layer) ... ok
+test_frozen_migration_upgrade_downgrade_and_model_alignment (test_schema.SchemaTests.test_frozen_migration_upgrade_downgrade_and_model_alignment) ... ok
+test_postgres_sql_contains_tenant_policies_and_native_types (test_schema.SchemaTests.test_postgres_sql_contains_tenant_policies_and_native_types) ... ok
+test_all_active_states_can_expire (test_state_machine.StateMachineTests.test_all_active_states_can_expire) ... ok
+test_all_supported_verification_paths (test_state_machine.StateMachineTests.test_all_supported_verification_paths) ... ok
+test_document_only_requires_document_and_policy (test_state_machine.StateMachineTests.test_document_only_requires_document_and_policy) ... ok
+test_incomplete_evidence_cannot_verify (test_state_machine.StateMachineTests.test_incomplete_evidence_cannot_verify) ... ok
+test_khmer_and_low_confidence_are_preserved (test_state_machine.StateMachineTests.test_khmer_and_low_confidence_are_preserved) ... ok
+test_levels_cannot_accept_unrequested_capture_stages (test_state_machine.StateMachineTests.test_levels_cannot_accept_unrequested_capture_stages) ... ok
+test_review_recapture_and_failure_paths (test_state_machine.StateMachineTests.test_review_recapture_and_failure_paths) ... ok
+test_skip_and_out_of_order_events_are_rejected (test_state_machine.StateMachineTests.test_skip_and_out_of_order_events_are_rejected) ... ok
+test_terminal_states_are_immutable (test_state_machine.StateMachineTests.test_terminal_states_are_immutable) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 1.348s
+
+OK (skipped=1)

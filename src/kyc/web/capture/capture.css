@@ -1,0 +1,62 @@
+:root {
+  --bg: #f2f5f4; --surface: #ffffff; --ink: #14232b; --muted: #56676e; --line: #cfd8d7;
+  --accent: #0d5c63; --ok: #2d7a4c; --ok-soft: #e1f1e7; --warn: #a86a12; --warn-soft: #f8ecd7;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1618; --surface: #142124; --ink: #e2eae9; --muted: #95a7a8; --line: #273739;
+    --accent: #63b9bf; --ok: #6cc58f; --ok-soft: #163024; --warn: #e3ad52; --warn-soft: #33270f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1618; --surface: #142124; --ink: #e2eae9; --muted: #95a7a8; --line: #273739;
+  --accent: #63b9bf; --ok: #6cc58f; --ok-soft: #163024; --warn: #e3ad52; --warn-soft: #33270f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+code { font-family: ui-monospace, Menlo, monospace; font-size: 0.9em; }
+.bar { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.tag { font-size: 0.75rem; color: var(--muted); }
+.layout { max-width: 720px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; }
+h1 { font-size: 1.15rem; margin: 0; }
+.muted { color: var(--muted); margin: 0; }
+.small { font-size: 0.85rem; }
+form { display: grid; gap: 10px; }
+label { display: grid; gap: 4px; font-size: 0.85rem; color: var(--muted); }
+input, select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0; }
+.row { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; }
+button, .file { font: 600 0.95rem system-ui, sans-serif; border-radius: 8px; padding: 10px 14px; cursor: pointer; border: 1px solid var(--accent); text-align: center; }
+.primary { background: var(--accent); color: var(--surface); }
+.secondary { background: transparent; color: var(--accent); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button:focus-visible, .file:focus-within, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.file input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.file { position: relative; display: inline-block; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stage { position: relative; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 4 / 3; }
+video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.frame { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.frame span { width: 82%; aspect-ratio: var(--doc-ratio, 1.586); border: 3px solid rgba(255, 255, 255, 0.9); border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45); max-height: 86%; }
+.frame.good span { border-color: #6cc58f; }
+.hint { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 8px 12px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 0.9rem; text-align: center; }
+.sides { list-style: none; display: flex; gap: 8px; margin: 0; padding: 0; flex-wrap: wrap; }
+.sides li { font-size: 0.8rem; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.sides li.done { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+.sides li.current { border-color: var(--accent); color: var(--accent); }
+.verdict { font-weight: 700; font-size: 1.1rem; padding: 10px 12px; border-radius: 8px; }
+.verdict.ok { background: var(--ok-soft); color: var(--ok); }
+.verdict.retry { background: var(--warn-soft); color: var(--warn); }
+.instructions { margin: 0; padding-left: 18px; }
+.scores { display: grid; grid-template-columns: minmax(0, 1fr) 2fr; gap: 6px 12px; margin: 0; font-size: 0.85rem; }
+.scores dt { color: var(--muted); }
+.scores dd { margin: 0; display: flex; align-items: center; gap: 8px; }
+.meter { flex: 1; height: 8px; border-radius: 4px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); }
+@media (max-width: 480px) {
+  .actions { grid-template-columns: 1fr; }
+  .scores { grid-template-columns: 1fr; }
+}

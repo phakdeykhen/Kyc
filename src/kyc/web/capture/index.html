@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Document Capture</title>
+  <link rel="stylesheet" href="capture.css">
+</head>
+<body>
+  <header class="bar">
+    <strong>Document capture</strong>
+    <span class="tag">Development client · Phase 2</span>
+  </header>
+
+  <main class="layout">
+    <section class="panel" id="setup" aria-labelledby="setup-title">
+      <h1 id="setup-title">1. Start a session</h1>
+      <p class="muted">Credentials stay in this tab's memory only. Use the values from your local <code>.env</code>.</p>
+      <form id="session-form" autocomplete="off">
+        <label>API key <input id="api-key" type="password" required minlength="32" spellcheck="false"></label>
+        <label>Organization ID <input id="org-id" required pattern="[0-9a-fA-F-]{36}" spellcheck="false"></label>
+        <div class="row">
+          <label>Country <input id="country" value="KH" maxlength="2" required></label>
+          <label>Document
+            <select id="doc-type">
+              <option value="KH_NATIONAL_ID">Cambodia National ID</option>
+              <option value="KH_PASSPORT">Cambodia Passport</option>
+              <option value="KH_NSSF">Cambodia NSSF card</option>
+              <option value="PASSPORT">Passport</option>
+              <option value="NATIONAL_ID">National ID</option>
+              <option value="RESIDENCE_CARD">Residence card</option>
+              <option value="DRIVING_LICENSE">Driving licence</option>
+            </select>
+          </label>
+        </div>
+        <label>Your user reference <input id="user-ref" value="capture-demo-user" required maxlength="128"></label>
+        <button type="submit" class="primary">Create session</button>
+      </form>
+      <p id="session-info" class="muted" hidden></p>
+    </section>
+
+    <section class="panel" id="capture" aria-labelledby="capture-title" hidden>
+      <h1 id="capture-title">2. Capture <span id="side-label">FRONT</span></h1>
+      <ol class="sides" id="sides"></ol>
+      <div class="stage">
+        <video id="video" playsinline muted></video>
+        <div class="frame" id="frame" aria-hidden="true"><span></span></div>
+        <p class="hint" id="hint" role="status">Starting camera…</p>
+      </div>
+      <div class="actions">
+        <button type="button" class="primary" id="shoot" disabled>Take photo</button>
+        <label class="secondary file">Upload a photo<input type="file" id="file" accept="image/jpeg,image/png,image/webp"></label>
+      </div>
+      <p class="muted small">Place the document on a plain, darker surface. Keep all four corners inside the frame, avoid glare, and hold the phone parallel to the document.</p>
+    </section>
+
+    <section class="panel" id="result" aria-labelledby="result-title" hidden>
+      <h1 id="result-title">Result</h1>
+      <div id="verdict" class="verdict"></div>
+      <ul id="instructions" class="instructions"></ul>
+      <dl id="scores" class="scores"></dl>
+      <p id="next" class="muted"></p>
+    </section>
+  </main>
+  <script src="capture.js"></script>
+</body>
+</html>

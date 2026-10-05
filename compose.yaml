@@ -1,0 +1,96 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: kyc_migrator
+      POSTGRES_DB: kyc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/configure_local.py first}
+      KYC_APP_PASSWORD: ${KYC_APP_PASSWORD:?Run scripts/configure_local.py first}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres-init.sh:/docker-entrypoint-initdb.d/01-kyc-app.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kyc_migrator -d kyc"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  api:
+    build: .
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg2://kyc_app:${KYC_APP_PASSWORD}@postgres:5432/kyc
+      DEVELOPMENT_API_KEY: ${DEVELOPMENT_API_KEY}
+      DEVELOPMENT_ORGANIZATION_ID: ${DEVELOPMENT_ORGANIZATION_ID}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-900}
+      CAPTURE_ENCRYPTION_KEYS: ${CAPTURE_ENCRYPTION_KEYS:?Run scripts/configure_local.py first}
+      CAPTURE_STORAGE_DIR: /var/lib/kyc/captures
+      PII_ENCRYPTION_KEYS: ${PII_ENCRYPTION_KEYS:?Run scripts/configure_local.py first}
+      PII_HMAC_KEY: ${PII_HMAC_KEY:?Run scripts/configure_local.py first}
+    volumes:
+      - capture_data:/var/lib/kyc/captures
+    ports:
+      - "127.0.0.1:8000:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  migrate:
+    build: .
+    profiles: [tools]
+    command: ["python", "scripts/bootstrap_local.py"]
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg2://kyc_app:${KYC_APP_PASSWORD}@postgres:5432/kyc
+      MIGRATION_DATABASE_URL: postgresql+psycopg2://kyc_migrator:${POSTGRES_PASSWORD}@postgres:5432/kyc
+      DEVELOPMENT_API_KEY: ${DEVELOPMENT_API_KEY}
+      DEVELOPMENT_ORGANIZATION_ID: ${DEVELOPMENT_ORGANIZATION_ID}
+    depends_on:
+      postgres:
+        condition: service_healthy
+  purge:
+    build: .
+    profiles: [tools]
+    command: ["python", "scripts/purge_captures.py"]
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg2://kyc_app:${KYC_APP_PASSWORD}@postgres:5432/kyc
+      DEVELOPMENT_API_KEY: ${DEVELOPMENT_API_KEY}
+      DEVELOPMENT_ORGANIZATION_ID: ${DEVELOPMENT_ORGANIZATION_ID}
+      CAPTURE_ENCRYPTION_KEYS: ${CAPTURE_ENCRYPTION_KEYS}
+      CAPTURE_STORAGE_DIR: /var/lib/kyc/captures
+    volumes:
+      - capture_data:/var/lib/kyc/captures
+    depends_on:
+      postgres:
+        condition: service_healthy
+  process:
+    build: .
+    profiles: [tools]
+    command: ["python", "scripts/process_documents.py"]
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg2://kyc_app:${KYC_APP_PASSWORD}@postgres:5432/kyc
+      DEVELOPMENT_API_KEY: ${DEVELOPMENT_API_KEY}
+      DEVELOPMENT_ORGANIZATION_ID: ${DEVELOPMENT_ORGANIZATION_ID}
+      CAPTURE_ENCRYPTION_KEYS: ${CAPTURE_ENCRYPTION_KEYS}
+      CAPTURE_STORAGE_DIR: /var/lib/kyc/captures
+      PII_ENCRYPTION_KEYS: ${PII_ENCRYPTION_KEYS}
+      PII_HMAC_KEY: ${PII_HMAC_KEY}
+    volumes:
+      - capture_data:/var/lib/kyc/captures
+    depends_on:
+      postgres:
+        condition: service_healthy
+  redis:
+    image: redis:7.4-alpine
+    profiles: [future]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    # Private compose network only. Cache integration belongs to a later phase.
+volumes:
+  postgres_data:
+  capture_data:

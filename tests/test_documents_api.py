@@ -1,0 +1,239 @@
+import base64
+import json
+import os
+import unittest
+from uuid import UUID, uuid4
+
+from cryptography.exceptions import InvalidTag
+import sqlalchemy as sa
+from sqlalchemy.orm import Session
+
+from kyc.db.models import AuditLog, DocumentCheck, DocumentField, DocumentImage, IdentityDocument, KYCSession
+from kyc.ocr.tesseract import OCRUnavailable, TesseractOCREngine
+from kyc.services.documents import pending_sessions
+from tests import images
+from tests.helpers import call
+from tests.test_captures_api import GOOD, GOOD_BACK, PASSPORT, CaptureAPICase
+from tests.test_capture_store import keyring
+from tests.test_kh_national_id import BACK, front_lines, line
+
+PII_SETTINGS = {"pii_encryption_keys": keyring("pii-test-v1"), "pii_hmac_key": base64.b64encode(os.urandom(32)).decode()}
+PII_VALUES = ("SOPHEA", "010203040", "សុខ", "ភ្នំពេញ", "1990-03-15")
+
+
+class ScriptedOCR:
+    """Returns prepared OCR pages in upload order; lets service tests run without Tesseract."""
+
+    engine_version = "scripted-ocr-test"
+
+    def __init__(self, *pages, error=None):
+        self.pages = list(pages)
+        self.error = error
+
+    def is_available(self, languages):
+        return True
+
+    def available_languages(self):
+        return {"khm", "eng"}  # no digit model, so numeric refinement is skipped
+
+    def read_lines(self, image, languages):
+        if self.error:
+            raise self.error
+        return self.pages.pop(0)
+
+
+class DocumentProcessingTests(CaptureAPICase):
+    extra_settings = PII_SETTINGS
+
+    def use_ocr(self, *pages, error=None):
+        self.app.state.document_processor.ocr = ScriptedOCR(*pages, error=error)
+
+    async def capture_both(self, document_type="KH_NATIONAL_ID", level="DOCUMENT_FACE_LIVENESS", front=GOOD, back=GOOD_BACK):
+        session_id = await self.create(document_type, level)
+        await self.upload(session_id, front, "front")
+        code, body, _ = await self.upload(session_id, back, "back")
+        self.assertEqual(code, 200, body)
+        self.assertEqual(body["status"], "DOCUMENT_PROCESSING")  # response is sent before processing runs
+        return session_id
+
+    async def session(self, session_id):
+        code, body, _ = await call(self.app, f"/v1/kyc/{session_id}", headers=self.headers)
+        return body
+
+    async def result(self, session_id):
+        code, body, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual(code, 200, body)
+        return body
+
+    async def test_valid_card_is_extracted_and_session_advances_to_selfie(self):
+        self.use_ocr(front_lines(), BACK)
+        session_id = await self.capture_both()
+        self.assertEqual((await self.session(session_id))["status"], "SELFIE_REQUIRED")
+        result = await self.result(session_id)
+        self.assertEqual(result["document"], {"country": "KH", "type": "KH_NATIONAL_ID",
+                                              "document_number_masked": "*****3040", "expiry_status": "VALID"})
+        self.assertEqual(result["identity"], {"full_name": "SOK SOPHEA", "full_name_local": "សុខ សុភា",
+                                              "date_of_birth": "1990-03-15", "sex": "F", "nationality": "KH"})
+        self.assertEqual(result["checks"], {"document_quality": "PASS", "document_classification": "PASS",
+                                            "document_data": "PASS", "expiry": "PASS", "mrz": "UNAVAILABLE",
+                                            "barcode": "UNAVAILABLE"})
+        self.assertEqual(result["review_flags"], [])
+        self.assertIsNone(result["decision"])  # extraction never decides
+
+    async def test_document_only_level_goes_straight_to_processing(self):
+        self.use_ocr(front_lines(), BACK)
+        session_id = await self.capture_both(level="DOCUMENT_ONLY")
+        self.assertEqual((await self.session(session_id))["status"], "PROCESSING")
+
+    async def test_fields_are_encrypted_bound_and_absent_from_audit_and_checks(self):
+        self.use_ocr(front_lines(), BACK)
+        session_id = await self.capture_both()
+        cipher = self.app.state.field_cipher
+        with Session(self.engine) as db:
+            fields = db.scalars(sa.select(DocumentField)).all()
+            document = db.scalar(sa.select(IdentityDocument))
+            audits = db.scalars(sa.select(AuditLog)).all()
+            checks = db.scalars(sa.select(DocumentCheck)).all()
+        self.assertGreaterEqual(len(fields), 10)
+        stored = b"".join((item.raw_value_ciphertext or b"") + (item.normalized_value_ciphertext or b"") for item in fields)
+        for value in PII_VALUES:
+            self.assertNotIn(value.encode(), stored)
+        name = next(item for item in fields if item.field_name == "full_name")
+        context = f"field/{self.org}/{session_id}/{document.id}/full_name/normalized"
+        self.assertEqual(cipher.open(name.normalized_value_ciphertext, name.key_version, context), "SOK SOPHEA")
+        with self.assertRaises(InvalidTag):
+            cipher.open(name.normalized_value_ciphertext, name.key_version, context.replace("full_name", "address"))
+        self.assertEqual(len(document.document_number_hmac), 64)
+        self.assertEqual(document.document_number_hmac, cipher.lookup_hash("010203040", "KH_NATIONAL_ID"))
+        self.assertIn("KH-NID-ADAPTER", document.extraction_version)
+        logged = json.dumps([[a.reason_codes, a.event_metadata] for a in audits] + [c.evidence_metadata for c in checks],
+                            ensure_ascii=False)
+        for value in PII_VALUES:
+            self.assertNotIn(value, logged)
+        self.assertIn("DOCUMENT_EXTRACTED", [a.action for a in audits])
+
+    async def test_expired_card_is_accepted_as_evidence_and_flagged(self):
+        self.use_ocr(front_lines(validity="០១.០១.២០១០ ដល់ថ្ងៃ ៣១.១២.២០១៩"), BACK)
+        session_id = await self.capture_both()
+        result = await self.result(session_id)
+        self.assertEqual(result["document"]["expiry_status"], "EXPIRED")
+        self.assertEqual(result["checks"]["expiry"], "FAIL")
+        self.assertIn("EXPIRED_DOCUMENT", result["review_flags"])
+        self.assertIsNone(result["decision"])  # the risk engine (Phase 13) decides, not the adapter
+
+    async def test_wrong_document_type_requests_recapture_and_clears_captures(self):
+        passport = [line("KINGDOM OF CAMBODIA PASSPORT", 0.1)]
+        self.use_ocr(passport, BACK)
+        session_id = await self.capture_both()
+        self.assertEqual((await self.session(session_id))["status"], "DOCUMENT_REQUIRED")
+        with Session(self.engine) as db:
+            self.assertEqual(db.scalar(sa.select(sa.func.count()).select_from(DocumentImage)), 0)
+            check = db.scalar(sa.select(DocumentCheck).where(DocumentCheck.check_type == "DOCUMENT_PROCESSING"))
+            self.assertEqual(check.evidence_metadata["reason_codes"], ["DOCUMENT_TYPE_MISMATCH"])
+            self.assertIn("DOCUMENT_RECAPTURE_REQUESTED", db.scalars(sa.select(AuditLog.action)).all())
+        code, body, _ = await self.upload(session_id, GOOD, "front")
+        self.assertEqual(body["sides"], {"FRONT": "ACCEPTED", "BACK": "REQUIRED"})  # old back no longer counts
+
+    async def test_recapture_reasons(self):
+        cases = [
+            ((front_lines(number="១២៣៤"), BACK), "CRITICAL_FIELD_UNREADABLE"),
+            (([line("hello", 0.1)], BACK), "DOCUMENT_NOT_RECOGNIZED"),
+            ((front_lines(), front_lines()), "BACK_SIDE_EXPECTED"),
+        ]
+        for pages, reason in cases:
+            with self.subTest(reason=reason):
+                self.use_ocr(*pages)
+                session_id = await self.capture_both()
+                self.assertEqual((await self.session(session_id))["status"], "DOCUMENT_REQUIRED")
+                with Session(self.engine) as db:
+                    codes = [c.evidence_metadata["reason_codes"] for c in db.scalars(sa.select(DocumentCheck).where(
+                        DocumentCheck.session_id == UUID(session_id), DocumentCheck.check_type == "DOCUMENT_PROCESSING"))]
+                self.assertEqual(codes, [[reason]])
+
+    async def test_sides_uploaded_the_wrong_way_round_are_handled(self):
+        self.use_ocr(BACK, front_lines())
+        session_id = await self.capture_both()
+        self.assertEqual((await self.session(session_id))["status"], "SELFIE_REQUIRED")
+        with Session(self.engine) as db:
+            check = db.scalar(sa.select(DocumentCheck).where(DocumentCheck.check_type == "CLASSIFICATION"))
+        self.assertEqual(check.evidence_metadata["notes"], ["SIDES_SWAPPED"])
+
+    async def test_document_type_without_an_adapter_waits_honestly(self):
+        self.use_ocr()
+        session_id = await self.create("PASSPORT")
+        code, body, _ = await self.upload(session_id, PASSPORT, None, side="DATA_PAGE")
+        self.assertEqual((await self.session(session_id))["status"], "DOCUMENT_PROCESSING")
+        outcome = self.app.state.document_processor.process(self.org, UUID(session_id), uuid4())
+        self.assertEqual(outcome.status, "NO_ADAPTER")
+        with Session(self.engine) as db:
+            self.assertEqual(db.scalar(sa.select(sa.func.count()).select_from(AuditLog)
+                                       .where(AuditLog.action == "DOCUMENT_ADAPTER_UNAVAILABLE")), 1)
+
+    async def test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it(self):
+        self.use_ocr(error=OCRUnavailable("OCR timed out."))
+        session_id = await self.capture_both()
+        self.assertEqual((await self.session(session_id))["status"], "DOCUMENT_PROCESSING")
+        with Session(self.engine) as db:
+            self.assertIn("DOCUMENT_PROCESSING_FAILED", db.scalars(sa.select(AuditLog.action)).all())
+        factory = self.app.state.session_factory
+        self.assertEqual(pending_sessions(factory, self.org), [UUID(session_id)])
+        self.use_ocr(front_lines(), BACK)
+        outcome = self.app.state.document_processor.process(self.org, UUID(session_id), uuid4())
+        self.assertEqual(outcome.status, "ACCEPTED")
+        self.assertEqual(pending_sessions(factory, self.org), [])
+
+    async def test_processor_cannot_reach_another_tenants_session(self):
+        session_id = await self.create()
+        outcome = self.app.state.document_processor.process(self.other_org, UUID(session_id), uuid4())
+        self.assertEqual(outcome.status, "NOT_FOUND")
+
+
+class ProcessingWithoutPIIKeysTests(CaptureAPICase):
+    async def test_extraction_is_unavailable_and_nothing_is_stored(self):
+        session_id = await self.create()
+        await self.upload(session_id, GOOD, "front")
+        await self.upload(session_id, GOOD_BACK, "back")
+        with Session(self.engine) as db:
+            self.assertEqual(db.get(KYCSession, UUID(session_id)).status.value, "DOCUMENT_PROCESSING")
+            self.assertEqual(db.scalar(sa.select(sa.func.count()).select_from(DocumentField)), 0)
+            self.assertIn("PII_ENCRYPTION_NOT_CONFIGURED", db.scalars(sa.select(AuditLog.action)).all())
+
+
+TESSERACT = TesseractOCREngine()
+
+
+@unittest.skipUnless(images.fonts_available() and TESSERACT.is_available(("khm", "eng")),
+                     "Tesseract with khm+eng and Khmer fonts are required for the real OCR test.")
+class RealOCREndToEndTests(CaptureAPICase):
+    extra_settings = PII_SETTINGS
+
+    async def test_photographed_specimen_card_is_read_by_real_ocr(self):
+        session_id = await self.create()
+        front = images.encode(images.photographed(images.kh_id_front()))
+        back = images.encode(images.photographed(images.kh_id_back()))
+        code, body, _ = await self.upload(session_id, front, "front")
+        self.assertEqual(body["capture_status"], "ACCEPTED", body)
+        code, body, _ = await self.upload(session_id, back, "back")
+        self.assertEqual(body["capture_status"], "ACCEPTED", body)
+        code, session, _ = await call(self.app, f"/v1/kyc/{session_id}", headers=self.headers)
+        self.assertEqual(session["status"], "SELFIE_REQUIRED")
+        code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual(result["document"]["document_number_masked"], "*****3040")
+        self.assertEqual(result["identity"]["full_name"], "SOK SOPHEA")
+        self.assertEqual(result["identity"]["full_name_local"], "សុខ សុភា")
+        self.assertEqual(result["identity"]["date_of_birth"], "1990-03-15")
+        self.assertEqual(result["identity"]["sex"], "F")
+        self.assertEqual(result["checks"]["document_classification"], "PASS")
+        with Session(self.engine) as db:
+            fields = {f.field_name: f for f in db.scalars(sa.select(DocumentField))}
+        # Anything the engine was unsure about is visibly flagged, never silently accepted.
+        for item in fields.values():
+            if item.source == "OCR" and item.confidence < 0.8 and item.normalized_value_ciphertext:
+                self.assertIn("LOW_OCR_CONFIDENCE", result["review_flags"])
+
+    async def test_card_without_identity_text_is_sent_back(self):
+        session_id = await self.create()
+        await self.upload(session_id, GOOD, "front")
+        await self.upload(session_id, GOOD_BACK, "back")
+        code, session, _ = await call(self.app, f"/v1/kyc/{session_id}", headers=self.headers)
+        self.assertEqual(session["status"], "DOCUMENT_REQUIRED")
