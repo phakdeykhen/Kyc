@@ -1202,7 +1202,7 @@ implemented at this workspace root. Later phases have not started.
 | 2 | Camera/document upload + quality pipeline | Complete; live PostgreSQL end-to-end passed; Docker pending |
 | 3 | Cambodia National ID adapter | Complete; real-OCR end-to-end passed; Docker pending |
 | 4 | Cambodia NSSF adapter | Complete; 109/109 tests; real-OCR end-to-end passed; Docker pending |
-| 5 | Passport + MRZ engine | Complete; 172/172 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
+| 5 | Passport + MRZ engine | Complete; 175/175 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
 | 6 | International generic passport adapter | Waiting for approval |
 | 7 | QR/barcode engine | Not started |
 | 8 | Face detection + quality | Not started |
@@ -1290,7 +1290,7 @@ are in [BUILD_PROGRESS.md](BUILD_PROGRESS.md); the design is in
 - Typed client MRZ metadata: format, validity, check-digit outcomes and field
   consistency; raw MRZ stays private. Generic MRZ-only consistency is NOT_APPLICABLE.
 - DATA_PAGE curl/Postman workflows and synthetic parser/API/real-OCR coverage.
-  172/172 tests passed with live PostgreSQL; MRZ tenant RLS and restricted-role
+  175/175 tests passed with live PostgreSQL; MRZ tenant RLS and restricted-role
   real-OCR passport workflows passed. Docker remains unexecuted. Evidence:
   [artifacts/phase5-postgres-e2e.json](artifacts/phase5-postgres-e2e.json).
 - Design and security limits in [docs/architecture-phase5.md](docs/architecture-phase5.md).

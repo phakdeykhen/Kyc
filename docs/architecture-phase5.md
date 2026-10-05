@@ -162,7 +162,7 @@ object contains `format`, `mrz_valid`, per-field check digits (`expected`, `comp
 values. A `RECAPTURE` capture needs a
 new photograph; a document recapture resets the session to `DOCUMENT_REQUIRED`.
 
-The full suite passed: **172 tests, 0 skipped, 0 failures** with live PostgreSQL
+The full suite passed: **175 tests, 0 skipped, 0 failures** with live PostgreSQL
 ([artifacts/phase5-tests.txt](../artifacts/phase5-tests.txt)). Live PostgreSQL tenant RLS validation, including
 MRZ results, passed. The [restricted-role PostgreSQL/OCR run](../artifacts/phase5-postgres-e2e.json)
 also passed for both passport adapters: each reached `SELFIE_REQUIRED` with valid

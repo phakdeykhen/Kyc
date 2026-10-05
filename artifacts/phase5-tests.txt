@@ -104,4 +104,129 @@ test_photographed_cambodian_passport_is_read_by_real_ocr (test_documents_api.Rea
 ok
 test_photographed_foreign_passport_is_read_from_its_mrz (test_documents_api.RealOCREndToEndTests.test_photographed_foreign_passport_is_read_from_its_mrz) ... Executing <Task pending name='Task-809' coro=<RealOCREndToEndTests.test_photographed_foreign_passport_is_read_from_its_mrz() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:422> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.116 seconds
 ok
-test_photographed_nssf_specimen_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_nssf_specimen_is_read_by_real_ocr) ... 
+test_photographed_nssf_specimen_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_nssf_specimen_is_read_by_real_ocr) ... Executing <Task pending name='Task-819' coro=<RealOCREndToEndTests.test_photographed_nssf_specimen_is_read_by_real_ocr() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:389> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.123 seconds
+ok
+test_photographed_specimen_card_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_specimen_card_is_read_by_real_ocr) ... Executing <Task pending name='Task-831' coro=<RealOCREndToEndTests.test_photographed_specimen_card_is_read_by_real_ocr() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:364> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.206 seconds
+ok
+test_classification_of_sides_and_other_documents (test_kh_national_id.AdapterTests.test_classification_of_sides_and_other_documents) ... ok
+test_clean_card_validates_and_engines_not_built_are_unavailable (test_kh_national_id.AdapterTests.test_clean_card_validates_and_engines_not_built_are_unavailable) ... ok
+test_corrupted_mrz_fails_its_check_digits (test_kh_national_id.AdapterTests.test_corrupted_mrz_fails_its_check_digits) ... ok
+test_extraction_produces_canonical_fields_with_provenance (test_kh_national_id.AdapterTests.test_extraction_produces_canonical_fields_with_provenance) ... ok
+test_label_value_on_the_next_line (test_kh_national_id.AdapterTests.test_label_value_on_the_next_line) ... ok
+test_mrz_fills_an_unreadable_visual_field_and_says_so (test_kh_national_id.AdapterTests.test_mrz_fills_an_unreadable_visual_field_and_says_so) ... ok
+test_mrz_visual_disagreement_is_reported_not_resolved (test_kh_national_id.AdapterTests.test_mrz_visual_disagreement_is_reported_not_resolved) ... ok
+test_problems_are_flagged_for_review_or_fail (test_kh_national_id.AdapterTests.test_problems_are_flagged_for_review_or_fail) ... ok
+test_registry_only_claims_implemented_adapters (test_kh_national_id.AdapterTests.test_registry_only_claims_implemented_adapters) ... ok
+test_wrapped_value_takes_the_weakest_line_confidence (test_kh_national_id.AdapterTests.test_wrapped_value_takes_the_weakest_line_confidence) ... ok
+test_dates_in_both_digit_scripts (test_kh_national_id.KhmerNormalizationTests.test_dates_in_both_digit_scripts) ... ok
+test_fuzzy_label_matching_tolerates_ocr_noise (test_kh_national_id.KhmerNormalizationTests.test_fuzzy_label_matching_tolerates_ocr_noise) ... ok
+test_mixed_digit_scripts_are_flagged_not_hidden (test_kh_national_id.KhmerNormalizationTests.test_mixed_digit_scripts_are_flagged_not_hidden) ... ok
+test_sex_names_and_invisible_characters (test_kh_national_id.KhmerNormalizationTests.test_sex_names_and_invisible_characters) ... ok
+test_each_khmer_adapter_recognizes_the_other_card (test_kh_national_id.NSSFAdapterTests.test_each_khmer_adapter_recognizes_the_other_card) ... ok
+test_extracts_member_card_fields (test_kh_national_id.NSSFAdapterTests.test_extracts_member_card_fields) ... ok
+test_registered_with_its_own_sides_and_version (test_kh_national_id.NSSFAdapterTests.test_registered_with_its_own_sides_and_version) ... ok
+test_unexpected_number_shapes_are_flagged (test_kh_national_id.NSSFAdapterTests.test_unexpected_number_shapes_are_flagged) ... ok
+test_validation_handles_cards_without_expiry_or_mrz (test_kh_national_id.NSSFAdapterTests.test_validation_handles_cards_without_expiry_or_mrz) ... ok
+test_disagreeing_reread_replaces_text_and_is_noted (test_kh_national_id.NumericRefinementTests.test_disagreeing_reread_replaces_text_and_is_noted) ... ok
+test_non_numeric_words_are_untouched (test_kh_national_id.NumericRefinementTests.test_non_numeric_words_are_untouched) ... ok
+test_structure_changing_reread_is_rejected (test_kh_national_id.NumericRefinementTests.test_structure_changing_reread_is_rejected) ... ok
+test_zero_confidence_reread_needs_a_confirming_pass (test_kh_national_id.NumericRefinementTests.test_zero_confidence_reread_needs_a_confirming_pass) ... ok
+test_a_single_corrupted_digit_is_caught (test_mrz.ParserTests.test_a_single_corrupted_digit_is_caught) ... ok
+test_best_block_is_chosen_across_ocr_passes (test_mrz.ParserTests.test_best_block_is_chosen_across_ocr_passes) ... ok
+test_century_inference_uses_full_birth_date_and_supplied_today (test_mrz.ParserTests.test_century_inference_uses_full_birth_date_and_supplied_today) ... ok
+test_check_digit_algorithm (test_mrz.ParserTests.test_check_digit_algorithm) ... ok
+test_check_digit_substitutions_are_counted_once_and_used_in_composite (test_mrz.ParserTests.test_check_digit_substitutions_are_counted_once_and_used_in_composite) ... ok
+test_checksum_success_cannot_make_impossible_or_illegal_fields_valid (test_mrz.ParserTests.test_checksum_success_cannot_make_impossible_or_illegal_fields_valid) ... ok
+test_comparison_reports_disagreement_without_resolving_it (test_mrz.ParserTests.test_comparison_reports_disagreement_without_resolving_it) ... ok
+test_document_codes_and_blank_issuing_state_are_validated (test_mrz.ParserTests.test_document_codes_and_blank_issuing_state_are_validated) ... ok
+test_extended_td1_document_number_checks_entire_number_and_retains_optional_data (test_mrz.ParserTests.test_extended_td1_document_number_checks_entire_number_and_retains_optional_data) ... ok
+test_extended_td2_document_number_and_ocr_overflow_check_digit (test_mrz.ParserTests.test_extended_td2_document_number_and_ocr_overflow_check_digit) ... ok
+test_filler_check_digits_are_only_allowed_for_unused_td3_personal_number (test_mrz.ParserTests.test_filler_check_digits_are_only_allowed_for_unused_td3_personal_number) ... ok
+test_filler_misreads_in_names_are_removed_and_flagged (test_mrz.ParserTests.test_filler_misreads_in_names_are_removed_and_flagged) ... ok
+test_icao_specimens_in_all_three_formats (test_mrz.ParserTests.test_icao_specimens_in_all_three_formats) ... ok
+test_icao_unknown_birth_date_is_distinguished_from_corrupt_date (test_mrz.ParserTests.test_icao_unknown_birth_date_is_distinguished_from_corrupt_date) ... ok
+test_lost_trailing_filler_is_restored_but_data_lines_are_not_stretched (test_mrz.ParserTests.test_lost_trailing_filler_is_restored_but_data_lines_are_not_stretched) ... ok
+test_malformed_extension_cannot_become_a_valid_truncated_number (test_mrz.ParserTests.test_malformed_extension_cannot_become_a_valid_truncated_number) ... ok
+test_multiline_input_and_unrelated_ocr_lines_do_not_expand_parse_search (test_mrz.ParserTests.test_multiline_input_and_unrelated_ocr_lines_do_not_expand_parse_search) ... ok
+test_name_prefix_is_not_a_match_without_mrz_truncation_evidence (test_mrz.ParserTests.test_name_prefix_is_not_a_match_without_mrz_truncation_evidence) ... ok
+test_numeric_substitutions_only_in_numeric_fields_and_reported (test_mrz.ParserTests.test_numeric_substitutions_only_in_numeric_fields_and_reported) ... ok
+test_parse_rejects_wrong_counts_lengths_and_characters (test_mrz.ParserTests.test_parse_rejects_wrong_counts_lengths_and_characters) ... ok
+test_unreadable_input (test_mrz.ParserTests.test_unreadable_input) ... ok
+test_cambodian_passport_reads_visual_zone_and_validates_mrz (test_mrz.PassportAdapterTests.test_cambodian_passport_reads_visual_zone_and_validates_mrz) ... ok
+test_foreign_mrz_for_a_cambodian_session_is_flagged (test_mrz.PassportAdapterTests.test_foreign_mrz_for_a_cambodian_session_is_flagged) ... ok
+test_generic_adapter_rejects_invalid_or_non_passport_mrz (test_mrz.PassportAdapterTests.test_generic_adapter_rejects_invalid_or_non_passport_mrz) ... ok
+test_generic_adapter_takes_everything_from_a_valid_mrz (test_mrz.PassportAdapterTests.test_generic_adapter_takes_everything_from_a_valid_mrz) ... ok
+test_passport_number_label_never_takes_a_title_word (test_mrz.PassportAdapterTests.test_passport_number_label_never_takes_a_title_word) ... ok
+test_visual_mrz_mismatch_is_the_spec_example (test_mrz.PassportAdapterTests.test_visual_mrz_mismatch_is_the_spec_example) ... ok
+test_deduplicates_equivalent_reads_but_keeps_distinct_candidates (test_mrz_reader.MRZReaderTests.test_deduplicates_equivalent_reads_but_keeps_distinct_candidates) ... ok
+test_preserves_raw_ocr_and_maps_bbox_to_the_corrected_page (test_mrz_reader.MRZReaderTests.test_preserves_raw_ocr_and_maps_bbox_to_the_corrected_page) ... ok
+test_a_card_without_mrz_cannot_take_identity_fields_from_another_cards_mrz (test_passport_regressions.PassportTrustRegressions.test_a_card_without_mrz_cannot_take_identity_fields_from_another_cards_mrz) ... ok
+test_a_visual_component_conflict_survives_partial_name_fallback (test_passport_regressions.PassportTrustRegressions.test_a_visual_component_conflict_survives_partial_name_fallback) ... ok
+test_adapter_reuse_does_not_compare_another_sessions_mrz (test_passport_regressions.PassportTrustRegressions.test_adapter_reuse_does_not_compare_another_sessions_mrz) ... ok
+test_check_evidence_has_no_raw_identity_values (test_passport_regressions.PassportTrustRegressions.test_check_evidence_has_no_raw_identity_values) ... ok
+test_checksum_success_does_not_hide_invalid_mrz_data (test_passport_regressions.PassportTrustRegressions.test_checksum_success_does_not_hide_invalid_mrz_data) ... ok
+test_english_label_case_does_not_change_the_extraction (test_passport_regressions.PassportTrustRegressions.test_english_label_case_does_not_change_the_extraction) ... ok
+test_fallback_keeps_the_unreadable_visual_evidence_and_mrz_source_box (test_passport_regressions.PassportTrustRegressions.test_fallback_keeps_the_unreadable_visual_evidence_and_mrz_source_box) ... ok
+test_good_visual_pass_can_rescue_a_failed_dedicated_mrz_pass (test_passport_regressions.PassportTrustRegressions.test_good_visual_pass_can_rescue_a_failed_dedicated_mrz_pass) ... ok
+test_missing_given_names_are_filled_before_composing_the_full_name (test_passport_regressions.PassportTrustRegressions.test_missing_given_names_are_filled_before_composing_the_full_name) ... ok
+test_passport_fields_point_to_the_data_page_and_name_covers_both_parts (test_passport_regressions.PassportTrustRegressions.test_passport_fields_point_to_the_data_page_and_name_covers_both_parts) ... ok
+test_printed_nationality_disagreement_is_not_hidden_by_a_derived_country (test_passport_regressions.PassportTrustRegressions.test_printed_nationality_disagreement_is_not_hidden_by_a_derived_country) ... ok
+test_raw_mrz_keeps_original_ocr_while_normalized_mrz_is_assembled (test_passport_regressions.PassportTrustRegressions.test_raw_mrz_keeps_original_ocr_while_normalized_mrz_is_assembled) ... ok
+test_unprotected_fields_and_missing_visual_comparison_are_reported_truthfully (test_passport_regressions.PassportTrustRegressions.test_unprotected_fields_and_missing_visual_comparison_are_reported_truthfully) ... ok
+test_valid_khmer_mrz_alone_identifies_a_data_page_and_foreign_mrz_is_a_different_type (test_passport_regressions.PassportTrustRegressions.test_valid_khmer_mrz_alone_identifies_a_data_page_and_foreign_mrz_is_a_different_type) ... ok
+test_wrong_document_layout_cannot_supply_canonical_fallback_fields (test_passport_regressions.PassportTrustRegressions.test_wrong_document_layout_cannot_supply_canonical_fallback_fields) ... ok
+test_migration_and_database_enforced_tenant_isolation (test_postgres.PostgreSQLIsolationTests.test_migration_and_database_enforced_tenant_isolation) ... INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_phase1, Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Running upgrade 0001_phase1 -> 0002_phase2, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running upgrade 0002_phase2 -> 0003_phase3, Phase 3 document extraction: field provenance/flags and document processing metadata.
+ok
+test_all_requested_tables_exist (test_schema.SchemaTests.test_all_requested_tables_exist) ... ok
+test_ciphertext_requires_a_key_version (test_schema.SchemaTests.test_ciphertext_requires_a_key_version) ... ok
+test_cross_session_document_link_fails (test_schema.SchemaTests.test_cross_session_document_link_fails) ... ok
+test_cross_tenant_artifact_link_fails_at_database_layer (test_schema.SchemaTests.test_cross_tenant_artifact_link_fails_at_database_layer) ... ok
+test_frozen_migration_upgrade_downgrade_and_model_alignment (test_schema.SchemaTests.test_frozen_migration_upgrade_downgrade_and_model_alignment) ... INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_phase1, Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Running upgrade 0001_phase1 -> 0002_phase2, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running upgrade 0002_phase2 -> 0003_phase3, Phase 3 document extraction: field provenance/flags and document processing metadata.
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.schemas
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.tables
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.types
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.constraints
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.defaults
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.comments
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running downgrade 0003_phase3 -> 0002_phase2, Phase 3 document extraction: field provenance/flags and document processing metadata.
+INFO  [alembic.runtime.migration] Running downgrade 0002_phase2 -> 0001_phase1, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running downgrade 0001_phase1 -> , Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_phase1, Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Running upgrade 0001_phase1 -> 0002_phase2, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running upgrade 0002_phase2 -> 0003_phase3, Phase 3 document extraction: field provenance/flags and document processing metadata.
+ok
+test_postgres_sql_contains_tenant_policies_and_native_types (test_schema.SchemaTests.test_postgres_sql_contains_tenant_policies_and_native_types) ... INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Generating static SQL
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_phase1, Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Running upgrade 0001_phase1 -> 0002_phase2, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running upgrade 0002_phase2 -> 0003_phase3, Phase 3 document extraction: field provenance/flags and document processing metadata.
+ok
+test_all_active_states_can_expire (test_state_machine.StateMachineTests.test_all_active_states_can_expire) ... ok
+test_all_supported_verification_paths (test_state_machine.StateMachineTests.test_all_supported_verification_paths) ... ok
+test_document_only_requires_document_and_policy (test_state_machine.StateMachineTests.test_document_only_requires_document_and_policy) ... ok
+test_incomplete_evidence_cannot_verify (test_state_machine.StateMachineTests.test_incomplete_evidence_cannot_verify) ... ok
+test_khmer_and_low_confidence_are_preserved (test_state_machine.StateMachineTests.test_khmer_and_low_confidence_are_preserved) ... ok
+test_levels_cannot_accept_unrequested_capture_stages (test_state_machine.StateMachineTests.test_levels_cannot_accept_unrequested_capture_stages) ... ok
+test_review_recapture_and_failure_paths (test_state_machine.StateMachineTests.test_review_recapture_and_failure_paths) ... ok
+test_skip_and_out_of_order_events_are_rejected (test_state_machine.StateMachineTests.test_skip_and_out_of_order_events_are_rejected) ... ok
+test_terminal_states_are_immutable (test_state_machine.StateMachineTests.test_terminal_states_are_immutable) ... ok
+
+----------------------------------------------------------------------
+Ran 175 tests in 109.773s
+
+OK

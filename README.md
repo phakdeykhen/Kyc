@@ -335,7 +335,7 @@ MRZ text is encrypted under the PII keyring; `mrz_results` contains only format,
 validity, digit outcomes and field-consistency metadata. See
 [Phase 5 security concerns](docs/architecture-phase5.md#5-security-concerns-and-limits)
 for unconfirmed passport layout assumptions, date-century heuristics and unsupported
-MRZ deviations. The Phase 5 suite passed 172/172 tests with live PostgreSQL; MRZ tenant
+MRZ deviations. The Phase 5 suite passed 175/175 tests with live PostgreSQL; MRZ tenant
 RLS and restricted-role real-OCR passport workflows passed. See
 [PostgreSQL passport evidence](artifacts/phase5-postgres-e2e.json). Per `Document.md`, work stops
 after Phase 5; Phase 6 requires separate approval.
