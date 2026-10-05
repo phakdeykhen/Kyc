@@ -1193,8 +1193,9 @@ Design this as:
 
 ## Implementation progress — 5 October 2026
 
-The original specification above is preserved. Phases 1–5 have been
-implemented at this workspace root. Later phases have not started.
+The original specification above is preserved. Phases 1–9 have been implemented
+at this workspace root. The user authorized Phases 8 and 9 together; their final
+validation passed. Phase 10 has not started.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -1205,9 +1206,9 @@ implemented at this workspace root. Later phases have not started.
 | 5 | Passport + MRZ engine | Complete; 175/175 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
 | 6 | International generic passport adapter | Complete; real-OCR end-to-end passed; Docker pending |
 | 7 | QR/barcode engine | Complete; 264/264 tests; live PostgreSQL passed; Docker pending |
-| 8 | Face detection + quality | Implemented in a Codex checkpoint; final validation pending |
-| 9 | Face embeddings + 1:1 comparison | Implemented in a Codex checkpoint; final validation pending |
-| 10 | Liveness / anti-spoof integration | Not started |
+| 8 | Face detection + quality | Complete; native inference and tenant isolation verified; quality limits documented |
+| 9 | Face embeddings + 1:1 comparison | Complete; 264/264 tests; encrypted native PostgreSQL flow passed; default REVIEW |
+| 10 | Liveness / anti-spoof integration | Waiting for approval |
 | 11 | ePassport NFC mobile architecture | Not started |
 | 12 | Cross-check + fraud signals | Not started |
 | 13 | Risk engine | Not started |
@@ -1295,5 +1296,20 @@ are in [BUILD_PROGRESS.md](BUILD_PROGRESS.md); the design is in
   [artifacts/phase5-postgres-e2e.json](artifacts/phase5-postgres-e2e.json).
 - Design and security limits in [docs/architecture-phase5.md](docs/architecture-phase5.md).
 
-**Approval gate:** Section 31 requires stopping after each phase. Phase 5 was
-approved; work stops after Phase 5 until separate approval to proceed to Phase 6.
+### Phases 8–9 deliverables
+
+- YuNet CPU detection and actionable selfie quality checks; SFace aligned normalized
+  embeddings and versioned, same-model 1:1 cosine comparison.
+- Explicit biometric consent, encrypted selfie capture and separately keyed templates,
+  scoped provenance, retention purge and migration `0004_phase8_9`.
+- Selfie API, resumable front-camera capture client, masked comparison results, pinned
+  model/license provisioning and Postman workflows.
+- 264/264 tests passed with live PostgreSQL; native detector/recognizer and encrypted
+  restricted-role selfie flow verified. Default matching returns REVIEW. Eye visibility,
+  severe occlusion and production calibration remain unverified; no liveness or final
+  decision is asserted. Docker remains unexecuted.
+- [Design](docs/architecture-phase8-9.md), [test evidence](artifacts/stage8-9-tests.txt),
+  [native PostgreSQL evidence](artifacts/stage8-9-postgres-native-e2e.json).
+
+**Approval gate:** Section 31 requires stopping after each phase. The user approved
+Phases 8 and 9 together. Work stops after Phase 9 until separate approval for Phase 10.

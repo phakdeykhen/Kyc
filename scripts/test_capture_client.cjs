@@ -55,7 +55,7 @@ const enqueue = (body, status = 200) => queue.push({ body, status });
   assert.equal(elements.instructions.children[0].textContent, 'Center your face inside the oval.');
   assert.equal(requests.at(-1).options.body.get('biometric_consent'), 'true');
   assert.equal(elements['selfie-file'].disabled, false, 'Recapture stays available');
-  enqueue({ capture_status: 'RECAPTURE', status: 'DOCUMENT_REQUIRED', instructions: ['RECAPTURE_DOCUMENT'], attempts_remaining: 8, comparison: null });
+  enqueue({ capture_status: 'RECAPTURE', status: 'DOCUMENT_REQUIRED', instructions: ['RECAPTURE_DOCUMENT_WITH_CLEAR_PORTRAIT'], attempts_remaining: 8, comparison: null });
   enqueue(session('DOCUMENT_REQUIRED'));
   enqueue({ document_types: [{ type: 'KH_PASSPORT', required_sides: ['DATA_PAGE'] }] });
   await run('submitSelfie(new Blob(["face"], {type: "image/jpeg"}))');

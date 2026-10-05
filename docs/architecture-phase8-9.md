@@ -1,8 +1,8 @@
 # Phases 8–9 — Face detection, quality and 1:1 comparison
 
 The user authorized both stages on 5 October 2026 after the passport/MRZ work.
-Phase 6 (international passport visual-zone extraction) and Phase 7 (QR/barcode) remain
-not started. Validation evidence and final test counts belong to
+The shared workspace also contains international document and barcode adapters.
+Validation evidence and final test counts belong to
 [BUILD_PROGRESS.md](../BUILD_PROGRESS.md).
 
 ## Design and scope

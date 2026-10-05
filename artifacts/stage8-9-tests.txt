@@ -1,0 +1,329 @@
+test_configuration_errors_omit_secret_values (test_api.ConfigurationTests.test_configuration_errors_omit_secret_values) ... ok
+test_production_and_sqlite_development_are_rejected (test_api.ConfigurationTests.test_production_and_sqlite_development_are_rejected) ... ok
+test_short_credential_is_rejected (test_api.ConfigurationTests.test_short_credential_is_rejected) ... ok
+test_audit_metadata_omits_identity_fields (test_api.SessionAPITests.test_audit_metadata_omits_identity_fields) ... Executing <Task finished name='Task-1' coro=<SessionAPITests.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.143 seconds
+ok
+test_create_fetch_and_pending_result (test_api.SessionAPITests.test_create_fetch_and_pending_result) ... Executing <Task finished name='Task-8' coro=<SessionAPITests.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.163 seconds
+ok
+test_credentials_and_organization_binding (test_api.SessionAPITests.test_credentials_and_organization_binding) ... ok
+test_cross_tenant_session_is_not_visible (test_api.SessionAPITests.test_cross_tenant_session_is_not_visible) ... ok
+test_expiry_is_persisted_and_audited_once (test_api.SessionAPITests.test_expiry_is_persisted_and_audited_once) ... ok
+test_health_and_inventory_are_honest (test_api.SessionAPITests.test_health_and_inventory_are_honest) ... ok
+test_invalid_payload_and_client_status_assertions (test_api.SessionAPITests.test_invalid_payload_and_client_status_assertions) ... ok
+test_no_public_transition_endpoint (test_api.SessionAPITests.test_no_public_transition_endpoint) ... ok
+test_readiness_requires_the_expected_migration (test_api.SessionAPITests.test_readiness_requires_the_expected_migration) ... ok
+test_verified_terminal_session_does_not_expire (test_api.SessionAPITests.test_verified_terminal_session_does_not_expire) ... ok
+test_absent_or_uncomparable_codes (test_barcode.AssessmentTests.test_absent_or_uncomparable_codes) ... ok
+test_consistent_unsigned_code_passes_as_consistent_only (test_barcode.AssessmentTests.test_consistent_unsigned_code_passes_as_consistent_only) ... ok
+test_disagreement_with_the_printed_card_is_flagged (test_barcode.AssessmentTests.test_disagreement_with_the_printed_card_is_flagged) ... ok
+test_signed_codes (test_barcode.AssessmentTests.test_signed_codes) ... ok
+test_nothing_to_decode (test_barcode.DecodeTests.test_nothing_to_decode) ... ok
+test_qr_and_pdf417_are_decoded_from_a_photographed_card (test_barcode.DecodeTests.test_qr_and_pdf417_are_decoded_from_a_photographed_card) ... ok
+test_aamva_driving_licence_pdf417 (test_barcode.PayloadTests.test_aamva_driving_licence_pdf417) ... ok
+test_structured_formats (test_barcode.PayloadTests.test_structured_formats) ... ok
+test_visible_digital_seal_and_plain_text (test_barcode.PayloadTests.test_visible_digital_seal_and_plain_text) ... ok
+test_tampered_unknown_key_and_alg_none (test_barcode.SignatureTests.test_tampered_unknown_key_and_alg_none) ... ok
+test_trust_store_loads_pem_keys_from_file (test_barcode.SignatureTests.test_trust_store_loads_pem_keys_from_file) ... ok
+test_valid_signature_with_a_trusted_key (test_barcode.SignatureTests.test_valid_signature_with_a_trusted_key) ... ok
+test_ciphertext_round_trip_is_separately_keyed (test_biometric_storage.BiometricStorageTests.test_ciphertext_round_trip_is_separately_keyed) ... ok
+test_config_rejects_reusing_capture_or_pii_keys_for_biometrics (test_biometric_storage.BiometricStorageTests.test_config_rejects_reusing_capture_or_pii_keys_for_biometrics) ... ok
+test_payload_size_and_incomplete_contexts_are_bounded (test_biometric_storage.BiometricStorageTests.test_payload_size_and_incomplete_contexts_are_bounded) ... ok
+test_rotation_keeps_existing_templates_decryptable (test_biometric_storage.BiometricStorageTests.test_rotation_keeps_existing_templates_decryptable) ... ok
+test_tampering_is_rejected (test_biometric_storage.BiometricStorageTests.test_tampering_is_rejected) ... ok
+test_tenant_session_template_source_and_model_are_authenticated (test_biometric_storage.BiometricStorageTests.test_tenant_session_template_source_and_model_are_authenticated) ... ok
+test_accepted_selfie_records_review_evidence_and_waits_for_liveness (test_biometrics_api.BiometricAPITests.test_accepted_selfie_records_review_evidence_and_waits_for_liveness) ... ok
+test_authentication_and_stage_are_checked_before_face_processing (test_biometrics_api.BiometricAPITests.test_authentication_and_stage_are_checked_before_face_processing) ... ok
+test_biometric_encryption_is_required_before_engine_processing (test_biometrics_api.BiometricAPITests.test_biometric_encryption_is_required_before_engine_processing) ... ok
+test_calibrated_failed_match_remains_evidence_without_final_rejection (test_biometrics_api.BiometricAPITests.test_calibrated_failed_match_remains_evidence_without_final_rejection) ... ok
+test_cross_tenant_sessions_are_inaccessible (test_biometrics_api.BiometricAPITests.test_cross_tenant_sessions_are_inaccessible) ... ok
+test_declared_length_cannot_bypass_actual_multipart_body_limit (test_biometrics_api.BiometricAPITests.test_declared_length_cannot_bypass_actual_multipart_body_limit) ... ok
+test_document_face_level_advances_only_to_processing (test_biometrics_api.BiometricAPITests.test_document_face_level_advances_only_to_processing) ... ok
+test_duplicate_success_is_closed_to_additional_selfies (test_biometrics_api.BiometricAPITests.test_duplicate_success_is_closed_to_additional_selfies) ... ok
+test_embedding_failure_does_not_persist_partial_templates (test_biometrics_api.BiometricAPITests.test_embedding_failure_does_not_persist_partial_templates) ... ok
+test_expired_reference_original_is_not_used_for_templates (test_biometrics_api.BiometricAPITests.test_expired_reference_original_is_not_used_for_templates) ... ok
+test_expired_session_persists_expiry_without_face_processing (test_biometrics_api.BiometricAPITests.test_expired_session_persists_expiry_without_face_processing) ... ok
+test_explicit_consent_is_required_before_face_processing (test_biometrics_api.BiometricAPITests.test_explicit_consent_is_required_before_face_processing) ... ok
+test_large_multipart_body_is_rejected_before_upload_parsing (test_biometrics_api.BiometricAPITests.test_large_multipart_body_is_rejected_before_upload_parsing) ... ok
+test_missing_original_reference_does_not_advance (test_biometrics_api.BiometricAPITests.test_missing_original_reference_does_not_advance) ... ok
+test_model_unavailability_does_not_create_or_advance_evidence (test_biometrics_api.BiometricAPITests.test_model_unavailability_does_not_create_or_advance_evidence) ... ok
+test_original_side_mapping_is_honored_for_swapped_card_captures (test_biometrics_api.BiometricAPITests.test_original_side_mapping_is_honored_for_swapped_card_captures) ... ok
+test_quality_recapture_consumes_attempt_without_storing_capture_or_vectors (test_biometrics_api.BiometricAPITests.test_quality_recapture_consumes_attempt_without_storing_capture_or_vectors) ... ok
+test_reference_detection_failure_reopens_document_capture (test_biometrics_api.BiometricAPITests.test_reference_detection_failure_reopens_document_capture) ... Executing <Task finished name='Task-199' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.186 seconds
+ok
+test_result_excludes_quality_from_an_earlier_document_attempt (test_biometrics_api.BiometricAPITests.test_result_excludes_quality_from_an_earlier_document_attempt) ... ok
+test_result_hides_expired_templates_before_a_retention_sweep (test_biometrics_api.BiometricAPITests.test_result_hides_expired_templates_before_a_retention_sweep) ... ok
+test_retention_is_scoped_to_the_requested_organization (test_biometrics_api.BiometricAPITests.test_retention_is_scoped_to_the_requested_organization) ... Executing <Task finished name='Task-221' coro=<BiometricAPITests.test_retention_is_scoped_to_the_requested_organization() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:478> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.104 seconds
+ok
+test_retention_removes_biometric_copies_and_cascades_comparison (test_biometrics_api.BiometricAPITests.test_retention_removes_biometric_copies_and_cascades_comparison) ... ok
+test_retention_sweep_keeps_live_selfie_ciphertext (test_biometrics_api.BiometricAPITests.test_retention_sweep_keeps_live_selfie_ciphertext) ... ok
+test_tampered_reference_ciphertext_returns_retryable_failure (test_biometrics_api.BiometricAPITests.test_tampered_reference_ciphertext_returns_retryable_failure) ... ok
+test_unreadable_input_and_pixel_bombs_are_bounded_before_detection (test_biometrics_api.BiometricAPITests.test_unreadable_input_and_pixel_bombs_are_bounded_before_detection) ... Executing <Task pending name='Task-249' coro=<BiometricAPITests.test_unreadable_input_and_pixel_bombs_are_bounded_before_detection() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:241> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.274 seconds
+ok
+test_valid_large_selfies_never_spool_plaintext_to_disk (test_biometrics_api.BiometricAPITests.test_valid_large_selfies_never_spool_plaintext_to_disk) ... ok
+test_recapture_attempts_are_limited_without_engine_calls_after_limit (test_biometrics_api.BiometricAttemptLimitTests.test_recapture_attempts_are_limited_without_engine_calls_after_limit) ... ok
+test_exif_orientation_is_applied_and_metadata_dropped (test_capture_quality.DecodeTests.test_exif_orientation_is_applied_and_metadata_dropped) ... ok
+test_rejects_unusable_inputs (test_capture_quality.DecodeTests.test_rejects_unusable_inputs) ... ok
+test_dark_frames_are_not_misreported_as_motion_blur (test_capture_quality.QualityGateTests.test_dark_frames_are_not_misreported_as_motion_blur) ... ok
+test_png_and_compressed_jpeg_are_accepted (test_capture_quality.QualityGateTests.test_png_and_compressed_jpeg_are_accepted) ... ok
+test_policy_is_versioned_and_marked_uncalibrated (test_capture_quality.QualityGateTests.test_policy_is_versioned_and_marked_uncalibrated) ... ok
+test_portrait_orientation_is_reported_not_rejected (test_capture_quality.QualityGateTests.test_portrait_orientation_is_reported_not_rejected) ... ok
+test_unusable_captures_request_recapture_with_instructions (test_capture_quality.QualityGateTests.test_unusable_captures_request_recapture_with_instructions) ... ok
+test_usable_captures_are_accepted (test_capture_quality.QualityGateTests.test_usable_captures_are_accepted) ... ok
+test_wrong_document_shape_is_flagged (test_capture_quality.QualityGateTests.test_wrong_document_shape_is_flagged) ... ok
+test_ciphertext_is_bound_to_tenant_session_and_object (test_capture_store.CaptureStoreTests.test_ciphertext_is_bound_to_tenant_session_and_object) ... ok
+test_delete_removes_object_and_empty_directories (test_capture_store.CaptureStoreTests.test_delete_removes_object_and_empty_directories) ... ok
+test_keyring_validation (test_capture_store.CaptureStoreTests.test_keyring_validation) ... ok
+test_references_cannot_escape_the_storage_root (test_capture_store.CaptureStoreTests.test_references_cannot_escape_the_storage_root) ... ok
+test_rotated_keys_still_decrypt_older_objects (test_capture_store.CaptureStoreTests.test_rotated_keys_still_decrypt_older_objects) ... ok
+test_round_trip_is_encrypted_at_rest_with_private_permissions (test_capture_store.CaptureStoreTests.test_round_trip_is_encrypted_at_rest_with_private_permissions) ... ok
+test_tampered_ciphertext_fails_authentication (test_capture_store.CaptureStoreTests.test_tampered_ciphertext_fails_authentication) ... ok
+test_capture_page_is_served_with_a_strict_policy (test_captures_api.CaptureAPITests.test_capture_page_is_served_with_a_strict_policy) ... ok
+test_cross_tenant_session_cannot_receive_captures (test_captures_api.CaptureAPITests.test_cross_tenant_session_cannot_receive_captures) ... ok
+test_document_only_level_still_waits_for_the_document_engine (test_captures_api.CaptureAPITests.test_document_only_level_still_waits_for_the_document_engine) ... ok
+test_document_types_list_required_sides (test_captures_api.CaptureAPITests.test_document_types_list_required_sides) ... ok
+test_expired_session_is_persisted_as_expired (test_captures_api.CaptureAPITests.test_expired_session_is_persisted_as_expired) ... ok
+test_front_and_back_complete_capture_and_hand_off (test_captures_api.CaptureAPITests.test_front_and_back_complete_capture_and_hand_off) ... ok
+test_invalid_side_and_invalid_files (test_captures_api.CaptureAPITests.test_invalid_side_and_invalid_files) ... ok
+test_oversized_and_unbounded_uploads_are_refused_before_parsing (test_captures_api.CaptureAPITests.test_oversized_and_unbounded_uploads_are_refused_before_parsing) ... ok
+test_passport_uses_a_single_data_page (test_captures_api.CaptureAPITests.test_passport_uses_a_single_data_page) ... ok
+test_poor_capture_requests_recapture_and_stores_no_image (test_captures_api.CaptureAPITests.test_poor_capture_requests_recapture_and_stores_no_image) ... ok
+test_recapture_of_a_side_replaces_the_previous_image (test_captures_api.CaptureAPITests.test_recapture_of_a_side_replaces_the_previous_image) ... ok
+test_same_image_cannot_satisfy_both_sides (test_captures_api.CaptureAPITests.test_same_image_cannot_satisfy_both_sides) ... ok
+test_stored_capture_decrypts_to_the_original_upload (test_captures_api.CaptureAPITests.test_stored_capture_decrypts_to_the_original_upload) ... ok
+test_unauthenticated_upload_is_rejected (test_captures_api.CaptureAPITests.test_unauthenticated_upload_is_rejected) ... ok
+test_attempt_limit_is_enforced_and_audited (test_captures_api.CaptureLimitTests.test_attempt_limit_is_enforced_and_audited) ... ok
+test_expired_captures_and_orphans_are_purged_without_touching_live_ones (test_captures_api.RetentionTests.test_expired_captures_and_orphans_are_purged_without_touching_live_ones) ... ok
+test_expired_document_cascades_to_its_images_and_checks (test_captures_api.RetentionTests.test_expired_document_cascades_to_its_images_and_checks) ... ok
+test_upload_is_unavailable_without_capture_keys (test_captures_api.UnconfiguredStorageTests.test_upload_is_unavailable_without_capture_keys) ... ok
+test_document_only_level_goes_straight_to_processing (test_documents_api.DocumentProcessingTests.test_document_only_level_goes_straight_to_processing) ... ok
+test_document_type_without_an_adapter_waits_honestly (test_documents_api.DocumentProcessingTests.test_document_type_without_an_adapter_waits_honestly) ... ok
+test_expired_card_is_accepted_as_evidence_and_flagged (test_documents_api.DocumentProcessingTests.test_expired_card_is_accepted_as_evidence_and_flagged) ... ok
+test_fields_are_encrypted_bound_and_absent_from_audit_and_checks (test_documents_api.DocumentProcessingTests.test_fields_are_encrypted_bound_and_absent_from_audit_and_checks) ... ok
+test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it (test_documents_api.DocumentProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it) ... Document processing failed for a session: OCRUnavailable
+Executing <Task finished name='Task-458' coro=<DocumentProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:179> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 1.441 seconds
+ok
+test_processor_cannot_reach_another_tenants_session (test_documents_api.DocumentProcessingTests.test_processor_cannot_reach_another_tenants_session) ... ok
+test_recapture_reasons (test_documents_api.DocumentProcessingTests.test_recapture_reasons) ... ok
+test_sides_uploaded_the_wrong_way_round_are_handled (test_documents_api.DocumentProcessingTests.test_sides_uploaded_the_wrong_way_round_are_handled) ... ok
+test_valid_card_is_extracted_and_session_advances_to_selfie (test_documents_api.DocumentProcessingTests.test_valid_card_is_extracted_and_session_advances_to_selfie) ... Executing <Task finished name='Task-497' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.173 seconds
+ok
+test_wrong_document_type_requests_recapture_and_clears_captures (test_documents_api.DocumentProcessingTests.test_wrong_document_type_requests_recapture_and_clears_captures) ... ok
+test_document_only_level_goes_straight_to_processing (test_documents_api.NSSFProcessingTests.test_document_only_level_goes_straight_to_processing) ... ok
+test_document_type_without_an_adapter_waits_honestly (test_documents_api.NSSFProcessingTests.test_document_type_without_an_adapter_waits_honestly) ... ok
+test_expired_card_is_accepted_as_evidence_and_flagged (test_documents_api.NSSFProcessingTests.test_expired_card_is_accepted_as_evidence_and_flagged) ... ok
+test_fields_are_encrypted_bound_and_absent_from_audit_and_checks (test_documents_api.NSSFProcessingTests.test_fields_are_encrypted_bound_and_absent_from_audit_and_checks) ... ok
+test_nssf_card_is_extracted_without_expiry_or_mrz (test_documents_api.NSSFProcessingTests.test_nssf_card_is_extracted_without_expiry_or_mrz) ... ok
+test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it (test_documents_api.NSSFProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it) ... Document processing failed for a session: OCRUnavailable
+Executing <Task finished name='Task-562' coro=<DocumentProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:179> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 1.386 seconds
+ok
+test_processor_cannot_reach_another_tenants_session (test_documents_api.NSSFProcessingTests.test_processor_cannot_reach_another_tenants_session) ... ok
+test_recapture_reasons (test_documents_api.NSSFProcessingTests.test_recapture_reasons) ... ok
+test_sides_uploaded_the_wrong_way_round_are_handled (test_documents_api.NSSFProcessingTests.test_sides_uploaded_the_wrong_way_round_are_handled) ... ok
+test_valid_card_is_extracted_and_session_advances_to_selfie (test_documents_api.NSSFProcessingTests.test_valid_card_is_extracted_and_session_advances_to_selfie) ... ok
+test_wrong_document_type_requests_recapture_and_clears_captures (test_documents_api.NSSFProcessingTests.test_wrong_document_type_requests_recapture_and_clears_captures) ... ok
+test_wrong_khmer_card_for_the_claimed_type_is_sent_back (test_documents_api.NSSFProcessingTests.test_wrong_khmer_card_for_the_claimed_type_is_sent_back) ... ok
+test_bad_checksum_is_stored_as_review_with_visual_fields_preserved (test_documents_api.PassportProcessingTests.test_bad_checksum_is_stored_as_review_with_visual_fields_preserved) ... ok
+test_cambodian_passport_is_extracted_and_mrz_result_stored (test_documents_api.PassportProcessingTests.test_cambodian_passport_is_extracted_and_mrz_result_stored) ... ok
+test_document_only_level_goes_straight_to_processing (test_documents_api.PassportProcessingTests.test_document_only_level_goes_straight_to_processing) ... ok
+test_document_type_without_an_adapter_waits_honestly (test_documents_api.PassportProcessingTests.test_document_type_without_an_adapter_waits_honestly) ... ok
+test_expired_card_is_accepted_as_evidence_and_flagged (test_documents_api.PassportProcessingTests.test_expired_card_is_accepted_as_evidence_and_flagged) ... ok
+test_fields_are_encrypted_bound_and_absent_from_audit_and_checks (test_documents_api.PassportProcessingTests.test_fields_are_encrypted_bound_and_absent_from_audit_and_checks) ... ok
+test_foreign_passport_uses_the_generic_mrz_adapter (test_documents_api.PassportProcessingTests.test_foreign_passport_uses_the_generic_mrz_adapter) ... ok
+test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it (test_documents_api.PassportProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it) ... Executing <Task finished name='Task-692' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.148 seconds
+Document processing failed for a session: OCRUnavailable
+Executing <Task finished name='Task-693' coro=<DocumentProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:179> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 1.650 seconds
+ok
+test_passport_shown_in_an_id_card_session_is_sent_back (test_documents_api.PassportProcessingTests.test_passport_shown_in_an_id_card_session_is_sent_back) ... Executing <Task finished name='Task-701' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.139 seconds
+ok
+test_processor_cannot_reach_another_tenants_session (test_documents_api.PassportProcessingTests.test_processor_cannot_reach_another_tenants_session) ... ok
+test_raw_mrz_is_encrypted_and_evidence_contains_no_identity_values (test_documents_api.PassportProcessingTests.test_raw_mrz_is_encrypted_and_evidence_contains_no_identity_values) ... ok
+test_recapture_reasons (test_documents_api.PassportProcessingTests.test_recapture_reasons) ... ok
+test_sides_uploaded_the_wrong_way_round_are_handled (test_documents_api.PassportProcessingTests.test_sides_uploaded_the_wrong_way_round_are_handled) ... ok
+test_unreadable_mrz_on_a_foreign_passport_means_recapture (test_documents_api.PassportProcessingTests.test_unreadable_mrz_on_a_foreign_passport_means_recapture) ... ok
+test_valid_card_is_extracted_and_session_advances_to_selfie (test_documents_api.PassportProcessingTests.test_valid_card_is_extracted_and_session_advances_to_selfie) ... ok
+test_visual_mrz_disagreement_reaches_the_result_as_a_review_flag (test_documents_api.PassportProcessingTests.test_visual_mrz_disagreement_reaches_the_result_as_a_review_flag) ... ok
+test_wrong_document_type_requests_recapture_and_clears_captures (test_documents_api.PassportProcessingTests.test_wrong_document_type_requests_recapture_and_clears_captures) ... ok
+test_extraction_is_unavailable_and_nothing_is_stored (test_documents_api.ProcessingWithoutPIIKeysTests.test_extraction_is_unavailable_and_nothing_is_stored) ... ok
+test_card_without_identity_text_is_sent_back (test_documents_api.RealOCREndToEndTests.test_card_without_identity_text_is_sent_back) ... ok
+test_photographed_cambodian_passport_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_cambodian_passport_is_read_by_real_ocr) ... Executing <Task pending name='Task-803' coro=<RealOCREndToEndTests.test_photographed_cambodian_passport_is_read_by_real_ocr() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:414> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.152 seconds
+ok
+test_photographed_foreign_id_card_is_read_front_and_back (test_documents_api.RealOCREndToEndTests.test_photographed_foreign_id_card_is_read_front_and_back) ... Executing <Task pending name='Task-811' coro=<RealOCREndToEndTests.test_photographed_foreign_id_card_is_read_front_and_back() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:446> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.138 seconds
+Executing <Task pending name='Task-811' coro=<RealOCREndToEndTests.test_photographed_foreign_id_card_is_read_front_and_back() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:446> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.192 seconds
+ok
+test_photographed_foreign_passport_is_read_from_its_mrz (test_documents_api.RealOCREndToEndTests.test_photographed_foreign_passport_is_read_from_its_mrz) ... Executing <Task pending name='Task-820' coro=<RealOCREndToEndTests.test_photographed_foreign_passport_is_read_from_its_mrz() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:431> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.131 seconds
+ok
+test_photographed_nssf_specimen_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_nssf_specimen_is_read_by_real_ocr) ... Executing <Task pending name='Task-828' coro=<RealOCREndToEndTests.test_photographed_nssf_specimen_is_read_by_real_ocr() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:391> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.137 seconds
+ok
+test_photographed_specimen_card_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_specimen_card_is_read_by_real_ocr) ... Executing <Task pending name='Task-837' coro=<RealOCREndToEndTests.test_photographed_specimen_card_is_read_by_real_ocr() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:366> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.301 seconds
+Executing <Task pending name='Task-837' coro=<RealOCREndToEndTests.test_photographed_specimen_card_is_read_by_real_ocr() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:368> wait_for=<Future pending cb=[Task.task_wakeup()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:460> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.117 seconds
+ok
+test_calibrated_policy_pass_review_and_fail (test_face_engines.EmbeddingTests.test_calibrated_policy_pass_review_and_fail) ... ok
+test_invalid_dimension_nonfinite_zero_and_unnormalized_embeddings (test_face_engines.EmbeddingTests.test_invalid_dimension_nonfinite_zero_and_unnormalized_embeddings) ... ok
+test_invalid_provenance_is_rejected (test_face_engines.EmbeddingTests.test_invalid_provenance_is_rejected) ... ok
+test_malformed_template_payloads_fail_closed (test_face_engines.EmbeddingTests.test_malformed_template_payloads_fail_closed) ... ok
+test_model_version_and_digest_must_match_both_templates_and_policy (test_face_engines.EmbeddingTests.test_model_version_and_digest_must_match_both_templates_and_policy) ... ok
+test_serialization_retains_internal_provenance_and_exact_values (test_face_engines.EmbeddingTests.test_serialization_retains_internal_provenance_and_exact_values) ... ok
+test_template_copy_does_not_alias_mutable_input (test_face_engines.EmbeddingTests.test_template_copy_does_not_alias_mutable_input) ... ok
+test_threshold_validation (test_face_engines.EmbeddingTests.test_threshold_validation) ... ok
+test_unvalidated_thresholds_always_require_review (test_face_engines.EmbeddingTests.test_unvalidated_thresholds_always_require_review) ... ok
+test_blur_is_measured_inside_face_crop (test_face_engines.FaceQualityTests.test_blur_is_measured_inside_face_crop) ... ok
+test_dark_frame_requires_light_without_claiming_motion_blur (test_face_engines.FaceQualityTests.test_dark_frame_requires_light_without_claiming_motion_blur) ... ok
+test_document_portrait_does_not_apply_selfie_framing (test_face_engines.FaceQualityTests.test_document_portrait_does_not_apply_selfie_framing) ... ok
+test_framing_and_size_feedback (test_face_engines.FaceQualityTests.test_framing_and_size_feedback) ... ok
+test_invalid_landmark_geometry_does_not_assert_occlusion (test_face_engines.FaceQualityTests.test_invalid_landmark_geometry_does_not_assert_occlusion) ... ok
+test_overexposed_frame_requires_less_light (test_face_engines.FaceQualityTests.test_overexposed_frame_requires_less_light) ... ok
+test_quality_policy_is_versioned_and_uncalibrated (test_face_engines.FaceQualityTests.test_quality_policy_is_versioned_and_uncalibrated) ... ok
+test_rotated_and_asymmetric_landmarks_request_frontal_pose (test_face_engines.FaceQualityTests.test_rotated_and_asymmetric_landmarks_request_frontal_pose) ... ok
+test_unknown_source_is_rejected (test_face_engines.FaceQualityTests.test_unknown_source_is_rejected) ... ok
+test_usable_selfie_keeps_unverified_eyes_and_occlusion (test_face_engines.FaceQualityTests.test_usable_selfie_keeps_unverified_eyes_and_occlusion) ... ok
+test_zero_and_multiple_faces_cannot_select_reference_or_live (test_face_engines.FaceQualityTests.test_zero_and_multiple_faces_cannot_select_reference_or_live) ... ok
+test_download_integrity_failure_preserves_existing_file_and_cleans_temp (test_face_engines.ModelProvisioningTests.test_download_integrity_failure_preserves_existing_file_and_cleans_temp) ... ok
+test_verified_download_is_atomic_and_existing_correct_file_is_reused (test_face_engines.ModelProvisioningTests.test_verified_download_is_atomic_and_existing_correct_file_is_reused) ... ok
+test_empty_detector_output_is_no_face_and_malformed_output_fails (test_face_engines.NativeAdapterTests.test_empty_detector_output_is_no_face_and_malformed_output_fails) ... ok
+test_invalid_cpu_resource_policy_is_rejected (test_face_engines.NativeAdapterTests.test_invalid_cpu_resource_policy_is_rejected) ... ok
+test_missing_or_corrupt_models_report_unavailable (test_face_engines.NativeAdapterTests.test_missing_or_corrupt_models_report_unavailable) ... ok
+test_native_detection_operations_are_serialized_across_requests (test_face_engines.NativeAdapterTests.test_native_detection_operations_are_serialized_across_requests) ... ok
+test_native_invalid_embedding_does_not_create_template (test_face_engines.NativeAdapterTests.test_native_invalid_embedding_does_not_create_template) ... ok
+test_resolution_cap_scales_boxes_and_landmarks_back_to_original (test_face_engines.NativeAdapterTests.test_resolution_cap_scales_boxes_and_landmarks_back_to_original) ... ok
+test_rgb_is_converted_to_bgr_before_alignment_and_features_are_normalized (test_face_engines.NativeAdapterTests.test_rgb_is_converted_to_bgr_before_alignment_and_features_are_normalized) ... ok
+test_runtime_does_not_attempt_network_or_fetch (test_face_engines.NativeAdapterTests.test_runtime_does_not_attempt_network_or_fetch) ... ok
+test_sha256_verifies_every_model_byte (test_face_engines.NativeAdapterTests.test_sha256_verifies_every_model_byte) ... ok
+test_real_cpu_detection_alignment_embedding_and_default_review (test_face_engines.NativeModelSmokeTests.test_real_cpu_detection_alignment_embedding_and_default_review) ... ok
+test_real_detector_rejects_blank_and_multiple_face_capture (test_face_engines.NativeModelSmokeTests.test_real_detector_rejects_blank_and_multiple_face_capture) ... ok
+test_alpha3_table_covers_every_supported_country_once (test_generic_documents.CountryCodeTests.test_alpha3_table_covers_every_supported_country_once) ... ok
+test_icao_specific_issuer_codes (test_generic_documents.CountryCodeTests.test_icao_specific_issuer_codes) ... ok
+test_front_labels_and_back_td1_mrz (test_generic_documents.GenericIDTests.test_front_labels_and_back_td1_mrz) ... ok
+test_passport_mrz_or_nothing_readable_is_not_an_id_card (test_generic_documents.GenericIDTests.test_passport_mrz_or_nothing_readable_is_not_an_id_card) ... ok
+test_residence_card_shares_the_engine_with_its_own_type (test_generic_documents.GenericIDTests.test_residence_card_shares_the_engine_with_its_own_type) ... ok
+test_unreadable_front_is_carried_by_a_valid_back_mrz (test_generic_documents.GenericIDTests.test_unreadable_front_is_carried_by_a_valid_back_mrz) ... ok
+test_printed_disagreement_with_the_mrz_is_flagged (test_generic_documents.GenericPassportTests.test_printed_disagreement_with_the_mrz_is_flagged) ... ok
+test_unfamiliar_label_language_falls_back_to_the_mrz (test_generic_documents.GenericPassportTests.test_unfamiliar_label_language_falls_back_to_the_mrz) ... ok
+test_visual_zone_and_mrz_agree_for_a_foreign_passport (test_generic_documents.GenericPassportTests.test_visual_zone_and_mrz_agree_for_a_foreign_passport) ... ok
+test_match_mismatch_and_non_state_issuer (test_generic_documents.IssuingCountryTests.test_match_mismatch_and_non_state_issuer) ... ok
+test_classification_of_sides_and_other_documents (test_kh_national_id.AdapterTests.test_classification_of_sides_and_other_documents) ... ok
+test_clean_card_validates_and_engines_not_built_are_unavailable (test_kh_national_id.AdapterTests.test_clean_card_validates_and_engines_not_built_are_unavailable) ... ok
+test_corrupted_mrz_fails_its_check_digits (test_kh_national_id.AdapterTests.test_corrupted_mrz_fails_its_check_digits) ... ok
+test_extraction_produces_canonical_fields_with_provenance (test_kh_national_id.AdapterTests.test_extraction_produces_canonical_fields_with_provenance) ... ok
+test_label_value_on_the_next_line (test_kh_national_id.AdapterTests.test_label_value_on_the_next_line) ... ok
+test_mrz_fills_an_unreadable_visual_field_and_says_so (test_kh_national_id.AdapterTests.test_mrz_fills_an_unreadable_visual_field_and_says_so) ... ok
+test_mrz_visual_disagreement_is_reported_not_resolved (test_kh_national_id.AdapterTests.test_mrz_visual_disagreement_is_reported_not_resolved) ... ok
+test_problems_are_flagged_for_review_or_fail (test_kh_national_id.AdapterTests.test_problems_are_flagged_for_review_or_fail) ... ok
+test_registry_only_claims_implemented_adapters (test_kh_national_id.AdapterTests.test_registry_only_claims_implemented_adapters) ... ok
+test_wrapped_value_takes_the_weakest_line_confidence (test_kh_national_id.AdapterTests.test_wrapped_value_takes_the_weakest_line_confidence) ... ok
+test_dates_in_both_digit_scripts (test_kh_national_id.KhmerNormalizationTests.test_dates_in_both_digit_scripts) ... ok
+test_fuzzy_label_matching_tolerates_ocr_noise (test_kh_national_id.KhmerNormalizationTests.test_fuzzy_label_matching_tolerates_ocr_noise) ... ok
+test_mixed_digit_scripts_are_flagged_not_hidden (test_kh_national_id.KhmerNormalizationTests.test_mixed_digit_scripts_are_flagged_not_hidden) ... ok
+test_sex_names_and_invisible_characters (test_kh_national_id.KhmerNormalizationTests.test_sex_names_and_invisible_characters) ... ok
+test_each_khmer_adapter_recognizes_the_other_card (test_kh_national_id.NSSFAdapterTests.test_each_khmer_adapter_recognizes_the_other_card) ... ok
+test_extracts_member_card_fields (test_kh_national_id.NSSFAdapterTests.test_extracts_member_card_fields) ... ok
+test_registered_with_its_own_sides_and_version (test_kh_national_id.NSSFAdapterTests.test_registered_with_its_own_sides_and_version) ... ok
+test_unexpected_number_shapes_are_flagged (test_kh_national_id.NSSFAdapterTests.test_unexpected_number_shapes_are_flagged) ... ok
+test_validation_handles_cards_without_expiry_or_mrz (test_kh_national_id.NSSFAdapterTests.test_validation_handles_cards_without_expiry_or_mrz) ... ok
+test_disagreeing_reread_replaces_text_and_is_noted (test_kh_national_id.NumericRefinementTests.test_disagreeing_reread_replaces_text_and_is_noted) ... ok
+test_non_numeric_words_are_untouched (test_kh_national_id.NumericRefinementTests.test_non_numeric_words_are_untouched) ... ok
+test_structure_changing_reread_is_rejected (test_kh_national_id.NumericRefinementTests.test_structure_changing_reread_is_rejected) ... ok
+test_zero_confidence_reread_needs_a_confirming_pass (test_kh_national_id.NumericRefinementTests.test_zero_confidence_reread_needs_a_confirming_pass) ... ok
+test_a_single_corrupted_digit_is_caught (test_mrz.ParserTests.test_a_single_corrupted_digit_is_caught) ... ok
+test_best_block_is_chosen_across_ocr_passes (test_mrz.ParserTests.test_best_block_is_chosen_across_ocr_passes) ... ok
+test_century_inference_uses_full_birth_date_and_supplied_today (test_mrz.ParserTests.test_century_inference_uses_full_birth_date_and_supplied_today) ... ok
+test_check_digit_algorithm (test_mrz.ParserTests.test_check_digit_algorithm) ... ok
+test_check_digit_substitutions_are_counted_once_and_used_in_composite (test_mrz.ParserTests.test_check_digit_substitutions_are_counted_once_and_used_in_composite) ... ok
+test_checksum_success_cannot_make_impossible_or_illegal_fields_valid (test_mrz.ParserTests.test_checksum_success_cannot_make_impossible_or_illegal_fields_valid) ... ok
+test_comparison_reports_disagreement_without_resolving_it (test_mrz.ParserTests.test_comparison_reports_disagreement_without_resolving_it) ... ok
+test_document_codes_and_blank_issuing_state_are_validated (test_mrz.ParserTests.test_document_codes_and_blank_issuing_state_are_validated) ... ok
+test_extended_td1_document_number_checks_entire_number_and_retains_optional_data (test_mrz.ParserTests.test_extended_td1_document_number_checks_entire_number_and_retains_optional_data) ... ok
+test_extended_td2_document_number_and_ocr_overflow_check_digit (test_mrz.ParserTests.test_extended_td2_document_number_and_ocr_overflow_check_digit) ... ok
+test_filler_check_digits_are_only_allowed_for_unused_td3_personal_number (test_mrz.ParserTests.test_filler_check_digits_are_only_allowed_for_unused_td3_personal_number) ... ok
+test_filler_misreads_in_names_are_removed_and_flagged (test_mrz.ParserTests.test_filler_misreads_in_names_are_removed_and_flagged) ... ok
+test_icao_specimens_in_all_three_formats (test_mrz.ParserTests.test_icao_specimens_in_all_three_formats) ... ok
+test_icao_unknown_birth_date_is_distinguished_from_corrupt_date (test_mrz.ParserTests.test_icao_unknown_birth_date_is_distinguished_from_corrupt_date) ... ok
+test_lost_trailing_filler_is_restored_but_data_lines_are_not_stretched (test_mrz.ParserTests.test_lost_trailing_filler_is_restored_but_data_lines_are_not_stretched) ... ok
+test_malformed_extension_cannot_become_a_valid_truncated_number (test_mrz.ParserTests.test_malformed_extension_cannot_become_a_valid_truncated_number) ... ok
+test_multiline_input_and_unrelated_ocr_lines_do_not_expand_parse_search (test_mrz.ParserTests.test_multiline_input_and_unrelated_ocr_lines_do_not_expand_parse_search) ... ok
+test_name_prefix_is_not_a_match_without_mrz_truncation_evidence (test_mrz.ParserTests.test_name_prefix_is_not_a_match_without_mrz_truncation_evidence) ... ok
+test_numeric_substitutions_only_in_numeric_fields_and_reported (test_mrz.ParserTests.test_numeric_substitutions_only_in_numeric_fields_and_reported) ... ok
+test_parse_rejects_wrong_counts_lengths_and_characters (test_mrz.ParserTests.test_parse_rejects_wrong_counts_lengths_and_characters) ... ok
+test_unreadable_input (test_mrz.ParserTests.test_unreadable_input) ... ok
+test_cambodian_passport_reads_visual_zone_and_validates_mrz (test_mrz.PassportAdapterTests.test_cambodian_passport_reads_visual_zone_and_validates_mrz) ... ok
+test_foreign_mrz_for_a_cambodian_session_is_flagged (test_mrz.PassportAdapterTests.test_foreign_mrz_for_a_cambodian_session_is_flagged) ... ok
+test_generic_adapter_rejects_invalid_or_non_passport_mrz (test_mrz.PassportAdapterTests.test_generic_adapter_rejects_invalid_or_non_passport_mrz) ... ok
+test_generic_adapter_takes_everything_from_a_valid_mrz (test_mrz.PassportAdapterTests.test_generic_adapter_takes_everything_from_a_valid_mrz) ... ok
+test_passport_number_label_never_takes_a_title_word (test_mrz.PassportAdapterTests.test_passport_number_label_never_takes_a_title_word) ... ok
+test_visual_mrz_mismatch_is_the_spec_example (test_mrz.PassportAdapterTests.test_visual_mrz_mismatch_is_the_spec_example) ... ok
+test_deduplicates_equivalent_reads_but_keeps_distinct_candidates (test_mrz_reader.MRZReaderTests.test_deduplicates_equivalent_reads_but_keeps_distinct_candidates) ... ok
+test_preserves_raw_ocr_and_maps_bbox_to_the_corrected_page (test_mrz_reader.MRZReaderTests.test_preserves_raw_ocr_and_maps_bbox_to_the_corrected_page) ... ok
+test_a_card_without_mrz_cannot_take_identity_fields_from_another_cards_mrz (test_passport_regressions.PassportTrustRegressions.test_a_card_without_mrz_cannot_take_identity_fields_from_another_cards_mrz) ... ok
+test_a_visual_component_conflict_survives_partial_name_fallback (test_passport_regressions.PassportTrustRegressions.test_a_visual_component_conflict_survives_partial_name_fallback) ... ok
+test_adapter_reuse_does_not_compare_another_sessions_mrz (test_passport_regressions.PassportTrustRegressions.test_adapter_reuse_does_not_compare_another_sessions_mrz) ... ok
+test_check_evidence_has_no_raw_identity_values (test_passport_regressions.PassportTrustRegressions.test_check_evidence_has_no_raw_identity_values) ... ok
+test_checksum_success_does_not_hide_invalid_mrz_data (test_passport_regressions.PassportTrustRegressions.test_checksum_success_does_not_hide_invalid_mrz_data) ... ok
+test_english_label_case_does_not_change_the_extraction (test_passport_regressions.PassportTrustRegressions.test_english_label_case_does_not_change_the_extraction) ... ok
+test_fallback_keeps_the_unreadable_visual_evidence_and_mrz_source_box (test_passport_regressions.PassportTrustRegressions.test_fallback_keeps_the_unreadable_visual_evidence_and_mrz_source_box) ... ok
+test_good_visual_pass_can_rescue_a_failed_dedicated_mrz_pass (test_passport_regressions.PassportTrustRegressions.test_good_visual_pass_can_rescue_a_failed_dedicated_mrz_pass) ... ok
+test_missing_given_names_are_filled_before_composing_the_full_name (test_passport_regressions.PassportTrustRegressions.test_missing_given_names_are_filled_before_composing_the_full_name) ... ok
+test_passport_fields_point_to_the_data_page_and_name_covers_both_parts (test_passport_regressions.PassportTrustRegressions.test_passport_fields_point_to_the_data_page_and_name_covers_both_parts) ... ok
+test_printed_nationality_disagreement_is_not_hidden_by_a_derived_country (test_passport_regressions.PassportTrustRegressions.test_printed_nationality_disagreement_is_not_hidden_by_a_derived_country) ... ok
+test_raw_mrz_keeps_original_ocr_while_normalized_mrz_is_assembled (test_passport_regressions.PassportTrustRegressions.test_raw_mrz_keeps_original_ocr_while_normalized_mrz_is_assembled) ... ok
+test_unprotected_fields_and_missing_visual_comparison_are_reported_truthfully (test_passport_regressions.PassportTrustRegressions.test_unprotected_fields_and_missing_visual_comparison_are_reported_truthfully) ... ok
+test_valid_khmer_mrz_alone_identifies_a_data_page_and_foreign_mrz_is_a_different_type (test_passport_regressions.PassportTrustRegressions.test_valid_khmer_mrz_alone_identifies_a_data_page_and_foreign_mrz_is_a_different_type) ... ok
+test_wrong_document_layout_cannot_supply_canonical_fallback_fields (test_passport_regressions.PassportTrustRegressions.test_wrong_document_layout_cannot_supply_canonical_fallback_fields) ... ok
+test_migration_and_database_enforced_tenant_isolation (test_postgres.PostgreSQLIsolationTests.test_migration_and_database_enforced_tenant_isolation) ... INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_phase1, Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Running upgrade 0001_phase1 -> 0002_phase2, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running upgrade 0002_phase2 -> 0003_phase3, Phase 3 document extraction: field provenance/flags and document processing metadata.
+INFO  [alembic.runtime.migration] Running upgrade 0003_phase3 -> 0004_phase8_9, Phases 8-9: face quality, encrypted selfie captures and biometric provenance.
+ok
+test_all_requested_tables_exist (test_schema.SchemaTests.test_all_requested_tables_exist) ... ok
+test_ciphertext_requires_a_key_version (test_schema.SchemaTests.test_ciphertext_requires_a_key_version) ... ok
+test_cross_session_document_link_fails (test_schema.SchemaTests.test_cross_session_document_link_fails) ... ok
+test_cross_tenant_artifact_link_fails_at_database_layer (test_schema.SchemaTests.test_cross_tenant_artifact_link_fails_at_database_layer) ... ok
+test_frozen_migration_upgrade_downgrade_and_model_alignment (test_schema.SchemaTests.test_frozen_migration_upgrade_downgrade_and_model_alignment) ... INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_phase1, Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Running upgrade 0001_phase1 -> 0002_phase2, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running upgrade 0002_phase2 -> 0003_phase3, Phase 3 document extraction: field provenance/flags and document processing metadata.
+INFO  [alembic.runtime.migration] Running upgrade 0003_phase3 -> 0004_phase8_9, Phases 8-9: face quality, encrypted selfie captures and biometric provenance.
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.schemas
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.tables
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.types
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.constraints
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.defaults
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.comments
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running downgrade 0004_phase8_9 -> 0003_phase3, Phases 8-9: face quality, encrypted selfie captures and biometric provenance.
+INFO  [alembic.runtime.migration] Running downgrade 0003_phase3 -> 0002_phase2, Phase 3 document extraction: field provenance/flags and document processing metadata.
+INFO  [alembic.runtime.migration] Running downgrade 0002_phase2 -> 0001_phase1, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running downgrade 0001_phase1 -> , Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_phase1, Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Running upgrade 0001_phase1 -> 0002_phase2, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running upgrade 0002_phase2 -> 0003_phase3, Phase 3 document extraction: field provenance/flags and document processing metadata.
+INFO  [alembic.runtime.migration] Running upgrade 0003_phase3 -> 0004_phase8_9, Phases 8-9: face quality, encrypted selfie captures and biometric provenance.
+ok
+test_postgres_sql_contains_tenant_policies_and_native_types (test_schema.SchemaTests.test_postgres_sql_contains_tenant_policies_and_native_types) ... INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Generating static SQL
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_phase1, Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Running upgrade 0001_phase1 -> 0002_phase2, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running upgrade 0002_phase2 -> 0003_phase3, Phase 3 document extraction: field provenance/flags and document processing metadata.
+INFO  [alembic.runtime.migration] Running upgrade 0003_phase3 -> 0004_phase8_9, Phases 8-9: face quality, encrypted selfie captures and biometric provenance.
+ok
+test_all_active_states_can_expire (test_state_machine.StateMachineTests.test_all_active_states_can_expire) ... ok
+test_all_supported_verification_paths (test_state_machine.StateMachineTests.test_all_supported_verification_paths) ... ok
+test_document_only_requires_document_and_policy (test_state_machine.StateMachineTests.test_document_only_requires_document_and_policy) ... ok
+test_incomplete_evidence_cannot_verify (test_state_machine.StateMachineTests.test_incomplete_evidence_cannot_verify) ... ok
+test_khmer_and_low_confidence_are_preserved (test_state_machine.StateMachineTests.test_khmer_and_low_confidence_are_preserved) ... ok
+test_levels_cannot_accept_unrequested_capture_stages (test_state_machine.StateMachineTests.test_levels_cannot_accept_unrequested_capture_stages) ... ok
+test_review_recapture_and_failure_paths (test_state_machine.StateMachineTests.test_review_recapture_and_failure_paths) ... ok
+test_skip_and_out_of_order_events_are_rejected (test_state_machine.StateMachineTests.test_skip_and_out_of_order_events_are_rejected) ... ok
+test_terminal_states_are_immutable (test_state_machine.StateMachineTests.test_terminal_states_are_immutable) ... ok
+
+----------------------------------------------------------------------
+Ran 264 tests in 145.950s
+
+OK

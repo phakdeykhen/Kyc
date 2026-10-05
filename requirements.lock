@@ -1,4 +1,4 @@
-# Reproducible runtime through phases 1–5 and 8–9. Verified on 5 October 2026.
+# Reproducible runtime through phases 1–9. Verified on 5 October 2026.
 alembic==1.18.4
 annotated-types==0.7.0
 anyio==4.13.0

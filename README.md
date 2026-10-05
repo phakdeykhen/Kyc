@@ -38,7 +38,7 @@ and 1:1 comparison against the accepted document portrait. Selfie submission req
 explicit biometric consent. Face photos and templates are encrypted with separate
 keyrings and retention deadlines. The default comparison policy is uncalibrated and
 always returns `REVIEW`; its cosine score is not an identity probability. Liveness
-and the final risk decision remain later stages. Phases 6 and 7 are still not started.
+and the final risk decision remain later stages.
 
 See the design docs ([Phase 1](docs/architecture-phase1.md), [Phase 2](docs/architecture-phase2.md),
 [Phase 3](docs/architecture-phase3.md), [Phase 4](docs/architecture-phase4.md),
@@ -405,7 +405,7 @@ for unconfirmed passport layout assumptions, date-century heuristics and unsuppo
 MRZ deviations. The Phase 5 suite passed 175/175 tests with live PostgreSQL; MRZ tenant
 RLS and restricted-role real-OCR passport workflows passed. See
 [PostgreSQL passport evidence](artifacts/phase5-postgres-e2e.json). The user authorized
-Phases 8–9 after Phase 5. Phase 6's visual passport adapter and Phase 7's QR/barcode engine
-remain separate, unstarted work. Face-quality usability does not prove visible eyes,
+Phases 8–9 after Phase 5. The shared workspace also contains the Phase 6 international
+adapters and Phase 7 barcode engine. Face-quality usability does not prove visible eyes,
 absence of occlusion, document authenticity or liveness. See
 [Phases 8–9 limitations](docs/architecture-phase8-9.md#security-and-limits).

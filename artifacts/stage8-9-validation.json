@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-05",
+  "stages": [
+    8,
+    9
+  ],
+  "status": "implemented and validated",
+  "python_version": "3.13.15",
+  "opencv_version": "4.14.0",
+  "tests": {
+    "collected": 264,
+    "passed": 264,
+    "skipped": 0,
+    "failed": 0,
+    "transcript": "artifacts/stage8-9-tests.txt"
+  },
+  "checks": {
+    "live_postgres_tenant_isolation": true,
+    "sqlite_migration_lifecycle_and_metadata": true,
+    "native_cpu_detection_alignment_embeddings": true,
+    "restricted_role_native_selfie_flow": true,
+    "model_and_license_hash_verification": true,
+    "capture_client_syntax_and_simulated_lifecycle": true,
+    "request_json_and_openapi": true,
+    "python_compilation": true,
+    "dependency_check": true,
+    "original_specification_preserved": true
+  },
+  "artifacts": [
+    "artifacts/stage8-9-native-face-smoke.json",
+    "artifacts/stage8-9-postgres-native-e2e.json",
+    "artifacts/openapi-stage8-9.json",
+    "artifacts/stage8-9-postgresql.sql"
+  ],
+  "limits": [
+    "Default uncalibrated matching returns REVIEW.",
+    "Eye visibility and severe occlusion remain unverified; quality is a usability heuristic.",
+    "Native smoke uses an upstream public sample; database boundary test seeds an accepted reference capture.",
+    "No production accuracy, fairness or threshold calibration claim.",
+    "Liveness and final risk decisions remain unimplemented.",
+    "Docker build and physical camera testing remain unexecuted."
+  ]
+}

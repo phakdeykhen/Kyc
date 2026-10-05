@@ -1,8 +1,64 @@
 # Build progress — Universal Identity Platform
 
 Updated: 5 October 2026. The full requirements in `Document.md` control the build.
-Phases 2–7 were approved and are implemented (Phases 8–9 exist as a Codex checkpoint
-awaiting final validation). Work is paused at the Phase 7 approval gate.
+Phases 1–9 are implemented. The user authorized face detection/quality and embeddings/
+1:1 matching together; their final validation is complete. Phase 10 has not started.
+
+## Phases 8–9 implementation (5 October 2026)
+
+Implemented local CPU YuNet face detection, measured capture quality and actionable
+selfie recapture, SFace aligned 128-dimensional embeddings, and same-model 1:1 cosine
+comparison against the session's accepted document portrait. The selfie endpoint is
+`POST /v1/kyc/{session_id}/selfie`; `/capture/` continues document processing into a
+front-camera selfie flow, requires explicit biometric consent, and can resume sessions.
+Document portraits use original color pixels, geometry correction and layout-specific
+regions, with a whole-page fallback. Physical/logical side mapping survives swapped
+document captures. Unusable reference portraits reopen document capture and invalidate
+stale document evidence while retaining attempt history.
+
+Templates use a third independent AES-256-GCM keyring with tenant/session/template/
+source/model-bound associated data. Photos remain encrypted capture objects. Selfie
+captures and face-quality evidence have tenant-scoped tables; migration `0004_phase8_9`
+adds provenance and retention metadata. Bootstrap grants, purge integration, pinned
+model/license provisioning, OpenAPI and Postman workflows are included. Models are
+installed locally and never fetched by a request. Design:
+[architecture-phase8-9.md](docs/architecture-phase8-9.md).
+
+### Phases 8–9 validation evidence
+
+- **264 tests: 264 passed, 0 skipped, 0 failures** against the combined workspace,
+  including the international document and barcode work that landed during this build
+  ([transcript](artifacts/stage8-9-tests.txt)).
+- Real CPU YuNet/SFace inference detected one face, rejected blank/multiple-face
+  fixtures, aligned the face and produced normalized 128-dimensional embeddings.
+  Self-comparison scored 1.0 and correctly remained REVIEW under the uncalibrated
+  policy ([native evidence](artifacts/stage8-9-native-face-smoke.json)).
+- Real PostgreSQL through ASGI as restricted `kyc_app`, starting from a seeded accepted
+  reference capture: consented native selfie submission reached PROCESSING, stored two
+  encrypted templates and an encrypted selfie, and exposed only safe REVIEW evidence.
+  The encrypted round trip, model-bound payloads, null decision, and late-upload 409
+  passed. This boundary test excludes document classification/OCR
+  ([evidence](artifacts/stage8-9-postgres-native-e2e.json)).
+- Live PostgreSQL verifies tenant visibility/default-deny access, rejected foreign
+  writes, and cross-session document/template links for all biometric tables. SQLite
+  migration upgrade → metadata comparison → downgrade → upgrade passed.
+- API tests cover quality and reference recapture, consent, expiry, attempt limits,
+  unavailable models/storage, stale-evidence hiding and tenant-specific retention.
+  Uploads now enforce actual streamed bytes and retain multipart captures in bounded
+  memory until encryption; a valid upload over 1 MiB does not spool plaintext to disk.
+- Client syntax and simulated consent, resume, camera, recapture, processing handoff
+  and unavailable-engine recovery passed. The simulation does not validate a physical
+  camera or rendered layout. Model/license integrity verification and Python compilation
+  passed. Artifacts: [OpenAPI](artifacts/openapi-stage8-9.json),
+  [migration SQL](artifacts/stage8-9-postgresql.sql).
+
+### Phases 8–9 limits
+
+The default uncalibrated comparison always returns REVIEW. Cosine similarity is not
+an identity probability. Pose/quality are heuristics; eye visibility and severe
+occlusion remain explicitly unverified and prevent a full quality PASS. Upstream sample
+success does not establish production accuracy, fairness or threshold calibration.
+Liveness, NFC and final risk decisions remain later work. Docker remains unexecuted.
 
 ## Phase 7 implementation (5 October 2026)
 
@@ -323,9 +379,9 @@ does not claim production readiness or functioning verification engines.
 | 5 | Passport and MRZ engine | Complete; 175/175 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
 | 6 | International generic passport adapter | Complete; real-OCR end-to-end passed; Docker pending |
 | 7 | QR/barcode engine | Complete; 264/264 tests; real decode end-to-end and live PostgreSQL passed; Docker pending |
-| 8 | Face detection and quality | Implemented in a Codex checkpoint (`0d509c0`); final validation and docs pending |
-| 9 | Face embeddings and 1:1 comparison | Implemented in a Codex checkpoint (`0d509c0`); final validation and docs pending |
-| 10 | Liveness/anti-spoof integration | Not started |
+| 8 | Face detection and quality | Complete; native inference and live PostgreSQL verified; quality limitations documented |
+| 9 | Face embeddings and 1:1 comparison | Complete; 264/264 tests; encrypted native PostgreSQL flow passed; uncalibrated REVIEW |
+| 10 | Liveness/anti-spoof integration | Waiting for approval |
 | 11 | ePassport NFC mobile architecture | Not started |
 | 12 | Cross-checks and fraud signals | Not started |
 | 13 | Deterministic risk engine | Not started |
@@ -340,7 +396,8 @@ does not claim production readiness or functioning verification engines.
 ## Approval requirement
 
 `Document.md`, section 31, states: **“Stop and wait for approval before next
-phase.”** Phase 6 will begin only after that approval.
+phase.”** The user's request authorized Phases 8 and 9 together. Phase 10 requires
+separate approval.
 
 ## Earlier reference work
 

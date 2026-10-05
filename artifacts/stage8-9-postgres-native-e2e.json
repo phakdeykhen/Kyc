@@ -1,0 +1,28 @@
+{
+  "database": "PostgreSQL",
+  "restricted_role": "kyc_app",
+  "native_models": true,
+  "reference": "Seeded accepted capture from the OpenCV tutorial sample; document/OCR stage excluded",
+  "transport": "In-process ASGI with real PostgreSQL and native CPU inference",
+  "status": "PROCESSING",
+  "capture_status": "ACCEPTED",
+  "comparison": {
+    "score": 0.736046325946714,
+    "metric": "COSINE_SIMILARITY",
+    "result": "REVIEW",
+    "policy_version": "SFACE-COSINE-UNCALIBRATED-2026.10.1",
+    "model_name": "OpenCV SFace",
+    "model_version": "2021dec",
+    "calibrated": false
+  },
+  "quality_result": "REVIEW",
+  "template_count": 2,
+  "embedding_dimension": 128,
+  "separate_template_encryption_verified": true,
+  "encrypted_selfie_round_trip": true,
+  "explicit_consent_recorded": true,
+  "audit_and_quality_exclude_vectors": true,
+  "late_selfie_status": 409,
+  "decision": null,
+  "liveness": "not implemented or asserted"
+}

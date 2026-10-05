@@ -215,14 +215,14 @@ def submit_selfie(db: Session, tenant: TenantContext, session_id: UUID, data: by
         IdentityDocument.organization_id == record.organization_id, IdentityDocument.session_id == record.id)
         .order_by(IdentityDocument.created_at.desc()).limit(1))
     if document is None or document.processed_at is None or aware(document.delete_after) <= now:
-        return _error(503, "REFERENCE_FACE_UNAVAILABLE", "The accepted document portrait is unavailable. Recapture the document.",
+        return _error(503, "REFERENCE_FACE_UNAVAILABLE", "The accepted document portrait is unavailable. Create a new session and capture the document again.",
                       limits.max_attempts - attempts)
 
     try:
         reference_image, reference_capture = _reference_image(db, record, document, store, limits)
         if reference_image is None:
             _portrait_check(db, record, document, CheckResult.UNAVAILABLE, ("REFERENCE_FACE_UNAVAILABLE",))
-            return _error(503, "REFERENCE_FACE_UNAVAILABLE", "The accepted document portrait is unavailable. Recapture the document.",
+            return _error(503, "REFERENCE_FACE_UNAVAILABLE", "The accepted document portrait is unavailable. Create a new session and capture the document again.",
                           limits.max_attempts - attempts)
         reference_quality = engine.assess(reference_image, source="DOCUMENT_PORTRAIT")
         if not reference_quality.accepted or reference_quality.face_count != 1 \
@@ -256,7 +256,7 @@ def submit_selfie(db: Session, tenant: TenantContext, session_id: UUID, data: by
         apply_event(db, record, tenant, Event.EXPIRE, request_id)
         return _error(409, "SESSION_EXPIRED", "The session has expired. Create a new session.")
     if aware(reference_capture.delete_after) <= now or aware(document.delete_after) <= now:
-        return _error(503, "REFERENCE_FACE_UNAVAILABLE", "The accepted document portrait has expired. Recapture the document.",
+        return _error(503, "REFERENCE_FACE_UNAVAILABLE", "The accepted document portrait has expired. Create a new session and capture the document again.",
                       limits.max_attempts - attempts)
 
     # Seal everything before changing session progress; failed infrastructure is retryable.

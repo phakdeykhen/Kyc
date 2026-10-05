@@ -23,6 +23,7 @@ const TEXT = {
   SHOW_FACE: "Make sure your whole face is visible in the photo.",
   RETAKE_SELFIE: "Please take another selfie.",
   RECAPTURE_DOCUMENT: "Retake your document photo so its portrait is clear and unobstructed.",
+  RECAPTURE_DOCUMENT_WITH_CLEAR_PORTRAIT: "Retake your document photo so its portrait is clear and unobstructed.",
   REDUCE_LIGHT: "Move out of direct bright light.",
   EVEN_LIGHTING: "Use even light across your face and avoid strong shadows.",
 };
