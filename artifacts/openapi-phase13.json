@@ -1,0 +1,2395 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "Universal Identity Platform",
+  "description": "KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness, ePassport chip verification, cross-checks, fraud signals and a deterministic risk engine (phases 1\u201313).",
+  "version": "0.13.0"
+ },
+ "paths": {
+  "/health/live": {
+   "get": {
+    "tags": [
+     "health"
+    ],
+    "summary": "Live",
+    "operationId": "live_health_live_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/health/ready": {
+   "get": {
+    "tags": [
+     "health"
+    ],
+    "summary": "Ready",
+    "operationId": "ready_health_ready_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/kyc/sessions": {
+   "post": {
+    "summary": "Start Session",
+    "operationId": "start_session_v1_kyc_sessions_post",
+    "parameters": [
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SessionCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SessionResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/kyc/{session_id}": {
+   "get": {
+    "summary": "Read Session",
+    "operationId": "read_session_v1_kyc__session_id__get",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SessionResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/kyc/{session_id}/result": {
+   "get": {
+    "summary": "Read Result",
+    "operationId": "read_result_v1_kyc__session_id__result_get",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SessionResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/kyc/{session_id}/documents": {
+   "post": {
+    "summary": "Upload Document",
+    "description": "Upload one side. Passports use DATA_PAGE; cards use FRONT and BACK.",
+    "operationId": "upload_document_v1_kyc__session_id__documents_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_document_v1_kyc__session_id__documents_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureResponse"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Session expired, closed, or not accepting document capture.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "413": {
+      "description": "Upload exceeds the size limit."
+     },
+     "422": {
+      "description": "Unreadable or unsupported image, or a side this document type does not have."
+     },
+     "429": {
+      "description": "Capture attempt limit reached for this session.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Capture storage is not configured."
+     }
+    }
+   }
+  },
+  "/v1/kyc/{session_id}/documents/front": {
+   "post": {
+    "summary": "Upload Front",
+    "operationId": "upload_front_v1_kyc__session_id__documents_front_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_front_v1_kyc__session_id__documents_front_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureResponse"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Session expired, closed, or not accepting document capture.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "413": {
+      "description": "Upload exceeds the size limit."
+     },
+     "422": {
+      "description": "Unreadable or unsupported image, or a side this document type does not have."
+     },
+     "429": {
+      "description": "Capture attempt limit reached for this session.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Capture storage is not configured."
+     }
+    }
+   }
+  },
+  "/v1/kyc/{session_id}/documents/back": {
+   "post": {
+    "summary": "Upload Back",
+    "operationId": "upload_back_v1_kyc__session_id__documents_back_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_back_v1_kyc__session_id__documents_back_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureResponse"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Session expired, closed, or not accepting document capture.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "413": {
+      "description": "Upload exceeds the size limit."
+     },
+     "422": {
+      "description": "Unreadable or unsupported image, or a side this document type does not have."
+     },
+     "429": {
+      "description": "Capture attempt limit reached for this session.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Capture storage is not configured."
+     }
+    }
+   }
+  },
+  "/v1/kyc/{session_id}/selfie": {
+   "post": {
+    "summary": "Upload Selfie",
+    "description": "Assess one selfie and compare it only to this session's document portrait.",
+    "operationId": "upload_selfie_v1_kyc__session_id__selfie_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_selfie_v1_kyc__session_id__selfie_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SelfieResponse"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Session is not accepting selfies.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "413": {
+      "description": "Upload exceeds the size limit."
+     },
+     "422": {
+      "description": "Consent is required, or image is unreadable."
+     },
+     "429": {
+      "description": "Selfie attempt limit reached.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Models, encrypted storage, or document portrait unavailable."
+     }
+    }
+   }
+  },
+  "/v1/kyc/{session_id}/liveness/challenge": {
+   "post": {
+    "summary": "Liveness Challenge",
+    "description": "Issue a single-use, randomly ordered head-movement challenge (expires quickly).",
+    "operationId": "liveness_challenge_v1_kyc__session_id__liveness_challenge_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "409": {
+      "description": "Session is not waiting for liveness.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Liveness attempt limit reached.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/kyc/{session_id}/liveness": {
+   "post": {
+    "summary": "Upload Liveness",
+    "description": "Verify the challenge from 4\u201312 frames. Frames are assessed in memory and never stored.",
+    "operationId": "upload_liveness_v1_kyc__session_id__liveness_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_liveness_v1_kyc__session_id__liveness_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "409": {
+      "description": "Challenge unknown, used or expired, or session not waiting for liveness.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "413": {
+      "description": "Upload exceeds the size limit."
+     },
+     "422": {
+      "description": "Frames unreadable or not matched to steps."
+     },
+     "503": {
+      "description": "Face models unavailable."
+     }
+    }
+   }
+  },
+  "/v1/kyc/{session_id}/nfc/challenge": {
+   "post": {
+    "summary": "Nfc Challenge",
+    "description": "Issue a fresh 8-byte Active Authentication challenge for the chip to sign.",
+    "operationId": "nfc_challenge_v1_kyc__session_id__nfc_challenge_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "409": {
+      "description": "Session is not waiting for the chip step.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Chip attempt limit reached.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/kyc/{session_id}/nfc": {
+   "post": {
+    "summary": "Upload Nfc",
+    "description": "Verify chip data server-side (Passive + Active Authentication). Raw chip data is not stored.",
+    "operationId": "upload_nfc_v1_kyc__session_id__nfc_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_nfc_v1_kyc__session_id__nfc_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "409": {
+      "description": "Challenge invalid, or session not waiting for the chip step.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "413": {
+      "description": "Upload exceeds the size limit."
+     },
+     "429": {
+      "description": "Chip attempt limit reached.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/kyc/{session_id}/verify": {
+   "post": {
+    "summary": "Verify",
+    "description": "Run the deterministic risk engine for a PROCESSING session, or return the decision already made.",
+    "operationId": "verify_v1_kyc__session_id__verify_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VerifyResponse"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Session not ready, expired, or document not processed.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaptureError"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/document-types": {
+   "get": {
+    "summary": "Document Types",
+    "operationId": "document_types_v1_document_types_get",
+    "parameters": [
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/countries": {
+   "get": {
+    "summary": "Countries",
+    "operationId": "countries_v1_countries_get",
+    "parameters": [
+     {
+      "name": "X-API-Key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Api-Key"
+      }
+     },
+     {
+      "name": "X-Organization-ID",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Organization-Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "Body_upload_back_v1_kyc__session_id__documents_back_post": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "format": "binary",
+      "title": "File"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file"
+    ],
+    "title": "Body_upload_back_v1_kyc__session_id__documents_back_post"
+   },
+   "Body_upload_document_v1_kyc__session_id__documents_post": {
+    "properties": {
+     "side": {
+      "type": "string",
+      "enum": [
+       "FRONT",
+       "BACK",
+       "DATA_PAGE"
+      ],
+      "title": "Side"
+     },
+     "file": {
+      "type": "string",
+      "format": "binary",
+      "title": "File"
+     }
+    },
+    "type": "object",
+    "required": [
+     "side",
+     "file"
+    ],
+    "title": "Body_upload_document_v1_kyc__session_id__documents_post"
+   },
+   "Body_upload_front_v1_kyc__session_id__documents_front_post": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "format": "binary",
+      "title": "File"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file"
+    ],
+    "title": "Body_upload_front_v1_kyc__session_id__documents_front_post"
+   },
+   "Body_upload_liveness_v1_kyc__session_id__liveness_post": {
+    "properties": {
+     "challenge_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Challenge Id"
+     },
+     "nonce": {
+      "type": "string",
+      "maxLength": 128,
+      "title": "Nonce"
+     },
+     "frame_steps": {
+      "type": "string",
+      "maxLength": 200,
+      "title": "Frame Steps",
+      "description": "Comma-separated step index per frame"
+     },
+     "frames": {
+      "items": {
+       "type": "string",
+       "format": "binary"
+      },
+      "type": "array",
+      "title": "Frames",
+      "description": "Raw (unmirrored) camera frames"
+     }
+    },
+    "type": "object",
+    "required": [
+     "challenge_id",
+     "nonce",
+     "frame_steps",
+     "frames"
+    ],
+    "title": "Body_upload_liveness_v1_kyc__session_id__liveness_post"
+   },
+   "Body_upload_nfc_v1_kyc__session_id__nfc_post": {
+    "properties": {
+     "read_status": {
+      "type": "string",
+      "enum": [
+       "READ",
+       "NOT_SUPPORTED",
+       "NOT_AVAILABLE",
+       "FAILED"
+      ],
+      "title": "Read Status",
+      "default": "READ"
+     },
+     "access_protocol": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "PACE",
+         "BAC"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Access Protocol"
+     },
+     "challenge_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Challenge Id"
+     },
+     "aa_signature": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2048,
+        "pattern": "^[0-9a-fA-F]*$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Aa Signature"
+     },
+     "sod": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "binary"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sod",
+      "description": "EF.SOD as read from the chip"
+     },
+     "dg1": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "binary"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dg1",
+      "description": "EF.DG1 (MRZ)"
+     },
+     "dg2": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "binary"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dg2",
+      "description": "EF.DG2 (portrait)"
+     },
+     "dg15": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "binary"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dg15",
+      "description": "EF.DG15 (Active Authentication key)"
+     }
+    },
+    "type": "object",
+    "title": "Body_upload_nfc_v1_kyc__session_id__nfc_post"
+   },
+   "Body_upload_selfie_v1_kyc__session_id__selfie_post": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "format": "binary",
+      "title": "File"
+     },
+     "biometric_consent": {
+      "type": "boolean",
+      "title": "Biometric Consent"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file",
+     "biometric_consent"
+    ],
+    "title": "Body_upload_selfie_v1_kyc__session_id__selfie_post"
+   },
+   "CaptureError": {
+    "properties": {
+     "detail": {
+      "type": "string",
+      "title": "Detail"
+     },
+     "reason_code": {
+      "type": "string",
+      "title": "Reason Code"
+     },
+     "attempts_remaining": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Attempts Remaining"
+     }
+    },
+    "type": "object",
+    "required": [
+     "detail",
+     "reason_code"
+    ],
+    "title": "CaptureError"
+   },
+   "CaptureGeometry": {
+    "properties": {
+     "document_detected": {
+      "type": "boolean",
+      "title": "Document Detected"
+     },
+     "orientation": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "LANDSCAPE",
+         "PORTRAIT"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Orientation"
+     },
+     "rotation_hint_degrees": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rotation Hint Degrees"
+     },
+     "skew_degrees": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Skew Degrees"
+     },
+     "corners": {
+      "anyOf": [
+       {
+        "items": {
+         "items": {
+          "type": "number"
+         },
+         "type": "array"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Corners",
+      "description": "Normalized [x, y] corners: top-left, top-right, bottom-right, bottom-left."
+     }
+    },
+    "type": "object",
+    "required": [
+     "document_detected"
+    ],
+    "title": "CaptureGeometry"
+   },
+   "CaptureQuality": {
+    "properties": {
+     "blur_score": {
+      "type": "number",
+      "title": "Blur Score"
+     },
+     "glare_score": {
+      "type": "number",
+      "title": "Glare Score"
+     },
+     "brightness_score": {
+      "type": "number",
+      "title": "Brightness Score"
+     },
+     "shadow_score": {
+      "type": "number",
+      "title": "Shadow Score"
+     },
+     "document_coverage": {
+      "type": "number",
+      "title": "Document Coverage"
+     },
+     "perspective_score": {
+      "type": "number",
+      "title": "Perspective Score"
+     },
+     "resolution_score": {
+      "type": "number",
+      "title": "Resolution Score"
+     },
+     "overall_quality": {
+      "type": "number",
+      "title": "Overall Quality"
+     },
+     "policy_version": {
+      "type": "string",
+      "title": "Policy Version"
+     }
+    },
+    "type": "object",
+    "required": [
+     "blur_score",
+     "glare_score",
+     "brightness_score",
+     "shadow_score",
+     "document_coverage",
+     "perspective_score",
+     "resolution_score",
+     "overall_quality",
+     "policy_version"
+    ],
+    "title": "CaptureQuality"
+   },
+   "CaptureResponse": {
+    "properties": {
+     "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Session Id"
+     },
+     "status": {
+      "$ref": "#/components/schemas/SessionStatus"
+     },
+     "side": {
+      "type": "string",
+      "enum": [
+       "FRONT",
+       "BACK",
+       "DATA_PAGE"
+      ],
+      "title": "Side"
+     },
+     "capture_status": {
+      "type": "string",
+      "enum": [
+       "ACCEPTED",
+       "RECAPTURE"
+      ],
+      "title": "Capture Status"
+     },
+     "quality": {
+      "$ref": "#/components/schemas/CaptureQuality"
+     },
+     "geometry": {
+      "$ref": "#/components/schemas/CaptureGeometry"
+     },
+     "reason_codes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Reason Codes"
+     },
+     "instructions": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Instructions"
+     },
+     "sides": {
+      "additionalProperties": {
+       "type": "string",
+       "enum": [
+        "ACCEPTED",
+        "REQUIRED"
+       ]
+      },
+      "type": "object",
+      "title": "Sides"
+     },
+     "next_step": {
+      "type": "string",
+      "title": "Next Step"
+     },
+     "attempts_remaining": {
+      "type": "integer",
+      "title": "Attempts Remaining"
+     }
+    },
+    "type": "object",
+    "required": [
+     "session_id",
+     "status",
+     "side",
+     "capture_status",
+     "quality",
+     "geometry",
+     "reason_codes",
+     "instructions",
+     "sides",
+     "next_step",
+     "attempts_remaining"
+    ],
+    "title": "CaptureResponse"
+   },
+   "CheckResult": {
+    "type": "string",
+    "enum": [
+     "PASS",
+     "REVIEW",
+     "FAIL",
+     "NOT_APPLICABLE",
+     "UNAVAILABLE"
+    ],
+    "title": "CheckResult"
+   },
+   "DocumentType": {
+    "type": "string",
+    "enum": [
+     "KH_NATIONAL_ID",
+     "KH_PASSPORT",
+     "KH_NSSF",
+     "PASSPORT",
+     "NATIONAL_ID",
+     "RESIDENCE_CARD",
+     "DRIVING_LICENSE",
+     "UNKNOWN"
+    ],
+    "title": "DocumentType"
+   },
+   "FaceComparisonSummary": {
+    "properties": {
+     "score": {
+      "type": "number",
+      "maximum": 1.0,
+      "minimum": -1.0,
+      "title": "Score",
+      "description": "Cosine similarity; not an identity probability."
+     },
+     "metric": {
+      "type": "string",
+      "const": "COSINE_SIMILARITY",
+      "title": "Metric"
+     },
+     "result": {
+      "$ref": "#/components/schemas/CheckResult"
+     },
+     "policy_version": {
+      "type": "string",
+      "title": "Policy Version"
+     },
+     "model_name": {
+      "type": "string",
+      "title": "Model Name"
+     },
+     "model_version": {
+      "type": "string",
+      "title": "Model Version"
+     },
+     "calibrated": {
+      "type": "boolean",
+      "title": "Calibrated"
+     }
+    },
+    "type": "object",
+    "required": [
+     "score",
+     "metric",
+     "result",
+     "policy_version",
+     "model_name",
+     "model_version",
+     "calibrated"
+    ],
+    "title": "FaceComparisonSummary"
+   },
+   "FraudSignalSummary": {
+    "properties": {
+     "signal": {
+      "type": "string",
+      "title": "Signal"
+     },
+     "severity": {
+      "type": "string",
+      "enum": [
+       "LOW",
+       "MEDIUM",
+       "HIGH"
+      ],
+      "title": "Severity"
+     },
+     "category": {
+      "type": "string",
+      "title": "Category"
+     }
+    },
+    "type": "object",
+    "required": [
+     "signal",
+     "severity",
+     "category"
+    ],
+    "title": "FraudSignalSummary"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "MRZCheckDigit": {
+    "properties": {
+     "expected": {
+      "type": "string",
+      "maxLength": 1,
+      "minLength": 1,
+      "title": "Expected"
+     },
+     "computed": {
+      "type": "string",
+      "pattern": "^[0-9]$",
+      "title": "Computed"
+     },
+     "valid": {
+      "type": "boolean",
+      "title": "Valid"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "expected",
+     "computed",
+     "valid"
+    ],
+    "title": "MRZCheckDigit"
+   },
+   "ResultDecision": {
+    "properties": {
+     "result": {
+      "$ref": "#/components/schemas/RiskDecision"
+     },
+     "reason_codes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Reason Codes"
+     },
+     "policy_version": {
+      "type": "string",
+      "title": "Policy Version"
+     },
+     "assessed_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Assessed At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "result",
+     "reason_codes",
+     "policy_version",
+     "assessed_at"
+    ],
+    "title": "ResultDecision"
+   },
+   "ResultDocument": {
+    "properties": {
+     "country": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Country"
+     },
+     "type": {
+      "$ref": "#/components/schemas/DocumentType"
+     },
+     "document_number_masked": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Document Number Masked"
+     },
+     "expiry_status": {
+      "type": "string",
+      "enum": [
+       "VALID",
+       "EXPIRED",
+       "UNKNOWN",
+       "NOT_APPLICABLE"
+      ],
+      "title": "Expiry Status"
+     }
+    },
+    "type": "object",
+    "required": [
+     "country",
+     "type",
+     "document_number_masked",
+     "expiry_status"
+    ],
+    "title": "ResultDocument"
+   },
+   "ResultIdentity": {
+    "properties": {
+     "full_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Full Name"
+     },
+     "full_name_local": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Full Name Local"
+     },
+     "date_of_birth": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date Of Birth"
+     },
+     "sex": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sex"
+     },
+     "nationality": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Nationality"
+     }
+    },
+    "type": "object",
+    "title": "ResultIdentity"
+   },
+   "ResultMRZ": {
+    "properties": {
+     "format": {
+      "type": "string",
+      "enum": [
+       "TD1",
+       "TD2",
+       "TD3",
+       "UNKNOWN"
+      ],
+      "title": "Format"
+     },
+     "mrz_valid": {
+      "type": "boolean",
+      "title": "Mrz Valid"
+     },
+     "check_digit_results": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/MRZCheckDigit"
+      },
+      "type": "object",
+      "title": "Check Digit Results"
+     },
+     "field_consistency": {
+      "additionalProperties": {
+       "type": "string",
+       "enum": [
+        "MATCH",
+        "MISMATCH",
+        "MRZ_ONLY",
+        "VIZ_ONLY",
+        "NOT_COMPARED"
+       ]
+      },
+      "type": "object",
+      "title": "Field Consistency"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "format",
+     "mrz_valid",
+     "check_digit_results",
+     "field_consistency"
+    ],
+    "title": "ResultMRZ",
+    "description": "Internal consistency evidence; raw MRZ and optional personal data stay encrypted."
+   },
+   "RiskDecision": {
+    "type": "string",
+    "enum": [
+     "PASS",
+     "REVIEW",
+     "FAIL"
+    ],
+    "title": "RiskDecision"
+   },
+   "SelfieResponse": {
+    "properties": {
+     "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Session Id"
+     },
+     "status": {
+      "$ref": "#/components/schemas/SessionStatus"
+     },
+     "capture_status": {
+      "type": "string",
+      "enum": [
+       "ACCEPTED",
+       "RECAPTURE"
+      ],
+      "title": "Capture Status"
+     },
+     "quality": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "integer"
+        },
+        {
+         "type": "string"
+        },
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        }
+       ]
+      },
+      "type": "object",
+      "title": "Quality"
+     },
+     "reason_codes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Reason Codes"
+     },
+     "instructions": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Instructions"
+     },
+     "next_step": {
+      "type": "string",
+      "title": "Next Step"
+     },
+     "attempts_remaining": {
+      "type": "integer",
+      "title": "Attempts Remaining"
+     },
+     "comparison": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/FaceComparisonSummary"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "session_id",
+     "status",
+     "capture_status",
+     "quality",
+     "reason_codes",
+     "instructions",
+     "next_step",
+     "attempts_remaining"
+    ],
+    "title": "SelfieResponse"
+   },
+   "SessionCreate": {
+    "properties": {
+     "user_id": {
+      "type": "string",
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "User Id"
+     },
+     "country": {
+      "type": "string",
+      "maxLength": 2,
+      "minLength": 2,
+      "title": "Country"
+     },
+     "expected_document_type": {
+      "$ref": "#/components/schemas/DocumentType"
+     },
+     "verification_level": {
+      "$ref": "#/components/schemas/VerificationLevel",
+      "default": "DOCUMENT_FACE_LIVENESS"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "user_id",
+     "country",
+     "expected_document_type"
+    ],
+    "title": "SessionCreate"
+   },
+   "SessionResponse": {
+    "properties": {
+     "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Session Id"
+     },
+     "organization_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Organization Id"
+     },
+     "user_id": {
+      "type": "string",
+      "title": "User Id"
+     },
+     "country": {
+      "type": "string",
+      "title": "Country"
+     },
+     "expected_document_type": {
+      "$ref": "#/components/schemas/DocumentType"
+     },
+     "verification_level": {
+      "$ref": "#/components/schemas/VerificationLevel"
+     },
+     "status": {
+      "$ref": "#/components/schemas/SessionStatus"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     },
+     "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Expires At"
+     },
+     "version": {
+      "type": "integer",
+      "title": "Version"
+     }
+    },
+    "type": "object",
+    "required": [
+     "session_id",
+     "organization_id",
+     "user_id",
+     "country",
+     "expected_document_type",
+     "verification_level",
+     "status",
+     "created_at",
+     "updated_at",
+     "expires_at",
+     "version"
+    ],
+    "title": "SessionResponse"
+   },
+   "SessionResult": {
+    "properties": {
+     "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Session Id"
+     },
+     "status": {
+      "$ref": "#/components/schemas/SessionStatus"
+     },
+     "document": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ResultDocument"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "identity": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ResultIdentity"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "mrz": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ResultMRZ"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "face_comparison": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/FaceComparisonSummary"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "checks": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Checks"
+     },
+     "review_flags": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Review Flags",
+      "description": "Reason codes that a reviewer or the risk engine must consider."
+     },
+     "fraud_signals": {
+      "items": {
+       "$ref": "#/components/schemas/FraudSignalSummary"
+      },
+      "type": "array",
+      "title": "Fraud Signals",
+      "description": "Signals from the fraud engine (Phase 12). Evidence, not a verdict."
+     },
+     "decision": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ResultDecision"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Set only by the deterministic risk engine (Phase 13)."
+     }
+    },
+    "type": "object",
+    "required": [
+     "session_id",
+     "status"
+    ],
+    "title": "SessionResult"
+   },
+   "SessionStatus": {
+    "type": "string",
+    "enum": [
+     "CREATED",
+     "DOCUMENT_REQUIRED",
+     "DOCUMENT_PROCESSING",
+     "SELFIE_REQUIRED",
+     "LIVENESS_REQUIRED",
+     "NFC_REQUIRED",
+     "PROCESSING",
+     "MANUAL_REVIEW",
+     "VERIFIED",
+     "REJECTED",
+     "EXPIRED"
+    ],
+    "title": "SessionStatus"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   },
+   "VerificationLevel": {
+    "type": "string",
+    "enum": [
+     "DOCUMENT_ONLY",
+     "DOCUMENT_FACE",
+     "DOCUMENT_FACE_LIVENESS",
+     "DOCUMENT_FACE_LIVENESS_NFC"
+    ],
+    "title": "VerificationLevel"
+   },
+   "VerifyResponse": {
+    "properties": {
+     "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Session Id"
+     },
+     "status": {
+      "$ref": "#/components/schemas/SessionStatus"
+     },
+     "decision": {
+      "$ref": "#/components/schemas/ResultDecision"
+     }
+    },
+    "type": "object",
+    "required": [
+     "session_id",
+     "status",
+     "decision"
+    ],
+    "title": "VerifyResponse"
+   }
+  }
+ }
+}

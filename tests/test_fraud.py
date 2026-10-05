@@ -181,7 +181,7 @@ class FraudAPITests(test_nfc.NFCAPICase):
         result = await self.result(session_id)
         self.assertEqual((result["checks"]["cross_check"], result["checks"]["fraud"]), ("PASS", "PASS"))
         self.assertEqual(result["fraud_signals"], [])
-        self.assertIsNone(result["decision"])
+        self.assertEqual(result["decision"]["result"], "REVIEW")  # clean fraud evidence is not a decision either
         with Session(self.engine) as db:
             check = db.scalar(sa.select(DocumentCheck).where(DocumentCheck.check_type == "CROSS_CHECK"))
             self.assertEqual(check.evidence_metadata["fields"]["mrz_data_lines"]["pairs"], {"NFC~MRZ": "MATCH"})
@@ -286,7 +286,7 @@ class DocumentOnlyTriggerTests(unittest.TestCase):
         calls = []
         state = type("State", (), {})()
         state.document_processor = type("P", (), {"process": lambda self, *args: ProcessingOutcome("ACCEPTED")})()
-        state.fraud_analyzer = type("A", (), {"analyze": lambda self, *args: calls.append(args)})()
+        state.assessor = type("A", (), {"assess": lambda self, *args: calls.append(args)})()
         _process_after_commit(state, uuid4(), uuid4(), uuid4())
         self.assertEqual(len(calls), 1)
         state.document_processor = type("P", (), {"process": lambda self, *args: ProcessingOutcome("RECAPTURE")})()

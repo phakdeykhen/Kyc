@@ -1,13 +1,14 @@
 """Client-facing session result. Masks the document number; never returns raw OCR or templates."""
 
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from kyc.api.schemas import FaceComparisonSummary, FraudSignalSummary, ResultDocument, ResultIdentity, ResultMRZ, SessionResult
+from kyc.api.schemas import FaceComparisonSummary, FraudSignalSummary, ResultDecision, ResultDocument, ResultIdentity, ResultMRZ, SessionResult
 from kyc.core.crypto import FieldCipher
-from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceComparison, FaceQualityCheck, FraudSignal, IdentityDocument, KYCSession, LivenessCheck, MRZResult, NFCResult
+from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceComparison, FaceQualityCheck, FraudSignal, IdentityDocument, KYCSession, LivenessCheck, MRZResult, NFCResult, RiskAssessmentRecord
 from kyc.domain.enums import CheckResult
 from kyc.services.captures import side_progress
 
@@ -29,7 +30,18 @@ def mask(value: str | None) -> str | None:
     return "*" * max(0, len(value) - 4) + value[-4:]
 
 
-def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) -> SessionResult:
+@dataclass
+class Evidence:
+    """Everything the result shows and the risk engine decides on: one source, so they never disagree."""
+
+    checks: dict[str, str]
+    flags: list[str]
+    face_comparison: FaceComparisonSummary | None
+    signals: list[FraudSignalSummary]
+    document: IdentityDocument | None
+
+
+def collect_evidence(db: Session, record: KYCSession) -> Evidence:
     checks: dict[str, str] = {}
     flags: list[str] = []
     now = datetime.now(timezone.utc)
@@ -106,23 +118,41 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) ->
                for row in sorted(db.scalars(sa.select(FraudSignal).where(FraudSignal.organization_id == record.organization_id,
                                                                          FraudSignal.session_id == record.id)),
                                  key=lambda row: (order[row.severity], row.signal))]
+    if document is not None:
+        rows = db.scalars(sa.select(DocumentCheck).where(DocumentCheck.organization_id == record.organization_id,
+                                                         DocumentCheck.document_id == document.id,
+                                                         DocumentCheck.created_at >= document.processed_at)).all()
+        data_result = None
+        for row in rows:
+            if row.check_type in CHECK_GROUPS:
+                checks[CHECK_GROUPS[row.check_type]] = row.result.value
+            if row.check_type in DATA_CHECKS and (data_result is None or SEVERITY.get(row.result, 0) > SEVERITY.get(data_result, 0)):
+                data_result = row.result
+            if row.result in (CheckResult.REVIEW, CheckResult.FAIL):
+                flags.extend(row.evidence_metadata.get("reason_codes", []))
+        if data_result is not None:
+            checks["document_data"] = data_result.value
+    return Evidence(checks, flags, summary, signals, document)
+
+
+def latest_decision(db: Session, record: KYCSession) -> ResultDecision | None:
+    row = db.scalar(sa.select(RiskAssessmentRecord).where(RiskAssessmentRecord.organization_id == record.organization_id,
+                                                          RiskAssessmentRecord.session_id == record.id)
+                    .order_by(RiskAssessmentRecord.created_at.desc()).limit(1))
+    if row is None:
+        return None
+    return ResultDecision(result=row.decision, reason_codes=row.reason_codes, policy_version=row.policy_version,
+                          assessed_at=row.created_at)
+
+
+def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) -> SessionResult:
+    evidence = collect_evidence(db, record)
+    checks, flags, summary, signals, document = (evidence.checks, evidence.flags, evidence.face_comparison,
+                                                 evidence.signals, evidence.document)
+    decision = latest_decision(db, record)
     if document is None or cipher is None:
         return SessionResult(session_id=record.id, status=record.status, checks=checks, fraud_signals=signals,
-                             face_comparison=summary, review_flags=sorted(set(flags)))
-
-    rows = db.scalars(sa.select(DocumentCheck).where(DocumentCheck.organization_id == record.organization_id,
-                                                     DocumentCheck.document_id == document.id,
-                                                     DocumentCheck.created_at >= document.processed_at)).all()
-    data_result = None
-    for row in rows:
-        if row.check_type in CHECK_GROUPS:
-            checks[CHECK_GROUPS[row.check_type]] = row.result.value
-        if row.check_type in DATA_CHECKS and (data_result is None or SEVERITY.get(row.result, 0) > SEVERITY.get(data_result, 0)):
-            data_result = row.result
-        if row.result in (CheckResult.REVIEW, CheckResult.FAIL):
-            flags.extend(row.evidence_metadata.get("reason_codes", []))
-    if data_result is not None:
-        checks["document_data"] = data_result.value
+                             face_comparison=summary, review_flags=sorted(set(flags)), decision=decision)
 
     values: dict[str, str] = {}
     for field in db.scalars(sa.select(DocumentField).where(DocumentField.organization_id == record.organization_id,
@@ -138,7 +168,7 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) ->
                                              MRZResult.document_id == document.id))
     return SessionResult(
         session_id=record.id, status=record.status, checks=checks, review_flags=sorted(set(flags)), face_comparison=summary,
-        fraud_signals=signals,
+        fraud_signals=signals, decision=decision,
         document=ResultDocument(country=document.issuing_country, type=document.document_type,
                                 document_number_masked=mask(values.get("document_number")), expiry_status=expiry_status),
         identity=ResultIdentity(full_name=values.get("full_name"), full_name_local=values.get("full_name_local"),

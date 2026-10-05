@@ -1191,11 +1191,11 @@ Design this as:
 
 ---
 
-## Implementation progress — 5 October 2026
+## Implementation progress — 6 October 2026
 
-The original specification above is preserved. Phases 1–12 have been implemented
+The original specification above is preserved. Phases 1–13 have been implemented
 at this workspace root. The user authorized Phases 8 and 9 together, then Phases 10
-and 11, then Phase 12; their validation passed. Phase 13 has not started.
+and 11, then Phases 12 and 13 in turn; their validation passed. Phase 14 has not started.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -1211,8 +1211,8 @@ and 11, then Phase 12; their validation passed. Phase 13 has not started.
 | 10 | Liveness / anti-spoof integration | Complete; re-tested 5 Oct (300/300); photo attacks blocked; uncalibrated REVIEW |
 | 11 | ePassport NFC mobile architecture | Complete; 300/300 tests; server-side PA + AA; clone/tamper detected; no physical chip yet |
 | 12 | Cross-check + fraud signals | Complete; 318/318 tests; signals not verdicts; forensics models not included |
-| 13 | Risk engine | Waiting for approval |
-| 14 | Manual review dashboard | Not started |
+| 13 | Risk engine | Complete; 333/333 tests; deterministic, tighten-only policy; uncalibrated biometrics → manual review |
+| 14 | Manual review dashboard | Waiting for approval |
 | 15 | Multi-tenant API + API keys | Not started |
 | 16 | Webhooks + SDK | Not started |
 | 17 | Security/privacy hardening | Not started |

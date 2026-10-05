@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile, status
 
 from kyc.api.dependencies import Database, Tenant
-from kyc.api.schemas import COUNTRY_CODES, CaptureError, CaptureResponse, DocumentSide, SessionCreate, SessionResponse, SessionResult, SelfieResponse
+from kyc.api.schemas import COUNTRY_CODES, CaptureError, CaptureResponse, DocumentSide, SessionCreate, SessionResponse, SessionResult, SelfieResponse, VerifyResponse
 from kyc.documents.adapters import adapter_for
 from kyc.documents.requirements import requirement_for
 from kyc.domain.enums import DocumentType
@@ -13,6 +13,7 @@ from kyc.services.biometrics import SelfieLimits, submit_selfie
 from kyc.services.liveness import LivenessLimits, issue_challenge, submit_liveness
 from kyc.services.nfc import NFCLimits, issue_nfc_challenge, submit_nfc
 from kyc.services.results import build_result
+from kyc.services.risk import verify_session
 from kyc.services.sessions import create_session, get_session, respond
 
 router = APIRouter(prefix="/v1")
@@ -47,15 +48,15 @@ def read_result(session_id: UUID, request: Request, tenant: Tenant, db: Database
 def _process_after_commit(state, organization_id: UUID, session_id: UUID, request_id: UUID) -> None:
     outcome = state.document_processor.process(organization_id, session_id, request_id)
     if outcome.status == "ACCEPTED":
-        # Document-only sessions reach PROCESSING here; the analyzer ignores any other status.
-        state.fraud_analyzer.analyze(organization_id, session_id, request_id)
+        # Document-only sessions reach PROCESSING here; the assessor ignores any other status.
+        state.assessor.assess(organization_id, session_id, request_id)
 
 
-def _analyze_if_processing(outcome, background: BackgroundTasks, request: Request, tenant, session_id: UUID):
-    """Cross-checks and fraud signals run after the transaction that reached PROCESSING commits."""
+def _assess_if_processing(outcome, background: BackgroundTasks, request: Request, tenant, session_id: UUID):
+    """Fraud analysis and the risk decision run after the transaction that reached PROCESSING commits."""
     status_value = outcome.get("status") if isinstance(outcome, dict) else getattr(outcome, "status", None)
     if str(getattr(status_value, "value", status_value)) == "PROCESSING":
-        background.add_task(request.app.state.fraud_analyzer.analyze, tenant.organization_id, session_id,
+        background.add_task(request.app.state.assessor.assess, tenant.organization_id, session_id,
                             request.state.request_id)
     return outcome
 
@@ -114,7 +115,7 @@ def upload_selfie(session_id: UUID, request: Request, tenant: Tenant, db: Databa
                             state.biometric_cipher, state.face_match_policy, limits, request.state.request_id,
                             biometric_consent=biometric_consent,
                             consent_policy_version=settings.biometric_consent_policy_version)
-    return _analyze_if_processing(outcome, background, request, tenant, session_id)
+    return _assess_if_processing(outcome, background, request, tenant, session_id)
 
 
 def _liveness_limits(settings) -> LivenessLimits:
@@ -157,7 +158,7 @@ def upload_liveness(session_id: UUID, request: Request, tenant: Tenant, db: Data
     outcome = submit_liveness(db, tenant, session_id, challenge_id, nonce, data, steps, state.face_engine,
                               state.biometric_cipher, state.face_match_policy, state.liveness_policy, limits,
                               request.state.request_id)
-    return _analyze_if_processing(outcome, background, request, tenant, session_id)
+    return _assess_if_processing(outcome, background, request, tenant, session_id)
 
 
 def _nfc_limits(settings) -> NFCLimits:
@@ -205,7 +206,16 @@ def upload_nfc(session_id: UUID, request: Request, tenant: Tenant, db: Database,
     outcome = submit_nfc(db, tenant, session_id, read_status, access_protocol, groups, _optional_file(sod, limit),
                          challenge_id, signature, state.csca_trust, state.field_cipher, state.face_engine,
                          state.biometric_cipher, state.face_match_policy, _nfc_limits(settings), request.state.request_id)
-    return _analyze_if_processing(outcome, background, request, tenant, session_id)
+    return _assess_if_processing(outcome, background, request, tenant, session_id)
+
+
+@router.post("/kyc/{session_id}/verify", response_model=VerifyResponse, responses={
+    409: {"model": CaptureError, "description": "Session not ready, expired, or document not processed."},
+})
+def verify(session_id: UUID, request: Request, tenant: Tenant, db: Database):
+    """Run the deterministic risk engine for a PROCESSING session, or return the decision already made."""
+    record = get_session(db, tenant, session_id, request.state.request_id)
+    return verify_session(db, tenant, record, request.app.state.assessor, request.state.request_id)
 
 
 @router.get("/document-types")

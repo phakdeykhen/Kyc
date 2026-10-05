@@ -21,7 +21,9 @@ from kyc.engines.capture_quality import HeuristicDocumentQualityEngine
 from kyc.barcode.signatures import TrustStore
 from kyc.liveness.active import ActiveLivenessPolicy
 from kyc.nfc.trust import CSCATrustStore
+from kyc.risk.policy import RiskPolicy
 from kyc.services.fraud import FraudAnalyzer
+from kyc.services.risk import SessionAssessor
 from kyc.ocr.tesseract import TesseractOCREngine
 from kyc.services.documents import DocumentProcessor
 from kyc.storage.captures import LocalEncryptedCaptureStore, parse_keyring
@@ -100,6 +102,8 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
         application.state.fraud_analyzer = build_fraud_analyzer(
             configuration, application.state.session_factory, application.state.field_cipher,
             application.state.biometric_cipher, application.state.capture_store, application.state.face_match_policy)
+        application.state.assessor = SessionAssessor(application.state.session_factory, application.state.fraud_analyzer,
+                                                     RiskPolicy.load(configuration.risk_policy_file))
         try:
             yield
         finally:
@@ -107,7 +111,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
                 engine.dispose()
 
     application = FastAPI(title="Universal Identity Platform", version=__version__, lifespan=lifespan,
-                          description="KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness, ePassport chip verification, cross-checks and fraud signals (phases 1–12).")
+                          description="KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness, ePassport chip verification, cross-checks, fraud signals and a deterministic risk engine (phases 1–13).")
     application.state.settings = settings
 
     @application.middleware("http")
@@ -165,7 +169,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
 
     @application.get("/health/live", tags=["health"])
     def live():
-        return {"status": "ok", "phase": 12, "implemented_phases": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "version": __version__}
+        return {"status": "ok", "phase": 13, "implemented_phases": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], "version": __version__}
 
     @application.get("/health/ready", tags=["health"])
     def ready():

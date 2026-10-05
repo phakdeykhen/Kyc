@@ -238,7 +238,8 @@ class LivenessAPITests(BiometricAPICase):
         self.assertEqual(body["coverage"]["MASK_3D"], "NOT_SUPPORTED")
         code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
         self.assertEqual(result["checks"]["liveness"], "REVIEW")
-        self.assertIsNone(result["decision"])
+        self.assertEqual(result["decision"]["result"], "REVIEW")  # uncalibrated liveness never auto-verifies
+        self.assertIn("LIVENESS_INCONCLUSIVE", result["decision"]["reason_codes"])
         with Session(self.engine) as db:
             check = db.scalar(sa.select(LivenessCheck))
             self.assertEqual((check.method, check.challenge_hash), ("ACTIVE_LIVENESS", challenges.nonce_hash(issued["nonce"])))

@@ -197,7 +197,9 @@ class BiometricAPITests(BiometricAPICase):
         self.assertEqual((body["status"], body["next_step"]), ("PROCESSING", "AWAIT_ASSESSMENT"))
         code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
         self.assertEqual(code, 200)
-        self.assertIsNone(result["decision"])
+        # Phase 13 decides right after PROCESSING; an uncalibrated face match can never auto-verify.
+        self.assertEqual((result["status"], result["decision"]["result"]), ("MANUAL_REVIEW", "REVIEW"))
+        self.assertIn("FACE_MATCH_UNCALIBRATED", result["decision"]["reason_codes"])
 
     async def test_calibrated_failed_match_remains_evidence_without_final_rejection(self):
         self.face.same_identity = False

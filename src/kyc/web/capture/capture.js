@@ -115,6 +115,15 @@ function sessionInfo() {
   $("session-info").textContent = `Session ${state.session.session_id} · expires ${new Date(state.session.expires_at).toLocaleTimeString()}`;
 }
 
+// Final outcomes for the person. Reason codes stay with the integrating service, never on this page.
+const OUTCOMES = {
+  VERIFIED: { css: "ok", text: "Identity verified", next: "You are done. You can close this page." },
+  MANUAL_REVIEW: { css: "retry", text: "Your details are being reviewed",
+    next: "A member of staff will check your verification. You can close this page." },
+  REJECTED: { css: "retry", text: "We could not verify your identity",
+    next: "Contact the service that sent you here if you think this is a mistake." },
+};
+
 function comparisonVerdict(comparison) {
   if (comparison && comparison.result === "PASS") return "Selfie accepted · face comparison passed";
   if (comparison && comparison.result === "FAIL") return "Selfie accepted · face comparison did not pass";
@@ -221,6 +230,13 @@ async function followSession() {
     setMode("processing");
     $("processing-info").textContent = "Please wait while your document is processed.";
     state.pollTimer = setTimeout(refreshSession, 2000);
+  } else if (status === "PROCESSING") {
+    // The decision is made seconds after the last step; keep checking until it arrives.
+    stopCamera();
+    state.current = null;
+    setMode("processing");
+    $("processing-info").textContent = "Checking your details. This usually takes a few seconds.";
+    state.pollTimer = setTimeout(refreshSession, 2000);
   } else if (status === "CREATED" || status === "DOCUMENT_REQUIRED") {
     stopPolling();
     await prepareDocument();
@@ -233,12 +249,13 @@ async function followSession() {
     if (session !== state.session) return;
     if (!result.ok) return showError(result);
     $("result").hidden = false;
-    $("verdict").className = "verdict retry";
-    $("verdict").textContent = status === "EXPIRED" ? "Session expired"
+    const outcome = OUTCOMES[status];
+    $("verdict").className = `verdict ${outcome ? outcome.css : "retry"}`;
+    $("verdict").textContent = status === "EXPIRED" ? "Session expired" : outcome ? outcome.text
       : result.body.face_comparison ? comparisonVerdict(result.body.face_comparison) : "Capture submitted";
     $("instructions").replaceChildren();
     $("scores").replaceChildren();
-    $("next").textContent = "Additional verification or review is still required before an identity decision.";
+    $("next").textContent = outcome ? outcome.next : "Additional verification or review is still required before an identity decision.";
   }
 }
 
@@ -466,7 +483,8 @@ function showLiveness(body) {
     stopCamera();
     state.current = null;
     setMode("done");
-    $("next").textContent = "Your capture is complete. Additional checks or review are still required before an identity decision.";
+    $("next").textContent = "Your capture is complete. We are checking your details.";
+    if (body.status === "PROCESSING") state.pollTimer = setTimeout(refreshSession, 2000);
   }
 }
 

@@ -192,7 +192,8 @@ class NFCAPITests(NFCAPICase):
         self.assertEqual((result["checks"]["nfc"], result["checks"]["nfc_status"]), ("PASS", "NFC_VERIFIED"))
         self.assertEqual(result["checks"]["chip_document_consistency"], "PASS")
         self.assertEqual(result["checks"]["chip_active_authentication"], "PASS")
-        self.assertIsNone(result["decision"])
+        self.assertEqual(result["decision"]["result"], "REVIEW")  # a verified chip is evidence, not a verdict
+        self.assertNotIn("DOCUMENT_AUTHENTICITY_UNVERIFIED", result["decision"]["reason_codes"])
         with Session(self.engine) as db:
             row = db.scalar(sa.select(NFCResult))
             stored = json.dumps(row.evidence_metadata) + json.dumps(row.data_group_checks)

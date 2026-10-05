@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     # Phase 12 fraud signals: duplicate-document velocity window and the session count that raises a signal.
     fraud_duplicate_window_hours: int = Field(default=24, ge=1, le=24 * 30)
     fraud_velocity_limit: int = Field(default=3, ge=2, le=100)
+    # Phase 13: optional JSON policy overrides (tighten-only). Unset: the built-in policy.
+    risk_policy_file: Path | None = None
     biometric_consent_policy_version: str = Field(default="BIOMETRIC-CONSENT-2026.10.1", min_length=1, max_length=80)
     face_match_policy_version: str = Field(default="SFACE-COSINE-UNCALIBRATED-2026.10.1", min_length=1, max_length=120)
     face_match_calibrated: bool = False

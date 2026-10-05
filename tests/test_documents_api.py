@@ -87,7 +87,10 @@ class DocumentProcessingTests(CaptureAPICase):
     async def test_document_only_level_goes_straight_to_processing(self):
         self.use_ocr(front_lines(), BACK)
         session_id = await self.capture_both(level="DOCUMENT_ONLY")
-        self.assertEqual((await self.session(session_id))["status"], "PROCESSING")
+        # PROCESSING, then the Phase 13 assessment: consistent data alone is not proof the card is genuine.
+        self.assertEqual((await self.session(session_id))["status"], "MANUAL_REVIEW")
+        code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual(result["decision"]["reason_codes"], ["DOCUMENT_AUTHENTICITY_UNVERIFIED"])
 
     async def test_fields_are_encrypted_bound_and_absent_from_audit_and_checks(self):
         self.use_ocr(front_lines(), BACK)

@@ -48,7 +48,9 @@ with engine.begin() as connection:
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON nfc_results TO kyc_app"))
     # Phase 12: signals are re-derived on every analysis, so the previous set is deleted and replaced.
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON fraud_signals TO kyc_app"))
+    # Phase 13: assessments are an append-only decision history.
+    connection.execute(sa.text("GRANT SELECT, INSERT ON risk_assessments TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON selfie_captures, face_quality_checks, biometric_templates, face_comparisons TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT ON consents TO kyc_app"))
 engine.dispose()
-print("Migrations through phase 12 applied and local organization provisioned.")
+print("Migrations through phase 13 applied and local organization provisioned.")

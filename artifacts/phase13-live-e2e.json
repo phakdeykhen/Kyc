@@ -1,0 +1,106 @@
+{
+ "server": "uvicorn, PostgreSQL 18.6 as kyc_app (forced RLS), migrations through 0007_phase12",
+ "pipeline": "real Tesseract OCR + YuNet/SFace; synthetic SPECIMEN KH passports; fictional test CSCA",
+ "default_policy_run": {
+  "run": "2026-10-06T00:01:37+0700",
+  "mode": "default",
+  "cases": {
+   "1_genuine_passport_and_chip": {
+    "status": "MANUAL_REVIEW",
+    "decision": "REVIEW",
+    "reason_codes": [
+     "EVIDENCE_MISSING_LIVENESS",
+     "FACE_SCORE_BORDERLINE",
+     "LOW_OCR_CONFIDENCE",
+     "PORTRAIT_UNVERIFIED",
+     "FACE_QUALITY_UNVERIFIED",
+     "PORTRAIT_QUALITY_UNVERIFIED",
+     "FACE_MATCH_UNCALIBRATED"
+    ],
+    "policy_version": "RISK-DEFAULT-2026.10.1",
+    "fraud": "PASS"
+   },
+   "1_verify_idempotent": {
+    "http": [
+     200,
+     200
+    ],
+    "same": true,
+    "status": "MANUAL_REVIEW"
+   },
+   "2_cloned_chip": {
+    "status": "REJECTED",
+    "decision": "FAIL",
+    "reason_codes": [
+     "HIGH_RISK_TAMPER_SIGNAL",
+     "FRAUD_NFC_CHIP_CLONE_SUSPECTED"
+    ],
+    "policy_version": "RISK-DEFAULT-2026.10.1",
+    "fraud": "FAIL"
+   },
+   "3_document_only_real_ocr": {
+    "status": "MANUAL_REVIEW",
+    "decision": "REVIEW",
+    "reason_codes": [
+     "LOW_OCR_CONFIDENCE",
+     "FRAUD_SIGNALS_PRESENT",
+     "DOCUMENT_AUTHENTICITY_UNVERIFIED",
+     "FRAUD_DOCUMENT_VELOCITY"
+    ],
+    "policy_version": "RISK-DEFAULT-2026.10.1",
+    "fraud": "REVIEW"
+   },
+   "4_expired_passport": {
+    "status": "REJECTED",
+    "decision": "FAIL",
+    "reason_codes": [
+     "EXPIRED_DOCUMENT"
+    ],
+    "policy_version": "RISK-DEFAULT-2026.10.1",
+    "fraud": "REVIEW"
+   },
+   "5_verify_before_liveness": {
+    "http": 409,
+    "reason_code": "VERIFICATION_NOT_READY"
+   }
+  },
+  "kyc_app_can_rewrite_decisions": false,
+  "rewrite_error": "permission denied for table risk_assessments",
+  "assessments": 4,
+  "assessment_failures": 0
+ },
+ "strict_policy_run": {
+  "run": "2026-10-06T00:02:52+0700",
+  "mode": "strict",
+  "cases": {
+   "6_strict_policy_duplicate_user": {
+    "status": "REJECTED",
+    "decision": "FAIL",
+    "reason_codes": [
+     "FRAUD_DOCUMENT_USED_BY_ANOTHER_USER"
+    ],
+    "policy_version": "KH-STRICT-2026.10.1",
+    "fraud": "REVIEW"
+   }
+  },
+  "assessments": 5,
+  "assessment_failures": 0
+ },
+ "strict_policy_file": {
+  "version": "KH-STRICT-2026.10.1",
+  "overrides": [
+   {
+    "country": "KH",
+    "document_type": "KH_PASSPORT",
+    "signal_rules": {
+     "DOCUMENT_USED_BY_ANOTHER_USER": "FAIL"
+    }
+   }
+  ]
+ },
+ "notes": [
+  "NFC sessions were moved past liveness with a migrator UPDATE, so the engine correctly reports EVIDENCE_MISSING_LIVENESS for them.",
+  "Every decision was made automatically by the post-commit assessment; POST /verify returned the same decision (idempotent).",
+  "kyc_app has SELECT/INSERT only on risk_assessments: an UPDATE was refused by PostgreSQL."
+ ]
+}

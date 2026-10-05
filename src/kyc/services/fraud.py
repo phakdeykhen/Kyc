@@ -277,13 +277,3 @@ class FraudAnalyzer:
 def _aware(value: datetime) -> datetime:
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
-
-def processing_sessions(factory: sessionmaker, organization_id: UUID) -> list[UUID]:
-    """PROCESSING sessions without a current analysis (for the deferred worker)."""
-    with factory() as db, db.begin():
-        set_tenant(db, organization_id)
-        analyzed = sa.select(DocumentCheck.session_id).where(DocumentCheck.organization_id == organization_id,
-                                                              DocumentCheck.check_type == "FRAUD_ANALYSIS")
-        return list(db.scalars(sa.select(KYCSession.id).where(KYCSession.organization_id == organization_id,
-                                                              KYCSession.status == SessionStatus.PROCESSING,
-                                                              KYCSession.id.not_in(analyzed))))

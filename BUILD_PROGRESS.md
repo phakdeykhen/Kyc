@@ -1,8 +1,45 @@
 # Build progress — Universal Identity Platform
 
-Updated: 5 October 2026. The full requirements in `Document.md` control the build.
-Phases 1–12 are implemented. Work is paused at the Phase 12 approval gate; Phase 13
-(deterministic risk engine) has not started.
+Updated: 6 October 2026. The full requirements in `Document.md` control the build.
+Phases 1–13 are implemented. Work is paused at the Phase 13 approval gate; Phase 14
+(authorized manual review dashboard) has not started.
+
+## Phase 13 implementation (6 October 2026)
+
+Implemented the deterministic risk engine. After the fraud analysis, `SessionAssessor`
+evaluates the same evidence the result shows against a versioned policy:
+- required evidence for the level
+- a check-rule table
+- an authenticity requirement (verified chip, signed barcode or forensics)
+- fraud-signal rules
+
+It records an append-only assessment with a full rule trace, then moves the session:
+PASS → VERIFIED (behind the state machine's evidence guard), REVIEW → MANUAL_REVIEW,
+FAIL → REJECTED. `POST /v1/kyc/{id}/verify` decides on demand and is idempotent. The
+result carries `decision`. An optional `RISK_POLICY_FILE` adds per-country/per-document
+overrides, which are validated to only tighten; liveness FAIL and tamper are fixed FAIL
+floors. The capture page shows the person the outcome without reason codes.
+Design: [architecture-phase13.md](docs/architecture-phase13.md).
+
+### Phase 13 validation evidence
+
+- **333 tests: 333 passed, 0 skipped, 0 failures** with live PostgreSQL 18.6 (RLS covers
+  `risk_assessments`) and native face models ([artifacts/phase13-tests.txt](artifacts/phase13-tests.txt)).
+- Live HTTP as `kyc_app` with real OCR and models
+  ([artifacts/phase13-live-e2e.json](artifacts/phase13-live-e2e.json)):
+  - Cloned chip and expired passport were REJECTED.
+  - Genuine passport + chip and the document-only session went to MANUAL_REVIEW, with the
+    exact reasons recorded.
+  - `/verify` returned 409 before liveness and was idempotent after the decision.
+  - A strict KH policy file turned "same passport, another user" into REJECTED.
+  - `kyc_app` could not rewrite a decision.
+
+### Phase 13 limits
+
+Until face/liveness calibration and document forensics exist, face sessions and
+document-only sessions without a signed barcode or verified chip go to MANUAL_REVIEW
+rather than VERIFIED. Loosening the built-in policy needs a code change and a new version.
+Webhooks are Phase 16. The rules need compliance review.
 
 ## Phase 12 implementation (5 October 2026)
 
@@ -518,8 +555,8 @@ does not claim production readiness or functioning verification engines.
 | 10 | Liveness/anti-spoof integration | Complete; re-tested 5 Oct (300/300, live HTTP); real photo attack blocked; live PostgreSQL passed; uncalibrated REVIEW |
 | 11 | ePassport NFC mobile architecture | Complete; 300/300 tests; PA + AA server-side; clone/tamper detected; live PostgreSQL passed; no physical chip yet |
 | 12 | Cross-checks and fraud signals | Complete; 318/318 tests; 7 detectors + cross-check matrix; live PostgreSQL E2E passed; forensics models not included |
-| 13 | Deterministic risk engine | Waiting for approval |
-| 14 | Authorized manual review dashboard | Not started |
+| 13 | Deterministic risk engine | Complete; 333/333 tests; tighten-only policy; live PostgreSQL E2E passed; uncalibrated biometrics → MANUAL_REVIEW |
+| 14 | Authorized manual review dashboard | Waiting for approval |
 | 15 | Multi-tenant API and credential provisioning | Not started |
 | 16 | Signed webhooks and SDKs | Not started |
 | 17 | Security/privacy hardening | Not started |
@@ -530,8 +567,8 @@ does not claim production readiness or functioning verification engines.
 ## Approval requirement
 
 `Document.md`, section 31, states: **“Stop and wait for approval before next
-phase.”** The user's request authorized Phases 8 and 9 together, then Phases 10–11, then Phase 12.
-Phase 13 requires separate approval.
+phase.”** The user's request authorized Phases 8 and 9 together, then Phases 10–11, then Phase 12, then Phase 13.
+Phase 14 requires separate approval.
 
 ## Earlier reference work
 

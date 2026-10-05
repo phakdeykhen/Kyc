@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from kyc.domain.enums import CheckResult, DocumentType, SessionStatus, VerificationLevel
+from kyc.domain.enums import CheckResult, DocumentType, RiskDecision, SessionStatus, VerificationLevel
 
 # ISO 3166-1 alpha-2. Core validation is country-neutral; adapters stay separate.
 COUNTRY_CODES = frozenset("""
@@ -102,6 +102,19 @@ class FraudSignalSummary(BaseModel):
     category: str
 
 
+class ResultDecision(BaseModel):
+    result: RiskDecision
+    reason_codes: list[str]
+    policy_version: str
+    assessed_at: datetime
+
+
+class VerifyResponse(BaseModel):
+    session_id: UUID
+    status: SessionStatus
+    decision: ResultDecision
+
+
 class SessionResult(BaseModel):
     session_id: UUID
     status: SessionStatus
@@ -112,7 +125,7 @@ class SessionResult(BaseModel):
     checks: dict[str, str] = Field(default_factory=dict)
     review_flags: list[str] = Field(default_factory=list, description="Reason codes that a reviewer or the risk engine must consider.")
     fraud_signals: list[FraudSignalSummary] = Field(default_factory=list, description="Signals from the fraud engine (Phase 12). Evidence, not a verdict.")
-    decision: None = Field(default=None, description="Set by the risk engine (Phase 13); never by extraction alone.")
+    decision: ResultDecision | None = Field(default=None, description="Set only by the deterministic risk engine (Phase 13).")
 
 
 DocumentSide = Literal["FRONT", "BACK", "DATA_PAGE"]

@@ -112,6 +112,10 @@ class PostgreSQLIsolationTests(unittest.TestCase):
                     "fraud_signals": sa.text("""INSERT INTO fraud_signals
                       (id, organization_id, session_id, signal, severity, category, evidence_metadata)
                       VALUES (:id, :org, :session, 'MRZ_VISUAL_DOB_MISMATCH', 'HIGH', 'CONSISTENCY', '{}')"""),
+                    # Phase 13: the decision history is tenant data like any other.
+                    "risk_assessments": sa.text("""INSERT INTO risk_assessments
+                      (id, organization_id, session_id, decision, policy_version, reason_codes, check_summary)
+                      VALUES (:id, :org, :session, 'REVIEW', 'risk-test-v1', '["FIELD_MISMATCH"]', '{}')"""),
                     "consents": sa.text("""INSERT INTO consents
                       (id, organization_id, session_id, user_id, scope, policy_version, granted)
                       VALUES (:id, :org, :session, 'postgres-test', 'BIOMETRIC_PROCESSING', 'consent-test-v1', true)"""),

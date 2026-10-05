@@ -1,5 +1,5 @@
 """Process sessions waiting in DOCUMENT_PROCESSING (deferred mode, or retries after OCR failures),
-then run cross-checks and fraud signals for PROCESSING sessions that have not been analyzed.
+then assess (fraud signals + risk decision) every PROCESSING session.
 
 Usage: python scripts/process_documents.py [ORGANIZATION_ID ...]
 Defaults to the local development organization. Safe to run repeatedly.
@@ -18,7 +18,8 @@ from kyc.main import (build_biometric_cipher, build_capture_store, build_documen
                       build_fraud_analyzer)
 from kyc.biometrics import FaceMatchPolicy
 from kyc.services.documents import pending_sessions
-from kyc.services.fraud import processing_sessions
+from kyc.risk.policy import RiskPolicy
+from kyc.services.risk import SessionAssessor, pending_assessments
 
 settings = get_settings()
 engine = build_engine(settings)
@@ -29,6 +30,7 @@ analyzer = build_fraud_analyzer(settings, factory, cipher, build_biometric_ciphe
     version=settings.face_match_policy_version, pass_threshold=settings.face_match_pass_threshold,
     fail_threshold=settings.face_match_fail_threshold, calibrated=settings.face_match_calibrated,
     calibration_reference=settings.face_match_calibration_reference))
+assessor = SessionAssessor(factory, analyzer, RiskPolicy.load(settings.risk_policy_file))
 reason = processor.unavailable_reason()
 if reason:
     raise SystemExit(f"Document processing unavailable: {reason}")
@@ -37,6 +39,6 @@ for organization_id in organizations:
     for session_id in pending_sessions(factory, organization_id):
         outcome = processor.process(organization_id, session_id, uuid4())
         print(f"{session_id}: {outcome.status} {' '.join(outcome.reason_codes)}".rstrip())
-    for session_id in processing_sessions(factory, organization_id):
-        print(f"{session_id}: fraud analysis {analyzer.analyze(organization_id, session_id, uuid4())}")
+    for session_id in pending_assessments(factory, organization_id):
+        print(f"{session_id}: assessment {assessor.assess(organization_id, session_id, uuid4())}")
 engine.dispose()
