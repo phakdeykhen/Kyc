@@ -142,7 +142,7 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
         code, body, _ = await call(self.app, "/health/live")
         self.assertEqual(code, 200)
         self.assertEqual(body["phase"], 9)
-        self.assertEqual(body["implemented_phases"], [1, 2, 3, 4, 5, 8, 9])
+        self.assertEqual(body["implemented_phases"], [1, 2, 3, 4, 5, 6, 8, 9])
         code, body, _ = await call(self.app, "/health/ready")
         self.assertEqual(code, 503)  # create_all is not a migration deployment.
         code, body, _ = await call(self.app, "/v1/document-types", headers=self.headers)
@@ -152,6 +152,8 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(statuses.pop("KH_NSSF"), "AVAILABLE")
         self.assertEqual(statuses.pop("KH_PASSPORT"), "AVAILABLE")
         self.assertEqual(statuses.pop("PASSPORT"), "AVAILABLE")
+        self.assertEqual(statuses.pop("NATIONAL_ID"), "AVAILABLE")
+        self.assertEqual(statuses.pop("RESIDENCE_CARD"), "AVAILABLE")
         self.assertTrue(all(value == "PLANNED" for value in statuses.values()))
         code, body, _ = await call(self.app, "/v1/countries", headers=self.headers)
         self.assertEqual(code, 200)

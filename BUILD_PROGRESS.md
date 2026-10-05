@@ -4,6 +4,36 @@ Updated: 5 October 2026. The full requirements in `Document.md` control the buil
 Phases 2–5 were approved and are implemented. Work is paused at the Phase 5
 approval gate; Phase 6 has not started.
 
+## Phase 6 implementation (5 October 2026)
+
+Implemented international document adapters. `GenericPassportAdapter` reads the printed
+data page of any country's passport (common English/French/Spanish labels, ICAO portrait
+area excluded, English OCR model) and cross-checks it with the TD3 MRZ; unfamiliar label
+languages fall back to check-digit-valid MRZ fields instead of guessing. `GenericIDAdapter`
+and `GenericResidenceCardAdapter` read a TD1/TD2 MRZ (normally on the back) plus labelled
+front fields; a front in an unreadable script is carried by a valid back MRZ at REVIEW
+classification confidence. A new `ISSUING_COUNTRY` check compares the MRZ issuing state
+(ISO 3166 alpha-3 / ICAO codes) with the session country; a check-digit-valid MRZ also
+corrects the stored issuing country. Printed nationality is compared only when it is a
+code (a demonym such as "UTOPIAN" is reported `NOT_COMPARED`, except on Cambodian
+documents, where any non-Cambodian wording remains a disagreement). Design:
+[architecture-phase6.md](docs/architecture-phase6.md).
+
+### Phase 6 validation evidence
+
+- Full suite green after the change (see the Phase 7 entry for the final count).
+- Real OCR on photographed synthetic SPECIMENs: the foreign passport's printed page and
+  MRZ agree on number, birth date, sex, expiry and name; the foreign ID card (front labels
+  + back TD1) agrees on all six fields, nationality included. Both reach `SELFIE_REQUIRED`.
+- Found and fixed: a shorter label variant ("Given name") could win inside a longer one
+  ("Given names"); demonyms were compared with alpha-3 codes and always "mismatched".
+
+### Phase 6 limits
+
+Label vocabularies cover English/French/Spanish only; other languages rely on the MRZ.
+Cards without an MRZ and without legible labels are sent back. Driving licences have no
+adapter. Accuracy on real foreign documents is unmeasured.
+
 ## Phase 5 implementation (5 October 2026)
 
 Implemented the passport and MRZ engine. `kyc/mrz/parser.py` parses ICAO 9303 TD1,
@@ -256,10 +286,10 @@ does not claim production readiness or functioning verification engines.
 | 3 | Cambodia National ID adapter | Complete; real-OCR and live PostgreSQL E2E passed; Docker pending |
 | 4 | Cambodia NSSF adapter | Complete; 109/109 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
 | 5 | Passport and MRZ engine | Complete; 175/175 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
-| 6 | International generic passport adapter | Waiting for approval |
-| 7 | QR/barcode engine | Not started |
-| 8 | Face detection and quality | Not started |
-| 9 | Face embeddings and 1:1 comparison | Not started |
+| 6 | International generic passport adapter | Complete; real-OCR end-to-end passed; Docker pending |
+| 7 | QR/barcode engine | In progress |
+| 8 | Face detection and quality | Implemented in a Codex checkpoint (`0d509c0`); final validation and docs pending |
+| 9 | Face embeddings and 1:1 comparison | Implemented in a Codex checkpoint (`0d509c0`); final validation and docs pending |
 | 10 | Liveness/anti-spoof integration | Not started |
 | 11 | ePassport NFC mobile architecture | Not started |
 | 12 | Cross-checks and fraud signals | Not started |

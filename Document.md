@@ -1203,10 +1203,10 @@ implemented at this workspace root. Later phases have not started.
 | 3 | Cambodia National ID adapter | Complete; real-OCR end-to-end passed; Docker pending |
 | 4 | Cambodia NSSF adapter | Complete; 109/109 tests; real-OCR end-to-end passed; Docker pending |
 | 5 | Passport + MRZ engine | Complete; 175/175 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
-| 6 | International generic passport adapter | Waiting for approval |
-| 7 | QR/barcode engine | Not started |
-| 8 | Face detection + quality | Not started |
-| 9 | Face embeddings + 1:1 comparison | Not started |
+| 6 | International generic passport adapter | Complete; real-OCR end-to-end passed; Docker pending |
+| 7 | QR/barcode engine | In progress |
+| 8 | Face detection + quality | Implemented in a Codex checkpoint; final validation pending |
+| 9 | Face embeddings + 1:1 comparison | Implemented in a Codex checkpoint; final validation pending |
 | 10 | Liveness / anti-spoof integration | Not started |
 | 11 | ePassport NFC mobile architecture | Not started |
 | 12 | Cross-check + fraud signals | Not started |

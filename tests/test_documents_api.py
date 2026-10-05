@@ -79,6 +79,7 @@ class DocumentProcessingTests(CaptureAPICase):
         self.assertEqual(result["checks"], {"document_quality": "PASS", "document_classification": "PASS",
                                             "document_data": "PASS", "expiry": "PASS", "mrz": "PASS",
                                             "mrz_consistency": "PASS", "barcode": "UNAVAILABLE",
+                                            "issuing_country": "PASS",
                                             "document_portrait": "UNAVAILABLE"})
         self.assertEqual(result["review_flags"], [])
         self.assertIsNone(result["decision"])  # extraction never decides
@@ -164,7 +165,7 @@ class DocumentProcessingTests(CaptureAPICase):
     async def test_document_type_without_an_adapter_waits_honestly(self):
         self.use_ocr()
         code, body, _ = await call(self.app, "/v1/kyc/sessions", "POST", {"user_id": "u", "country": "TH",
-                                   "expected_document_type": "NATIONAL_ID"}, self.headers)
+                                   "expected_document_type": "DRIVING_LICENSE"}, self.headers)
         session_id = body["session_id"]
         await self.upload(session_id, GOOD, "front")
         await self.upload(session_id, GOOD_BACK, "back")
@@ -427,6 +428,22 @@ class RealOCREndToEndTests(CaptureAPICase):
         self.assertEqual(result["identity"]["full_name"], "ANNA MARIA ERIKSSON")
         self.assertEqual(result["document"]["document_number_masked"], "*****02C3")
         self.assertEqual(result["checks"]["mrz"], "PASS")
+        # Phase 6: the printed page is read too and agrees with the MRZ.
+        self.assertEqual(result["checks"]["mrz_consistency"], "PASS")
+
+    async def test_photographed_foreign_id_card_is_read_front_and_back(self):
+        code, body, _ = await call(self.app, "/v1/kyc/sessions", "POST", {"user_id": "resident", "country": "TH",
+                                   "expected_document_type": "NATIONAL_ID"}, self.headers)
+        session_id = body["session_id"]
+        for path, card in [("front", images.foreign_id_front()), ("back", images.foreign_id_back())]:
+            code, body, _ = await self.upload(session_id, images.encode(images.photographed(card)), path)
+            self.assertEqual(body["capture_status"], "ACCEPTED", body)
+        code, session, _ = await call(self.app, f"/v1/kyc/{session_id}", headers=self.headers)
+        self.assertEqual(session["status"], "SELFIE_REQUIRED")
+        code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual(result["identity"]["full_name"], "ANNA MARIA ERIKSSON")
+        self.assertEqual((result["checks"]["mrz"], result["checks"]["mrz_consistency"]), ("PASS", "PASS"))
+        self.assertEqual(result["checks"]["issuing_country"], "REVIEW")  # ICAO's fictional "UTO" is no ISO country
 
     async def test_card_without_identity_text_is_sent_back(self):
         session_id = await self.create()

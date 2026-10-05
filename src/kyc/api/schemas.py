@@ -83,7 +83,7 @@ class ResultMRZ(BaseModel):
     format: Literal["TD1", "TD2", "TD3", "UNKNOWN"]
     mrz_valid: bool
     check_digit_results: dict[str, MRZCheckDigit]
-    field_consistency: dict[str, Literal["MATCH", "MISMATCH", "MRZ_ONLY", "VIZ_ONLY"]]
+    field_consistency: dict[str, Literal["MATCH", "MISMATCH", "MRZ_ONLY", "VIZ_ONLY", "NOT_COMPARED"]]
 
 
 class FaceComparisonSummary(BaseModel):

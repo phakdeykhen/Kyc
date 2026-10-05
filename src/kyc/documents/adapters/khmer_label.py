@@ -105,6 +105,7 @@ class CardLayout:
     viz_regions: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)  # side → OCR region
     mrz_document_code: str | None = None                     # e.g. "ID" or "P" (first MRZ characters)
     mrz_issuing_state: str | None = None                     # e.g. "KHM"
+    ocr_languages: tuple[str, ...] | None = None              # visual-zone OCR models; None → service default
     portrait_regions: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)
 
 
@@ -214,7 +215,8 @@ class KhmerLabelAdapter:
                      if (match := find_label(line.text, variant, self.policy.label_similarity))]
             if not found:
                 continue
-            found.sort()
+            # At one position the exact, longest variant wins ("Given names" over "Given name").
+            found.sort(key=lambda match: (match[0], match[2], -match[1]))
             start, end, fuzzy = found[0]
             for other_start, other_end, other_fuzzy in found[1:]:
                 # Bilingual labels ("Surname / នាមត្រកូល") are one label when only separators lie between.
@@ -537,15 +539,26 @@ class KhmerLabelAdapter:
                 # independently read components instead of treating the composition
                 # as an entirely visual name.
                 visual.pop("full_name", None)
+            not_compared: list[str] = []
             printed_nationality = visual.get("nationality_printed")
             if printed_nationality:
                 aliases = {"KH", "KHM", "CAMBODIAN", "CAMBODIA", "ខ្មែរ", "កម្ពុជា"}
                 normalized = khmer.clean(printed_nationality).upper()
                 parts = [part.strip() for part in normalized.split("/")]
-                visual["nationality"] = "KH" if all(part in aliases for part in parts) else normalized
+                if all(part in aliases for part in parts):
+                    visual["nationality"] = "KH"
+                elif re.fullmatch(r"[A-Z]{3}", normalized) or self.layout.nationality:
+                    # A printed code is comparable; on a single-country document any other wording is a disagreement.
+                    visual["nationality"] = normalized
+                else:
+                    # A demonym ("UTOPIAN") cannot be checked against a code without a translation table.
+                    visual.pop("nationality", None)
+                    not_compared.append("nationality")
             elif self.layout.nationality:
                 visual["nationality"] = document.nationality
             consistency = mrz_parser.compare(parsed, visual)
+            for name in not_compared:
+                consistency[name] = "NOT_COMPARED"
             if mixed_name:
                 for name, other in (("surname", "given_names"), ("given_names", "surname")):
                     if visual.get(name):

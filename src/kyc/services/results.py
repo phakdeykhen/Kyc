@@ -13,7 +13,7 @@ from kyc.services.captures import side_progress
 
 SEVERITY = {CheckResult.FAIL: 3, CheckResult.REVIEW: 2, CheckResult.PASS: 1, CheckResult.NOT_APPLICABLE: 0}
 CHECK_GROUPS = {"CLASSIFICATION": "document_classification", "EXPIRY": "expiry", "MRZ": "mrz", "PORTRAIT": "document_portrait",
-                "MRZ_CONSISTENCY": "mrz_consistency", "BARCODE": "barcode"}
+                "MRZ_CONSISTENCY": "mrz_consistency", "BARCODE": "barcode", "ISSUING_COUNTRY": "issuing_country"}
 DATA_CHECKS = {"REQUIRED_FIELDS", "DOCUMENT_NUMBER_FORMAT", "NATIONAL_ID_NUMBER_FORMAT", "DATE_CONSISTENCY",
                "OCR_CONFIDENCE", "SCRIPT_CONSISTENCY"}
 

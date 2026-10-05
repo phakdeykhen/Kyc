@@ -291,7 +291,8 @@ class PassportAdapterTests(unittest.TestCase):
         self.assertEqual(adapter.classify(lines, "DATA_PAGE").document_type, DocumentType.PASSPORT)
         document = adapter.extract_fields({"DATA_PAGE": lines})
         self.assertEqual((document.document_number, document.full_name, document.nationality), ("L898902C3", "ANNA MARIA ERIKSSON", "UTO"))
-        self.assertTrue(all(item.source == "MRZ" for item in document.fields if item.field != "mrz"))
+        # No printed labels were read, so every value present came from the MRZ.
+        self.assertTrue(all(item.source == "MRZ" for item in document.fields if item.field != "mrz" and item.normalized_value))
         checks = {c.check_type: c for c in adapter.validate_fields(document, TODAY)}
         self.assertEqual(checks["EXPIRY"].result, CheckResult.FAIL)  # the ICAO specimen expired in 2012
         self.assertEqual(checks["MRZ"].result, CheckResult.PASS)

@@ -59,6 +59,11 @@ def find_dates(text: str) -> list[tuple[str, Normalized]]:
 
 def parse_sex(text: str) -> Normalized:
     value = clean(text)
+    tokens = {token.upper() for token in re.split(r"[\s/|,]+", value) if token}
+    if tokens and tokens <= {"M", "MALE", "H", "HOMBRE", "MASCULIN"}:
+        return Normalized("M")  # bilingual passports print e.g. "M/H" or "F/F"
+    if tokens and tokens <= {"F", "FEMALE", "MUJER", "FÉMININ", "FEMININ"}:
+        return Normalized("F")
     if "ប្រុស" in value or re.fullmatch(r"(?i)m(ale)?", value):
         return Normalized("M")
     if "ស្រី" in value or re.fullmatch(r"(?i)f(emale)?", value):

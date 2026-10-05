@@ -31,6 +31,8 @@ from kyc.domain.state_machine import Event, TERMINAL_STATUSES
 from kyc.engines.capture_quality import HeuristicDocumentQualityEngine, decode_capture
 from kyc.engines.contracts import CheckEvidence
 from kyc.mrz.reader import read_mrz_lines
+from kyc.mrz import parser as mrz_parser
+from kyc.documents.iso3166 import ICAO_NON_STATE, to_alpha2
 from kyc.services.sessions import apply_event, aware
 from kyc.storage.captures import CaptureStore
 
@@ -127,8 +129,11 @@ class DocumentProcessor:
             prepared, located[side] = prepare_side(capture.pixels, aspect, self.quality)
             layout = getattr(adapter, "layout", None)
             viz = layout.viz_regions.get(side) if layout else None
-            read = (self.ocr.read_region(prepared, viz, self.languages) if viz and hasattr(self.ocr, "read_region")
-                    else self.ocr.read_lines(prepared, self.languages))
+            languages = self.languages
+            if layout and layout.ocr_languages and set(layout.ocr_languages) <= self.ocr.available_languages():
+                languages = layout.ocr_languages  # e.g. Latin-script foreign documents need no Khmer model
+            read = (self.ocr.read_region(prepared, viz, languages) if viz and hasattr(self.ocr, "read_region")
+                    else self.ocr.read_lines(prepared, languages))
             refinement = getattr(adapter, "numeric_refinement", None)
             if refinement and set(refinement.languages) <= self.ocr.available_languages():
                 read = refine_numeric_words(self.ocr, prepared, read, refinement)
@@ -162,6 +167,12 @@ class DocumentProcessor:
         if any(check.check_type == "REQUIRED_FIELDS" and check.result == CheckResult.FAIL for check in checks):
             return self._recapture(db, record, tenant, document, images, request_id, ("CRITICAL_FIELD_UNREADABLE",), classifications)
 
+        issuer = self._issuing_country_check(extracted, record.country)
+        if issuer is not None:
+            checks.append(issuer)
+            if issuer.details.get("issuing_country") and issuer.details.get("mrz_valid"):
+                # Evidence from a check-digit-valid MRZ replaces the client's claimed country.
+                document.issuing_country = issuer.details["issuing_country"]
         # The primary side identifies the card; a secondary side without cues is noted, not penalized.
         confidence = primary.confidence
         notes.extend(f"{side}_SIDE_UNVERIFIED" for side in sides[1:] if classifications[side].document_side == "UNKNOWN")
@@ -203,6 +214,25 @@ class DocumentProcessor:
                         event_metadata={"version": record.version, "check_results": worst, "adapter_version": adapter.version}))
         db.flush()
         return ProcessingOutcome("ACCEPTED")
+
+    @staticmethod
+    def _issuing_country_check(extracted, session_country: str) -> CheckEvidence | None:
+        """Compare the MRZ issuing state with the country the client declared for the session."""
+        parsed = mrz_parser.read(extracted.mrz.splitlines()) if extracted.mrz else None
+        if parsed is None or not parsed.issuing_state.strip("<"):
+            return None
+        code = parsed.issuing_state.replace("<", "")
+        alpha2 = to_alpha2(code)
+        details = {"issuing_state": code, "issuing_country": alpha2, "session_country": session_country,
+                   "mrz_valid": parsed.mrz_valid}
+        if alpha2 is None:
+            result, reason = ((CheckResult.NOT_APPLICABLE, "NON_STATE_ISSUER") if code in ICAO_NON_STATE
+                              else (CheckResult.REVIEW, "ISSUING_STATE_UNRECOGNIZED"))
+        elif alpha2 == session_country:
+            result, reason = CheckResult.PASS, "ISSUING_STATE_MATCHES_SESSION_COUNTRY"
+        else:
+            result, reason = CheckResult.REVIEW, "ISSUING_STATE_DIFFERS_FROM_SESSION_COUNTRY"
+        return CheckEvidence(result, (reason,), check_type="ISSUING_COUNTRY", details=details)
 
     def _store_fields(self, db: Session, record: KYCSession, document: IdentityDocument, extracted) -> None:
         db.execute(sa.delete(DocumentField).where(DocumentField.organization_id == record.organization_id,

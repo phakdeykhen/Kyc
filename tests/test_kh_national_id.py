@@ -62,7 +62,7 @@ class AdapterTests(unittest.TestCase):
 
     def test_registry_only_claims_implemented_adapters(self):
         self.assertIsNotNone(self.adapter)
-        self.assertIsNone(adapter_for(DocumentType.NATIONAL_ID))  # generic IDs arrive in Phase 6
+        self.assertIsNone(adapter_for(DocumentType.DRIVING_LICENSE))  # no adapter yet
         self.assertEqual(self.adapter.required_sides(), ("FRONT", "BACK"))
 
     def test_classification_of_sides_and_other_documents(self):

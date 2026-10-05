@@ -308,3 +308,37 @@ def foreign_passport():
     rows = [("Passport No", "L898902C3"), ("Surname", "ERIKSSON"), ("Given names", "ANNA MARIA"),
             ("Nationality", "UTOPIAN"), ("Date of birth", "12 AUG 1974"), ("Sex", "F"), ("Date of expiry", "15 APR 2034")]
     return passport_data_page(rows, mrz, header=("UTOPIA", "PASSPORT"))
+
+
+# --- Phase 6: fictional international ID card (ICAO "Utopia" holder, marked SPECIMEN) ---
+def foreign_id_front(width=1600, surname="ERIKSSON", given="ANNA MARIA", number="D23145890", dob="12.08.1974"):
+    from PIL import ImageFont
+    height = round(width / CARD_RATIO)
+    image = Image.new("RGB", (width, height), (226, 234, 240))
+    draw = ImageDraw.Draw(image)
+    latin = lambda size: ImageFont.truetype(LATIN_FONT, size)  # noqa: E731
+    draw.text((width // 2, 24), "UTOPIA  IDENTITY CARD", font=latin(48), fill=(20, 40, 90), anchor="mt")
+    draw.rectangle((50, 200, 420, 660), fill=(214, 222, 232), outline=(140, 150, 160), width=3)
+    draw.ellipse((140, 250, 330, 450), fill=(170, 140, 120))
+    rows = [("Surname", surname), ("Given names", given), ("Document No", number), ("Date of birth", dob),
+            ("Sex", "F"), ("Nationality", "UTO"), ("Date of expiry", "15.04.2034")]
+    y = 140
+    for label, value in rows:
+        draw.text((470, y), label, font=latin(26), fill=(90, 90, 90))
+        draw.text((470, y + 30), value, font=latin(38), fill=(10, 10, 10))
+        y += 84
+    draw.text((60, height - 60), "SPECIMEN", font=latin(28), fill=(180, 60, 60))
+    return image
+
+
+def foreign_id_back(width=1600):
+    from PIL import ImageFont
+    from tests.mrz_build import td1
+    height = round(width / CARD_RATIO)
+    image = Image.new("RGB", (width, height), (226, 234, 240))
+    draw = ImageDraw.Draw(image)
+    mono = ImageFont.truetype(MONO_FONT, 56)
+    for index, line in enumerate(td1(code="I", state="UTO", number="D23145890", birth="740812", sex="F", expiry="340415",
+                                     nationality="UTO", surname="ERIKSSON", given="ANNA MARIA")):
+        draw.text((60, height - 300 + index * 85), line, font=mono, fill=(10, 10, 10))
+    return image
