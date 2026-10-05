@@ -1,10 +1,43 @@
 # Build progress — Universal Identity Platform
 
 Updated: 5 October 2026. The full requirements in `Document.md` control the build.
-Phases 2 and 3 were approved and are implemented. Work is paused at the Phase 3
-approval gate; Phase 4 has not started.
+Phases 2–4 were approved and are implemented. Work is paused at the Phase 4
+approval gate; Phase 5 has not started.
 
-## Phase 3 implementation (5 October 2026)
+## Phase 4 implementation (5 October 2026)
+
+Implemented the Cambodia NSSF member card adapter. Phase 3's extraction code became a
+shared `KhmerLabelAdapter` engine driven by declarative `CardLayout`s; the national ID
+is now a layout too. Engine improvements: rival-card detection (wrong Khmer card →
+`DOCUMENT_TYPE_MISMATCH`), overlap-safe label matching, fronts require labels or
+numbers, adapter-owned capture sides, primary-side classification confidence, and
+`NOT_APPLICABLE` expiry/MRZ for cards that print neither. No migration was needed.
+Design: [architecture-phase4.md](docs/architecture-phase4.md).
+
+### Phase 4 validation evidence
+
+- **109 tests: 109 passed, 0 skipped, 0 failures** with live PostgreSQL 18.6, run with
+  stray keys deliberately set in the environment to prove isolation
+  ([artifacts/phase4-tests.txt](artifacts/phase4-tests.txt)).
+- **Real OCR on a synthetic NSSF specimen.** Member number, linked ID number, Khmer
+  name, Latin name, sex, birth date and employer were read correctly; the misread issue
+  date was flagged. The session reached `SELFIE_REQUIRED` through the API.
+- **Live PostgreSQL over HTTP** as `kyc_app`: the NSSF flow passed (masked `******5678`,
+  `expiry_status: NOT_APPLICABLE`, `decision: null`). A national ID card uploaded to an
+  NSSF session went back with `DOCUMENT_TYPE_MISMATCH`.
+- The refactor kept every Phase 3 test green. The NSSF service test class also runs all
+  inherited national ID tests.
+- **Found and fixed.** Test settings could inherit keys from the shell environment. They
+  are now hermetic.
+
+### Phase 4 limits
+
+The NSSF label set, member-number format, absence of an expiry and the back content are
+assumptions that need official specimens and consented samples. Accuracy has been
+measured on one synthetic card. The back QR waits for Phase 7. Cross-checking the linked
+national ID number waits for Phase 12. Docker is still unexecuted here.
+
+## Phase 3 record (5 October 2026)
 
 Implemented the Cambodia National ID adapter and the document engine. The pipeline
 decrypts captures, corrects perspective from the Phase 2 quadrilateral, normalizes the
@@ -164,9 +197,9 @@ does not claim production readiness or functioning verification engines.
 | --- | --- | --- |
 | 1 | Architecture, database schema, KYC session state machine | Complete; live PostgreSQL RLS verified 5 Oct; Docker pending |
 | 2 | Camera/document upload and quality pipeline | Complete; live PostgreSQL E2E passed; Docker pending |
-| 3 | Cambodia National ID adapter | Complete; 91/91 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
-| 4 | Cambodia NSSF adapter | Waiting for approval |
-| 5 | Passport and MRZ engine | Not started |
+| 3 | Cambodia National ID adapter | Complete; real-OCR and live PostgreSQL E2E passed; Docker pending |
+| 4 | Cambodia NSSF adapter | Complete; 109/109 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
+| 5 | Passport and MRZ engine | Waiting for approval |
 | 6 | International generic passport adapter | Not started |
 | 7 | QR/barcode engine | Not started |
 | 8 | Face detection and quality | Not started |
@@ -186,7 +219,7 @@ does not claim production readiness or functioning verification engines.
 ## Approval requirement
 
 `Document.md`, section 31, states: **“Stop and wait for approval before next
-phase.”** Phase 4 will begin only after that approval.
+phase.”** Phase 5 will begin only after that approval.
 
 ## Earlier reference work
 

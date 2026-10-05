@@ -66,7 +66,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
                 engine.dispose()
 
     application = FastAPI(title="Universal Identity Platform", version=__version__, lifespan=lifespan,
-                          description="Phases 1-3: KYC session lifecycle, document capture quality gate, and Cambodia National ID extraction.")
+                          description="Phases 1-4: KYC session lifecycle, document capture quality gate, and Cambodia National ID / NSSF extraction.")
     application.state.settings = settings
 
     @application.middleware("http")
@@ -109,7 +109,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
 
     @application.get("/health/live", tags=["health"])
     def live():
-        return {"status": "ok", "phase": 3, "version": __version__}
+        return {"status": "ok", "phase": 4, "version": __version__}
 
     @application.get("/health/ready", tags=["health"])
     def ready():

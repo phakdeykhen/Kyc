@@ -1,4 +1,4 @@
-# Universal Identity Platform — Phases 1–3
+# Universal Identity Platform — Phases 1–4
 
 Phase 1 implements the architecture contracts, a 17-table PostgreSQL schema with
 tenant policies, a frozen Alembic migration, and the KYC session state machine.
@@ -16,8 +16,12 @@ moves the session on to `SELFIE_REQUIRED`. Uncertain readings are flagged for re
 never silently corrected. No final decision is made yet; that is the risk engine
 (Phase 13).
 
+Phase 4 adds the Cambodia NSSF member card. Phase 3's extraction became a shared
+Khmer label engine (`KhmerLabelAdapter`), so each card type is now a small
+`CardLayout`. Each adapter also detects when the photo shows the other Khmer card.
+
 See the design docs ([Phase 1](docs/architecture-phase1.md), [Phase 2](docs/architecture-phase2.md),
-[Phase 3](docs/architecture-phase3.md))
+[Phase 3](docs/architecture-phase3.md), [Phase 4](docs/architecture-phase4.md))
 and [build progress](BUILD_PROGRESS.md).
 The original requirements are preserved in [Document.md](Document.md).
 
@@ -56,7 +60,7 @@ The original requirements are preserved in [Document.md](Document.md).
 │   ├── services/retention.py     expiry purge and orphan sweep (Phase 2)
 │   ├── services/documents.py     document engine orchestration (Phase 3)
 │   ├── services/results.py       masked client result (Phase 3)
-│   ├── documents/adapters/       country adapters; kh_national_id.py (Phase 3)
+│   ├── documents/adapters/       khmer_label.py engine; kh_national_id.py (P3), kh_nssf.py (P4)
 │   ├── documents/{khmer,preprocess,refine}.py  normalization, rectification, digit re-read
 │   ├── ocr/tesseract.py          Khmer/Latin OCR engine (Phase 3)
 │   ├── core/crypto.py            keyrings and encrypted PII fields (Phase 3)
@@ -68,7 +72,7 @@ The original requirements are preserved in [Document.md](Document.md).
 │   └── process_documents.py      processes or retries sessions in DOCUMENT_PROCESSING
 ├── infra/postgres-init.sh         restricted application database role
 ├── tests/                        state, ASGI API, schema, and migration tests
-├── requests/phase{1,2,3}.postman.json  runnable API checks
+├── requests/phase{1..4}.postman.json  runnable API checks
 ├── artifacts/                    generated OpenAPI, PostgreSQL SQL, test report
 └── prototypes/local-review/       earlier reference prototype, outside Phase 1
 ```
@@ -238,7 +242,11 @@ use `-F side=DATA_PAGE`. A poor photo returns `"capture_status": "RECAPTURE"` an
 an instruction such as `HOLD_STILL`, and nothing is stored. Further uploads after
 hand-off return 409, and more than `MAX_CAPTURE_ATTEMPTS` uploads return 429.
 
-Import `requests/phase3.postman.json` to run the equivalent checks. Set the private
+For an NSSF card, create the session with `"expected_document_type":"KH_NSSF"`. Its
+result reports `expiry_status: NOT_APPLICABLE` and `mrz: NOT_APPLICABLE`, because the
+card prints neither.
+
+Import `requests/phase4.postman.json` to run the equivalent checks. Set the private
 collection variables `api_key` and `organization_id`; the collection captures the
 session ID after creation. Never export a collection with real credentials.
 
@@ -256,5 +264,5 @@ Extracted identity fields are encrypted with a separate PII keyring and never lo
 The adapter's layout assumptions and thresholds are uncalibrated. See
 [Phase 3 security concerns](docs/architecture-phase3.md#4-security-concerns).
 
-Phase 4 adds the Cambodia NSSF adapter. Per `Document.md`, work pauses after Phase 3
+Phase 5 adds the passport and MRZ engine. Per `Document.md`, work pauses after Phase 4
 until approval.

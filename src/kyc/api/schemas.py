@@ -58,7 +58,7 @@ class ResultDocument(BaseModel):
     country: str | None
     type: DocumentType
     document_number_masked: str | None
-    expiry_status: Literal["VALID", "EXPIRED", "UNKNOWN"]
+    expiry_status: Literal["VALID", "EXPIRED", "UNKNOWN", "NOT_APPLICABLE"]
 
 
 class ResultIdentity(BaseModel):

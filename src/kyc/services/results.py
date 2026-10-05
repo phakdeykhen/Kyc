@@ -11,9 +11,10 @@ from kyc.db.models import DocumentCheck, DocumentField, IdentityDocument, KYCSes
 from kyc.domain.enums import CheckResult
 from kyc.services.captures import side_progress
 
-SEVERITY = {CheckResult.FAIL: 3, CheckResult.REVIEW: 2, CheckResult.PASS: 1}
+SEVERITY = {CheckResult.FAIL: 3, CheckResult.REVIEW: 2, CheckResult.PASS: 1, CheckResult.NOT_APPLICABLE: 0}
 CHECK_GROUPS = {"CLASSIFICATION": "document_classification", "EXPIRY": "expiry", "MRZ": "mrz", "BARCODE": "barcode"}
-DATA_CHECKS = {"REQUIRED_FIELDS", "DOCUMENT_NUMBER_FORMAT", "DATE_CONSISTENCY", "OCR_CONFIDENCE", "SCRIPT_CONSISTENCY"}
+DATA_CHECKS = {"REQUIRED_FIELDS", "DOCUMENT_NUMBER_FORMAT", "NATIONAL_ID_NUMBER_FORMAT", "DATE_CONSISTENCY",
+               "OCR_CONFIDENCE", "SCRIPT_CONSISTENCY"}
 
 
 def mask(value: str | None) -> str | None:
@@ -57,7 +58,8 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) ->
             context = f"field/{record.organization_id}/{record.id}/{document.id}/{field.field_name}/normalized"
             values[field.field_name] = cipher.open(field.normalized_value_ciphertext, field.key_version, context)
     expiry = values.get("expiry_date")
-    expiry_status = "UNKNOWN" if not expiry else "EXPIRED" if date.fromisoformat(expiry) < date.today() else "VALID"
+    expiry_status = ("NOT_APPLICABLE" if checks.get("expiry") == "NOT_APPLICABLE" else "UNKNOWN") if not expiry \
+        else "EXPIRED" if date.fromisoformat(expiry) < date.today() else "VALID"
     return SessionResult(
         session_id=record.id, status=record.status, checks=checks, review_flags=sorted(set(flags)),
         document=ResultDocument(country=document.issuing_country, type=document.document_type,

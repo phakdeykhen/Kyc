@@ -18,8 +18,11 @@ TEST_KEY = "test-only-key-" + "a" * 40
 
 
 def configuration(organization_id, **extra):
+    # Explicit values beat environment variables, so tests never pick up a developer's real keys.
+    hermetic = {"capture_encryption_keys": None, "pii_encryption_keys": None, "pii_hmac_key": None,
+                "document_processing_mode": "inline", "tesseract_cmd": "tesseract", "ocr_languages": "khm,eng"}
     return Settings(_env_file=None, environment="test", database_url="sqlite://",
-                    development_api_key=TEST_KEY, development_organization_id=organization_id, **extra)
+                    development_api_key=TEST_KEY, development_organization_id=organization_id, **(hermetic | extra))
 
 
 class SessionAPITests(unittest.IsolatedAsyncioTestCase):
@@ -134,13 +137,14 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
     async def test_health_and_inventory_are_honest(self):
         code, body, _ = await call(self.app, "/health/live")
         self.assertEqual(code, 200)
-        self.assertEqual(body["phase"], 3)
+        self.assertEqual(body["phase"], 4)
         code, body, _ = await call(self.app, "/health/ready")
         self.assertEqual(code, 503)  # create_all is not a migration deployment.
         code, body, _ = await call(self.app, "/v1/document-types", headers=self.headers)
         self.assertEqual(code, 200)
         statuses = {row["type"]: row["adapter_status"] for row in body["document_types"]}
         self.assertEqual(statuses.pop("KH_NATIONAL_ID"), "AVAILABLE")
+        self.assertEqual(statuses.pop("KH_NSSF"), "AVAILABLE")
         self.assertTrue(all(value == "PLANNED" for value in statuses.values()))
         code, body, _ = await call(self.app, "/v1/countries", headers=self.headers)
         self.assertEqual(code, 200)

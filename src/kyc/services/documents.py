@@ -152,7 +152,9 @@ class DocumentProcessor:
         if any(check.check_type == "REQUIRED_FIELDS" and check.result == CheckResult.FAIL for check in checks):
             return self._recapture(db, record, tenant, document, images, request_id, ("CRITICAL_FIELD_UNREADABLE",), classifications)
 
-        confidence = min(item.confidence for item in classifications.values())
+        # The primary side identifies the card; a secondary side without cues is noted, not penalized.
+        confidence = primary.confidence
+        notes.extend(f"{side}_SIDE_UNVERIFIED" for side in sides[1:] if classifications[side].document_side == "UNKNOWN")
         classification_result = CheckResult.PASS if confidence >= adapter.policy.accept_classification else CheckResult.REVIEW
         checks.insert(0, CheckEvidence(classification_result,
                                        ("DOCUMENT_CLASSIFIED",) if classification_result == CheckResult.PASS else ("LOW_CLASSIFICATION_CONFIDENCE",),

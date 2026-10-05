@@ -1193,16 +1193,16 @@ Design this as:
 
 ## Implementation progress — 5 October 2026
 
-The original specification above is preserved. Phases 1–3 have been
+The original specification above is preserved. Phases 1–4 have been
 implemented at this workspace root. Later phases have not started.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
 | 1 | Architecture + DB schema + KYC session state machine | Complete; live PostgreSQL RLS verified; Docker pending |
 | 2 | Camera/document upload + quality pipeline | Complete; live PostgreSQL end-to-end passed; Docker pending |
-| 3 | Cambodia National ID adapter | Complete; 91/91 tests; real-OCR end-to-end passed; Docker pending |
-| 4 | Cambodia NSSF adapter | Waiting for approval |
-| 5 | Passport + MRZ engine | Not started |
+| 3 | Cambodia National ID adapter | Complete; real-OCR end-to-end passed; Docker pending |
+| 4 | Cambodia NSSF adapter | Complete; 109/109 tests; real-OCR end-to-end passed; Docker pending |
+| 5 | Passport + MRZ engine | Waiting for approval |
 | 6 | International generic passport adapter | Not started |
 | 7 | QR/barcode engine | Not started |
 | 8 | Face detection + quality | Not started |
@@ -1267,5 +1267,14 @@ are in [BUILD_PROGRESS.md](BUILD_PROGRESS.md); the design is in
 - Masked result with identity fields and review flags; decision left to Phase 13.
 - Migration `0003_phase3`, design in [docs/architecture-phase3.md](docs/architecture-phase3.md).
 
+### Phase 4 deliverables
+
+- Cambodia NSSF member card adapter: member number, linked national ID number,
+  Khmer/Latin names, sex, birth date, employer, issue date; expiry and MRZ reported as
+  NOT_APPLICABLE when not printed.
+- Shared Khmer label engine with declarative card layouts; rival-card detection between
+  the national ID and NSSF cards.
+- No migration needed; design in [docs/architecture-phase4.md](docs/architecture-phase4.md).
+
 **Approval gate:** Section 31 requires stopping after each phase. Work is paused
-after Phase 3 until approval to proceed to Phase 4.
+after Phase 4 until approval to proceed to Phase 5.

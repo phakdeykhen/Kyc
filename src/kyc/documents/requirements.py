@@ -1,7 +1,7 @@
 """Capture requirements per claimed document type.
 
-Phase 2 defaults only. Country adapters (Phase 3+) own required_sides() and will
-replace these entries; the core never encodes country-specific extraction rules.
+Defaults for document types without an adapter. When an adapter exists, its
+required_sides() is used; the core never encodes country-specific extraction rules.
 """
 
 from dataclasses import dataclass
@@ -34,4 +34,9 @@ CAPTURE_REQUIREMENTS: dict[DocumentType, CaptureRequirement] = {
 
 
 def requirement_for(document_type: DocumentType) -> CaptureRequirement:
-    return CAPTURE_REQUIREMENTS[document_type]
+    """An implemented adapter's required_sides() wins over the defaults above."""
+    from kyc.documents.adapters import adapter_for  # local import: adapters depend on this module's callers
+
+    default = CAPTURE_REQUIREMENTS[document_type]
+    adapter = adapter_for(document_type)
+    return CaptureRequirement(adapter.required_sides(), default.aspect_ratio) if adapter else default

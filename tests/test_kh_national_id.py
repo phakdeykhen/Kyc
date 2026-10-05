@@ -177,3 +177,65 @@ class NumericRefinementTests(unittest.TestCase):
         original = OCRLine(text="សុខ", confidence=0.9, bbox=word.bbox, words=(word,))
         self.assertEqual(refine_numeric_words(reader, None, [original], self.spec), [original])
         self.assertEqual(reader.calls, [])
+
+
+def nssf_front(**overrides):
+    values = {"member": "លេខសមាជិក: ០០១២៣៤៥៦៧៨", "name": "គោត្តនាម និងនាម: ចាន់ ដារ៉ា", "expiry": None} | overrides
+    lines = [line("ព្រះរាជាណាចក្រកម្ពុជា", 0.02), line("បេឡាជាតិរបបសន្តិសុខសង្គម", 0.08),
+             line(f"ប័ណ្ណសមាជិក {values['member']}", 0.18), line(values["name"], 0.26), line("CHAN DARA", 0.32),
+             line("ភេទ: ប្រុស ថ្ងៃខែឆ្នាំកំណើត: ០២.០៧.១៩៨៨", 0.40), line("លេខអត្តសញ្ញាណប័ណ្ណ: ០៩០៨០៧០៦០", 0.48),
+             line("ឈ្មោះសហគ្រាស: ក្រុមហ៊ុន អង្គរ ផលិតកម្ម", 0.56), line("ថ្ងៃចេញប័ណ្ណ: ១០.០៥.២០២២", 0.64)]
+    if values["expiry"]:
+        lines.append(line(f"ផុតកំណត់: {values['expiry']}", 0.72))
+    return lines
+
+
+NSSF_BACK = [line("ចំណាំ៖ ប័ណ្ណនេះជាកម្មសិទ្ធិរបស់ ប.ស.ស", 0.2), line("សូមបង្ហាញប័ណ្ណនេះ នៅពេលទទួលសេវា", 0.3)]
+
+
+class NSSFAdapterTests(unittest.TestCase):
+    def setUp(self):
+        self.adapter = adapter_for(DocumentType.KH_NSSF)
+
+    def test_registered_with_its_own_sides_and_version(self):
+        from kyc.documents.requirements import requirement_for
+        self.assertEqual(self.adapter.version, "KH-NSSF-ADAPTER-2026.10.1")
+        self.assertEqual(requirement_for(DocumentType.KH_NSSF).sides, self.adapter.required_sides())
+
+    def test_extracts_member_card_fields(self):
+        document = self.adapter.extract_fields({"FRONT": nssf_front(), "BACK": NSSF_BACK})
+        fields = {item.field: item.normalized_value for item in document.fields}
+        self.assertEqual(document.document_number, "0012345678")
+        self.assertEqual(fields["national_id_number"], "090807060")
+        self.assertEqual(document.full_name_local, "ចាន់ ដារ៉ា")
+        self.assertEqual(document.full_name, "CHAN DARA")
+        self.assertEqual((document.sex, str(document.date_of_birth), str(document.issue_date)), ("M", "1988-07-02", "2022-05-10"))
+        # "ឈ្មោះ" (name) inside "ឈ្មោះសហគ្រាស" (enterprise name) must not steal the employer line.
+        self.assertEqual(fields["employer"], "ក្រុមហ៊ុន អង្គរ ផលិតកម្ម")
+        self.assertIsNone(document.expiry_date)
+        self.assertIsNone(document.mrz)
+
+    def test_validation_handles_cards_without_expiry_or_mrz(self):
+        document = self.adapter.extract_fields({"FRONT": nssf_front(), "BACK": NSSF_BACK})
+        checks = {check.check_type: check for check in self.adapter.validate_fields(document, TODAY)}
+        self.assertEqual(checks["EXPIRY"].result, CheckResult.NOT_APPLICABLE)
+        self.assertEqual(checks["MRZ"].result, CheckResult.NOT_APPLICABLE)
+        self.assertEqual(checks["NATIONAL_ID_NUMBER_FORMAT"].result, CheckResult.PASS)
+        for name in ("REQUIRED_FIELDS", "DOCUMENT_NUMBER_FORMAT", "DATE_CONSISTENCY", "OCR_CONFIDENCE"):
+            self.assertEqual(checks[name].result, CheckResult.PASS, name)
+        expired = self.adapter.extract_fields({"FRONT": nssf_front(expiry="០១.០១.២០២៤"), "BACK": NSSF_BACK})
+        self.assertEqual({c.check_type: c for c in self.adapter.validate_fields(expired, TODAY)}["EXPIRY"].result, CheckResult.FAIL)
+
+    def test_unexpected_number_shapes_are_flagged(self):
+        short = self.adapter.extract_fields({"FRONT": nssf_front(member="លេខសមាជិក: ១២៣៤"), "BACK": NSSF_BACK})
+        check = {c.check_type: c for c in self.adapter.validate_fields(short, TODAY)}["REQUIRED_FIELDS"]
+        self.assertEqual(check.result, CheckResult.FAIL)  # member number unreadable → critical
+        self.assertIn("NUMBER_NOT_FOUND", {f.field: f for f in short.fields}["document_number"].flags)
+
+    def test_each_khmer_adapter_recognizes_the_other_card(self):
+        nid = adapter_for(DocumentType.KH_NATIONAL_ID)
+        self.assertEqual(nid.classify(nssf_front(), "FRONT").document_type, DocumentType.KH_NSSF)
+        self.assertEqual(self.adapter.classify(front_lines(), "FRONT").document_type, DocumentType.KH_NATIONAL_ID)
+        self.assertEqual(self.adapter.classify(nssf_front(), "FRONT").document_type, DocumentType.KH_NSSF)
+        back = self.adapter.classify(NSSF_BACK, "BACK")
+        self.assertEqual(back.document_side, "BACK")

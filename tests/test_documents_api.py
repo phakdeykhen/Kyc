@@ -15,7 +15,7 @@ from tests import images
 from tests.helpers import call
 from tests.test_captures_api import GOOD, GOOD_BACK, PASSPORT, CaptureAPICase
 from tests.test_capture_store import keyring
-from tests.test_kh_national_id import BACK, front_lines, line
+from tests.test_kh_national_id import BACK, NSSF_BACK, front_lines, line, nssf_front
 
 PII_SETTINGS = {"pii_encryption_keys": keyring("pii-test-v1"), "pii_hmac_key": base64.b64encode(os.urandom(32)).decode()}
 PII_VALUES = ("SOPHEA", "010203040", "សុខ", "ភ្នំពេញ", "1990-03-15")
@@ -188,6 +188,40 @@ class DocumentProcessingTests(CaptureAPICase):
         self.assertEqual(outcome.status, "NOT_FOUND")
 
 
+class NSSFProcessingTests(DocumentProcessingTests):
+    """Runs the inherited Phase 3 tests too, proving the shared engine change kept them green."""
+
+    async def test_nssf_card_is_extracted_without_expiry_or_mrz(self):
+        self.use_ocr(nssf_front(), NSSF_BACK)
+        session_id = await self.capture_both("KH_NSSF")
+        self.assertEqual((await self.session(session_id))["status"], "SELFIE_REQUIRED")
+        result = await self.result(session_id)
+        self.assertEqual(result["document"], {"country": "KH", "type": "KH_NSSF",
+                                              "document_number_masked": "******5678", "expiry_status": "NOT_APPLICABLE"})
+        self.assertEqual(result["identity"]["full_name"], "CHAN DARA")
+        self.assertEqual(result["identity"]["full_name_local"], "ចាន់ ដារ៉ា")
+        self.assertEqual(result["checks"]["expiry"], "NOT_APPLICABLE")
+        self.assertEqual(result["checks"]["mrz"], "NOT_APPLICABLE")
+        self.assertEqual(result["checks"]["document_data"], "PASS")
+        self.assertEqual(result["checks"]["document_classification"], "PASS")
+        with Session(self.engine) as db:
+            names = set(db.scalars(sa.select(DocumentField.field_name)))
+            document = db.scalar(sa.select(IdentityDocument))
+        self.assertTrue({"national_id_number", "employer"} <= names)
+        self.assertEqual(document.document_number_hmac, self.app.state.field_cipher.lookup_hash("0012345678", "KH_NSSF"))
+
+    async def test_wrong_khmer_card_for_the_claimed_type_is_sent_back(self):
+        for claimed, pages in [("KH_NSSF", (front_lines(), BACK)), ("KH_NATIONAL_ID", (nssf_front(), NSSF_BACK))]:
+            with self.subTest(claimed=claimed):
+                self.use_ocr(*pages)
+                session_id = await self.capture_both(claimed)
+                self.assertEqual((await self.session(session_id))["status"], "DOCUMENT_REQUIRED")
+                with Session(self.engine) as db:
+                    check = db.scalar(sa.select(DocumentCheck).where(DocumentCheck.session_id == UUID(session_id),
+                                                                     DocumentCheck.check_type == "DOCUMENT_PROCESSING"))
+                self.assertEqual(check.evidence_metadata["reason_codes"], ["DOCUMENT_TYPE_MISMATCH"])
+
+
 class ProcessingWithoutPIIKeysTests(CaptureAPICase):
     async def test_extraction_is_unavailable_and_nothing_is_stored(self):
         session_id = await self.create()
@@ -230,6 +264,22 @@ class RealOCREndToEndTests(CaptureAPICase):
         for item in fields.values():
             if item.source == "OCR" and item.confidence < 0.8 and item.normalized_value_ciphertext:
                 self.assertIn("LOW_OCR_CONFIDENCE", result["review_flags"])
+
+    async def test_photographed_nssf_specimen_is_read_by_real_ocr(self):
+        session_id = await self.create("KH_NSSF")
+        for path, card in [("front", images.kh_nssf_front()), ("back", images.kh_nssf_back())]:
+            code, body, _ = await self.upload(session_id, images.encode(images.photographed(card)), path)
+            self.assertEqual(body["capture_status"], "ACCEPTED", body)
+        code, session, _ = await call(self.app, f"/v1/kyc/{session_id}", headers=self.headers)
+        self.assertEqual(session["status"], "SELFIE_REQUIRED")
+        code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual(result["document"]["type"], "KH_NSSF")
+        self.assertEqual(result["document"]["document_number_masked"], "******5678")
+        self.assertEqual(result["identity"]["full_name"], "CHAN DARA")
+        self.assertEqual(result["identity"]["full_name_local"], "ចាន់ ដារ៉ា")
+        self.assertEqual(result["identity"]["date_of_birth"], "1988-07-02")
+        self.assertEqual(result["identity"]["sex"], "M")
+        self.assertEqual(result["checks"]["document_classification"], "PASS")
 
     async def test_card_without_identity_text_is_sent_back(self):
         session_id = await self.create()

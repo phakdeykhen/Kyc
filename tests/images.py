@@ -202,3 +202,54 @@ def photographed(document, doc_width=1200):
     """Place a rendered document on a desk-like background, as a phone photo would."""
     scaled = document.resize((doc_width, round(doc_width * document.height / document.width)), Image.Resampling.LANCZOS)
     return scene(scaled, size=(1800, 1350))
+
+
+# --- Phase 4: fictional Cambodian NSSF member card specimen (synthetic data, marked SPECIMEN) ---
+NSSF_SPECIMEN = {
+    "member": "០០១២៣៤៥៦៧៨", "name_km": "ចាន់ ដារ៉ា", "name_latin": "CHAN DARA", "sex": "ប្រុស", "dob": "០២.០៧.១៩៨៨",
+    "nid": "០៩០៨០៧០៦០", "employer": "ក្រុមហ៊ុន អង្គរ ផលិតកម្ម", "issue": "១០.០៥.២០២២",
+}
+
+
+def kh_nssf_front(width=1600, **overrides):
+    from PIL import ImageFont
+    data = NSSF_SPECIMEN | overrides
+    height = round(width / CARD_RATIO)
+    image = Image.new("RGB", (width, height), (232, 240, 236))
+    draw = ImageDraw.Draw(image)
+    km = lambda size: ImageFont.truetype(KHMER_FONT, size, layout_engine=ImageFont.Layout.RAQM)  # noqa: E731
+    latin = lambda size: ImageFont.truetype(LATIN_FONT, size)  # noqa: E731
+    draw.rectangle((0, 0, width, 150), fill=(214, 232, 222))
+    draw.text((width // 2, 18), "ព្រះរាជាណាចក្រកម្ពុជា", font=km(40), fill=(20, 60, 40), anchor="mt")
+    draw.text((width // 2, 80), "បេឡាជាតិរបបសន្តិសុខសង្គម", font=km(40), fill=(20, 60, 40), anchor="mt")
+    draw.rectangle((40, 230, 380, 660), fill=(214, 226, 232), outline=(140, 150, 160), width=3)
+    draw.ellipse((120, 280, 300, 470), fill=(160, 130, 110))
+    rows = [f"ប័ណ្ណសមាជិក លេខសមាជិក: {data['member']}", f"គោត្តនាម និងនាម: {data['name_km']}", None,
+            f"ភេទ: {data['sex']} ថ្ងៃខែឆ្នាំកំណើត: {data['dob']}", f"លេខអត្តសញ្ញាណប័ណ្ណ: {data['nid']}",
+            f"ឈ្មោះសហគ្រាស: {data['employer']}", f"ថ្ងៃចេញប័ណ្ណ: {data['issue']}"]
+    y = 190
+    for row in rows:
+        if row is None:
+            draw.text((420, y), data["name_latin"], font=latin(40), fill=(10, 10, 10))
+        else:
+            draw.text((420, y), row, font=km(36), fill=(10, 10, 10))
+        y += 80
+    draw.text((60, height - 60), "SPECIMEN", font=latin(28), fill=(180, 60, 60))
+    return image
+
+
+def kh_nssf_back(width=1600):
+    from PIL import ImageFont
+    height = round(width / CARD_RATIO)
+    image = Image.new("RGB", (width, height), (232, 240, 236))
+    draw = ImageDraw.Draw(image)
+    km = ImageFont.truetype(KHMER_FONT, 34, layout_engine=ImageFont.Layout.RAQM)
+    for index, row in enumerate(("ចំណាំ៖ ប័ណ្ណនេះជាកម្មសិទ្ធិរបស់ ប.ស.ស", "សូមបង្ហាញប័ណ្ណនេះ នៅពេលទទួលសេវា")):
+        draw.text((80, 120 + index * 80), row, font=km, fill=(20, 20, 20))
+    draw.rectangle((width - 420, height - 420, width - 80, height - 80), fill=(20, 20, 20))  # QR placeholder
+    for row in range(8):
+        for column in range(8):
+            if (row * 3 + column * 5) % 4 == 0:
+                draw.rectangle((width - 400 + column * 40, height - 400 + row * 40,
+                                width - 370 + column * 40, height - 370 + row * 40), fill=(240, 240, 240))
+    return image

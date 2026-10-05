@@ -1,0 +1,660 @@
+{
+ "info": {
+  "name": "Universal KYC — Phases 1-4",
+  "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+  "description": "Set api_key and organization_id from your .env. Create a KH_NATIONAL_ID or KH_NSSF session, upload front and back photos, then read the result: Phase 3 extracts fields with Khmer/Latin OCR. decision stays null until the risk engine (Phase 13)."
+ },
+ "variable": [
+  {
+   "key": "base_url",
+   "value": "http://127.0.0.1:8000"
+  },
+  {
+   "key": "api_key",
+   "value": ""
+  },
+  {
+   "key": "organization_id",
+   "value": ""
+  },
+  {
+   "key": "session_id",
+   "value": ""
+  }
+ ],
+ "item": [
+  {
+   "name": "Liveness",
+   "request": {
+    "method": "GET",
+    "header": [],
+    "url": {
+     "raw": "{{base_url}}/health/live",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "health",
+      "live"
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Live\", () => pm.response.to.have.status(200));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Migration readiness",
+   "request": {
+    "method": "GET",
+    "header": [],
+    "url": {
+     "raw": "{{base_url}}/health/ready",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "health",
+      "ready"
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Ready after migrations\", () => pm.response.to.have.status(200));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Create session",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/sessions",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "sessions"
+     ]
+    },
+    "body": {
+     "mode": "raw",
+     "raw": "{\n  \"user_id\": \"postman-demo-customer\",\n  \"country\": \"KH\",\n  \"expected_document_type\": \"KH_NATIONAL_ID\",\n  \"verification_level\": \"DOCUMENT_FACE_LIVENESS\"\n}",
+     "options": {
+      "raw": {
+       "language": "json"
+      }
+     }
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Created\", () => pm.response.to.have.status(201));",
+       "const result = pm.response.json();",
+       "pm.collectionVariables.set(\"session_id\", result.session_id);",
+       "pm.test(\"Initial status\", () => pm.expect(result.status).to.eql(\"CREATED\"));",
+       "pm.test(\"UUID4 ID\", () => pm.expect(result.session_id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Create NSSF session",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/sessions",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "sessions"
+     ]
+    },
+    "body": {
+     "mode": "raw",
+     "raw": "{\n  \"user_id\": \"postman-demo-customer\",\n  \"country\": \"KH\",\n  \"expected_document_type\": \"KH_NSSF\",\n  \"verification_level\": \"DOCUMENT_FACE_LIVENESS\"\n}",
+     "options": {
+      "raw": {
+       "language": "json"
+      }
+     }
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Created\", () => pm.response.to.have.status(201));",
+       "const result = pm.response.json();",
+       "pm.collectionVariables.set(\"session_id\", result.session_id);",
+       "pm.test(\"Initial status\", () => pm.expect(result.status).to.eql(\"CREATED\"));",
+       "pm.test(\"UUID4 ID\", () => pm.expect(result.session_id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Read session",
+   "request": {
+    "method": "GET",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}"
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Found\", () => pm.response.to.have.status(200));",
+       "pm.test(\"Tenant bound\", () => pm.expect(pm.response.json().organization_id).to.eql(pm.collectionVariables.get(\"organization_id\")));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Pending result",
+   "request": {
+    "method": "GET",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}/result",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}",
+      "result"
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Found\", () => pm.response.to.have.status(200));",
+       "pm.test(\"No asserted verification\", () => { const result = pm.response.json(); pm.expect(result.decision).to.eql(null); pm.expect(result.identity).to.eql(null); pm.expect(result.checks).to.eql({}); });"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Client status rejected",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/sessions",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "sessions"
+     ]
+    },
+    "body": {
+     "mode": "raw",
+     "raw": "{\n  \"user_id\": \"postman-demo-customer\",\n  \"country\": \"KH\",\n  \"expected_document_type\": \"KH_NATIONAL_ID\",\n  \"verification_level\": \"DOCUMENT_FACE_LIVENESS\",\n  \"status\": \"VERIFIED\"\n}",
+     "options": {
+      "raw": {
+       "language": "json"
+      }
+     }
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Status cannot be supplied by client\", () => pm.response.to.have.status(422));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Credentials required",
+   "request": {
+    "method": "GET",
+    "header": [],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}"
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Unauthorized\", () => pm.response.to.have.status(401));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Document adapter inventory",
+   "request": {
+    "method": "GET",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/document-types",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "document-types"
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Inventory\", () => pm.response.to.have.status(200));",
+       "pm.test(\"Adapters honestly planned\", () => pm.expect(pm.response.json().document_types.every(x => x.adapter_status === \"PLANNED\")).to.eql(true));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Country inventory",
+   "request": {
+    "method": "GET",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/countries",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "countries"
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Country codes\", () => pm.response.to.have.status(200));",
+       "pm.test(\"249 ISO codes\", () => pm.expect(pm.response.json().countries.length).to.eql(249));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Upload document front",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}/documents/front",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}",
+      "documents",
+      "front"
+     ]
+    },
+    "body": {
+     "mode": "formdata",
+     "formdata": [
+      {
+       "key": "file",
+       "type": "file",
+       "src": ""
+      }
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Assessed\", () => pm.response.to.have.status(200));",
+       "const body = pm.response.json();",
+       "pm.test(\"Has quality scores and a capture verdict\", () => { pm.expect(body.quality).to.have.property(\"overall_quality\"); pm.expect([\"ACCEPTED\", \"RECAPTURE\"]).to.include(body.capture_status); });",
+       "pm.test(\"Thresholds are never returned\", () => pm.expect(JSON.stringify(body)).to.not.include(\"min_\"));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Upload document back (generic endpoint)",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}/documents",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}",
+      "documents"
+     ]
+    },
+    "body": {
+     "mode": "formdata",
+     "formdata": [
+      {
+       "key": "side",
+       "value": "BACK",
+       "type": "text"
+      },
+      {
+       "key": "file",
+       "type": "file",
+       "src": ""
+      }
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Assessed\", () => pm.response.to.have.status(200));",
+       "const body = pm.response.json();",
+       "pm.test(\"Has quality scores and a capture verdict\", () => { pm.expect(body.quality).to.have.property(\"overall_quality\"); pm.expect([\"ACCEPTED\", \"RECAPTURE\"]).to.include(body.capture_status); });",
+       "pm.test(\"Thresholds are never returned\", () => pm.expect(JSON.stringify(body)).to.not.include(\"min_\"));",
+       "pm.test(\"Hands off after all sides\", () => { if (Object.values(body.sides).every(s => s === \"ACCEPTED\")) pm.expect(body.status).to.eql(\"DOCUMENT_PROCESSING\"); });"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Upload unsupported side (expect 422)",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}/documents",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}",
+      "documents"
+     ]
+    },
+    "body": {
+     "mode": "formdata",
+     "formdata": [
+      {
+       "key": "side",
+       "value": "SELFIE",
+       "type": "text"
+      },
+      {
+       "key": "file",
+       "type": "file",
+       "src": ""
+      }
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"Rejected\", () => pm.response.to.have.status(422));"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Result after extraction",
+   "request": {
+    "method": "GET",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}",
+      "type": "text"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}",
+      "type": "text"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}/result",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}",
+      "result"
+     ]
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "pm.test(\"OK\", () => pm.response.to.have.status(200));",
+       "const body = pm.response.json();",
+       "pm.test(\"Decision is never set by extraction\", () => pm.expect(body.decision).to.eql(null));",
+       "pm.test(\"Document number is masked\", () => { if (body.document) pm.expect(body.document.document_number_masked).to.match(/^\\*+\\d{4}$/); });"
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}
