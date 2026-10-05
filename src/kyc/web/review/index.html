@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Review Queue</title>
+  <link rel="stylesheet" href="review.css">
+</head>
+<body>
+  <header class="bar">
+    <strong>KYC review</strong>
+    <span id="who" class="who" hidden></span>
+    <button type="button" id="sign-out" class="secondary small-button" hidden>Sign out</button>
+  </header>
+
+  <main>
+    <section class="panel sign-in" id="sign-in" aria-labelledby="sign-in-title">
+      <h1 id="sign-in-title">Sign in as a reviewer</h1>
+      <p class="muted">Your token stays in this tab's memory only and is never saved. Closing the tab signs you out.</p>
+      <form id="sign-in-form" autocomplete="off">
+        <label>Organization ID <input id="org-id" required pattern="[0-9a-fA-F-]{36}" spellcheck="false"></label>
+        <label>Reviewer token <input id="token" type="password" required minlength="20" spellcheck="false"></label>
+        <button type="submit" class="primary">Sign in</button>
+      </form>
+      <p id="sign-in-error" class="error" role="alert" hidden></p>
+    </section>
+
+    <div class="workspace" id="workspace" hidden>
+      <section class="panel queue" aria-labelledby="queue-title">
+        <div class="queue-head">
+          <h1 id="queue-title">Waiting for review <span id="queue-count" class="count"></span></h1>
+          <button type="button" id="refresh" class="secondary small-button">Refresh</button>
+        </div>
+        <ol id="queue" class="queue-list"></ol>
+        <p id="queue-empty" class="muted" hidden>No cases are waiting. New cases appear here when the risk engine asks for a human check.</p>
+      </section>
+
+      <section class="panel case" id="case" aria-live="polite">
+        <p id="case-empty" class="muted">Select a case from the queue.</p>
+        <div id="case-body" hidden>
+          <div class="case-head">
+            <div>
+              <h2 id="case-title"></h2>
+              <p id="case-meta" class="muted small"></p>
+            </div>
+            <span id="case-decision" class="pill"></span>
+          </div>
+          <div id="case-reasons" class="codes"></div>
+
+          <h3>Photos</h3>
+          <div id="images" class="images"></div>
+
+          <h3>Document and identity</h3>
+          <table class="kv"><tbody id="identity"></tbody></table>
+
+          <h3>Checks</h3>
+          <div id="checks" class="checks"></div>
+
+          <h3>Fraud signals</h3>
+          <ul id="signals" class="signals"></ul>
+
+          <h3>Evidence detail</h3>
+          <div id="evidence" class="evidence"></div>
+
+          <details class="trace"><summary>Risk engine trace</summary><ol id="trace"></ol></details>
+
+          <h3>History</h3>
+          <ul id="history" class="history"></ul>
+
+          <form id="decision" class="decision" hidden>
+            <h3>Your decision</h3>
+            <fieldset class="actions" id="actions">
+              <legend class="muted small">Action</legend>
+              <label><input type="radio" name="action" value="APPROVE"> Approve</label>
+              <label><input type="radio" name="action" value="REJECT"> Reject</label>
+              <label><input type="radio" name="action" value="REQUEST_RECAPTURE"> Request recapture</label>
+            </fieldset>
+            <label>Reason <select id="reason" required disabled><option value="">Choose an action first</option></select></label>
+            <label>Note (required, kept encrypted, visible to reviewers only)
+              <textarea id="note" required minlength="5" maxlength="1000" rows="3"></textarea></label>
+            <button type="submit" class="primary" id="submit-decision" disabled>Submit decision</button>
+            <p id="decision-error" class="error" role="alert" hidden></p>
+          </form>
+          <p id="read-only" class="muted small" hidden>Your role can view cases but not decide them.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script src="review.js"></script>
+</body>
+</html>

@@ -50,7 +50,11 @@ with engine.begin() as connection:
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON fraud_signals TO kyc_app"))
     # Phase 13: assessments are an append-only decision history.
     connection.execute(sa.text("GRANT SELECT, INSERT ON risk_assessments TO kyc_app"))
+    # Phase 14: reviewers are provisioned by scripts/create_reviewer.py (migrator); the API only reads them.
+    # Review decisions are an append-only record.
+    connection.execute(sa.text("GRANT SELECT ON reviewers TO kyc_app"))
+    connection.execute(sa.text("GRANT SELECT, INSERT ON manual_reviews TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON selfie_captures, face_quality_checks, biometric_templates, face_comparisons TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT ON consents TO kyc_app"))
 engine.dispose()
-print("Migrations through phase 13 applied and local organization provisioned.")
+print("Migrations through phase 14 applied and local organization provisioned.")

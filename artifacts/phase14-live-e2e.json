@@ -1,0 +1,68 @@
+{
+ "run": "2026-10-06T00:51:51+0700",
+ "cases": {
+  "A_status_after_engine": "MANUAL_REVIEW",
+  "A_approve_attempt": {
+   "http": 409,
+   "reason_code": "APPROVAL_BLOCKED",
+   "blockers": [
+    "EVIDENCE_MISSING_LIVENESS"
+   ]
+  },
+  "A_recapture": {
+   "http": 200,
+   "status": "DOCUMENT_REQUIRED"
+  },
+  "A_redo_document_after_recapture": "SELFIE_REQUIRED",
+  "B_status_after_engine": "MANUAL_REVIEW",
+  "queue_total_before_decisions": 1,
+  "B_reviewer_sees_identity": true,
+  "B_reviewer_images": [
+   "DOCUMENT_DATA_PAGE"
+  ],
+  "B_image_bytes": 371198,
+  "B_auditor_identity_hidden": true,
+  "B_auditor_image_http": 403,
+  "B_stale_version": {
+   "http": 409,
+   "reason_code": "CASE_CHANGED"
+  },
+  "B_approve": {
+   "http": 200,
+   "status": "VERIFIED"
+  },
+  "B_client_result": {
+   "status": "VERIFIED",
+   "review": {
+    "action": "APPROVE",
+    "reason_code": "DOCUMENT_CONFIRMED_GENUINE",
+    "decided_at": "2026-10-06T00:52:26.252501+07:00"
+   },
+   "engine_decision": "REVIEW",
+   "note_leaked": false
+  },
+  "C_status_after_engine": "MANUAL_REVIEW",
+  "C_session_id": "b9e31c2c-9caf-4433-9100-3fd99161c139"
+ },
+ "kyc_app_can_rewrite_reviews": false,
+ "audit": {
+  "RECAPTURE_REQUIRED": 1,
+  "REVIEW_APPROVAL_BLOCKED": 1,
+  "REVIEW_APPROVED": 1,
+  "REVIEW_CASE_VIEWED": 3,
+  "REVIEW_DECISION": 2,
+  "REVIEW_IMAGE_VIEWED": 1
+ },
+ "notes_stored_encrypted": true,
+ "C_decided_in_browser_dashboard": {
+  "status": "REJECTED",
+  "action": "REJECT",
+  "reason_code": "IDENTITY_MISUSE_SUSPECTED",
+  "screenshot": "artifacts/phase14-dashboard.jpg"
+ },
+ "notes": [
+  "Reviewers were provisioned with scripts/create_reviewer.py; tokens were never printed into evidence.",
+  "Case A reached review via a DB-advanced NFC step (no liveness), so approval was correctly blocked.",
+  "Case C was opened and rejected through the /review/ dashboard in Chrome."
+ ]
+}

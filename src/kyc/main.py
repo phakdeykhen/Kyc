@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 
 from kyc import __schema_revision__, __version__
+from kyc.api.review_routes import router as review_router
 from kyc.api.routes import router
 from kyc.biometrics import FaceMatchPolicy, OpenCVFaceEngine
 from kyc.core.config import Settings, get_settings
@@ -39,8 +40,11 @@ MULTIPART_OVERHEAD = 256 * 1024
 # until encrypted storage rather than Starlette's default plaintext disk spool.
 MultiPartParser.spool_max_size = 25 * 1024 * 1024 + MULTIPART_OVERHEAD
 CAPTURE_PAGE = Path(__file__).resolve().parent / "web" / "capture"
+REVIEW_PAGE = Path(__file__).resolve().parent / "web" / "review"
 CAPTURE_PAGE_CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; "
                     "media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+REVIEW_PAGE_CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; "
+                   "frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
 
 
 def build_field_cipher(settings: Settings) -> FieldCipher | None:
@@ -111,7 +115,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
                 engine.dispose()
 
     application = FastAPI(title="Universal Identity Platform", version=__version__, lifespan=lifespan,
-                          description="KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness, ePassport chip verification, cross-checks, fraud signals and a deterministic risk engine (phases 1–13).")
+                          description="KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness, ePassport chip verification, cross-checks, fraud signals and a deterministic risk engine and an authorized manual review dashboard (phases 1–14).")
     application.state.settings = settings
 
     @application.middleware("http")
@@ -149,6 +153,10 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
         response.headers["X-Request-ID"] = str(request.state.request_id)
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
+        if request.url.path.startswith("/review"):
+            response.headers["Content-Security-Policy"] = REVIEW_PAGE_CSP
+            response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+            response.headers["Referrer-Policy"] = "no-referrer"
         if request.url.path.startswith("/capture"):
             response.headers["Content-Security-Policy"] = CAPTURE_PAGE_CSP
             response.headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()"
@@ -169,7 +177,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
 
     @application.get("/health/live", tags=["health"])
     def live():
-        return {"status": "ok", "phase": 13, "implemented_phases": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], "version": __version__}
+        return {"status": "ok", "phase": 14, "implemented_phases": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "version": __version__}
 
     @application.get("/health/ready", tags=["health"])
     def ready():
@@ -183,8 +191,11 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
             return JSONResponse(status_code=503, content={"status": "not_ready"})
 
     application.include_router(router)
+    application.include_router(review_router)
     # Development capture client; the server-side gate stays authoritative.
     application.mount("/capture", StaticFiles(directory=CAPTURE_PAGE, html=True), name="capture")
+    # Reviewer dashboard: static shell; every case, image and decision goes through the reviewer API.
+    application.mount("/review", StaticFiles(directory=REVIEW_PAGE, html=True), name="review")
     return application
 
 

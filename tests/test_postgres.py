@@ -116,6 +116,10 @@ class PostgreSQLIsolationTests(unittest.TestCase):
                     "risk_assessments": sa.text("""INSERT INTO risk_assessments
                       (id, organization_id, session_id, decision, policy_version, reason_codes, check_summary)
                       VALUES (:id, :org, :session, 'REVIEW', 'risk-test-v1', '["FIELD_MISMATCH"]', '{}')"""),
+                    # Phase 14: review decisions (note stored as opaque ciphertext).
+                    "manual_reviews": sa.text("""INSERT INTO manual_reviews
+                      (id, organization_id, session_id, reviewer_id, action, reason_code, reason_ciphertext, key_version, session_version)
+                      VALUES (:id, :org, :session, 'reviewer-test', 'REJECT', 'POLICY_NOT_MET', :ciphertext, 'test-v1', 2)"""),
                     "consents": sa.text("""INSERT INTO consents
                       (id, organization_id, session_id, user_id, scope, policy_version, granted)
                       VALUES (:id, :org, :session, 'postgres-test', 'BIOMETRIC_PROCESSING', 'consent-test-v1', true)"""),
@@ -162,6 +166,17 @@ class PostgreSQLIsolationTests(unittest.TestCase):
                     with self.subTest(table=table, violation="cross-tenant session foreign key"):
                         with self.assertRaises(sa.exc.IntegrityError), connection.begin_nested():
                             connection.execute(statement, {**face_parameters_a, "id": uuid4(), "session": sessions[org_b]})
+
+                # Phase 14: reviewer accounts are organization-scoped without a session.
+                reviewer_insert = sa.text("""INSERT INTO reviewers (id, organization_id, display_name, role, token_sha256)
+                  VALUES (:id, :org, 'Reviewer', 'REVIEWER', :sha)""")
+                connection.execute(reviewer_insert, {"id": uuid4(), "org": org_a, "sha": "a" * 64})
+                self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM reviewers")).scalar_one(), 1)
+                with self.assertRaises(sa.exc.ProgrammingError), connection.begin_nested():
+                    connection.execute(reviewer_insert, {"id": uuid4(), "org": org_b, "sha": "b" * 64})
+                connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_b)})
+                self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM reviewers")).scalar_one(), 0)
+                connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_a)})
 
                 secondary_session, secondary_document, secondary_template = uuid4(), uuid4(), uuid4()
                 now = datetime.now(timezone.utc)

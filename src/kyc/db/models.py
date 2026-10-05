@@ -324,9 +324,27 @@ class ManualReview(SessionArtifact, Base):
     reviewer_id: Mapped[str] = mapped_column(sa.String(128))
     action: Mapped[ReviewAction] = mapped_column(enum_type(ReviewAction))
     reason_code: Mapped[str] = mapped_column(sa.String(80))
-    reason_ciphertext: Mapped[bytes] = mapped_column(sa.LargeBinary)
+    reason_ciphertext: Mapped[bytes] = mapped_column(sa.LargeBinary)   # the reviewer's note, encrypted
     key_version: Mapped[str] = mapped_column(sa.String(256))
-    __table_args__ = artifact_constraints(__tablename__, sa.CheckConstraint("length(reason_code) > 0", name="reason_required"))
+    session_version: Mapped[int | None] = mapped_column(sa.Integer)     # the case version the reviewer saw
+    risk_assessment_id: Mapped[UUID | None] = mapped_column(sa.Uuid)    # the assessment being resolved
+    __table_args__ = artifact_constraints(__tablename__, sa.CheckConstraint("length(reason_code) > 0", name="reason_required"),
+                                          sa.Index("ix_manual_reviews_session_created", "organization_id", "session_id", "created_at"))
+
+
+class Reviewer(Record, Base):
+    """A person allowed to review one organization's cases. Only a SHA-256 of the token is stored."""
+
+    __tablename__ = "reviewers"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid, sa.ForeignKey("organizations.id", ondelete="RESTRICT"))
+    display_name: Mapped[str] = mapped_column(sa.String(120))
+    role: Mapped[str] = mapped_column(sa.String(20))
+    token_sha256: Mapped[str] = mapped_column(sa.String(64))
+    active: Mapped[bool] = mapped_column(sa.Boolean, default=True, server_default=sa.true())
+    __table_args__ = (sa.UniqueConstraint("token_sha256", name="uq_reviewers_token_sha256"),
+                      sa.UniqueConstraint("organization_id", "id", name="uq_reviewers_scope_id"),
+                      sa.CheckConstraint("role IN ('REVIEWER', 'AUDITOR')", name="reviewer_role"),
+                      sa.CheckConstraint("length(token_sha256) = 64", name="token_hash_length"))
 
 
 class Consent(SessionArtifact, Base):

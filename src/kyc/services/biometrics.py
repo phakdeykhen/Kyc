@@ -130,6 +130,14 @@ def _template_context(record, template_id, source, embedding):
 
 def _recapture_reference(db, record, document, tenant, request_id):
     """Invalidate stale identity evidence while preserving capture attempt history."""
+    clear_identity_evidence(db, record, document)
+    apply_event(db, record, tenant, Event.REFERENCE_RECAPTURE_REQUIRED, request_id)
+    return "CAPTURE_" + requirement_for(record.expected_document_type).sides[0]
+
+
+def clear_identity_evidence(db, record, document) -> None:
+    """Remove photos, extracted fields and templates so a recapture starts clean.
+    Checks, signals, assessments, reviews and audit history are kept."""
     for model in (DocumentImage, DocumentField, MRZResult):
         db.execute(sa.delete(model).where(model.organization_id == record.organization_id,
                                          model.session_id == record.id, model.document_id == document.id))
@@ -141,8 +149,6 @@ def _recapture_reference(db, record, document, tenant, request_id):
     document.side_classification = {}
     document.document_number_hmac = None
     document.extraction_version = None
-    apply_event(db, record, tenant, Event.REFERENCE_RECAPTURE_REQUIRED, request_id)
-    return "CAPTURE_" + requirement_for(record.expected_document_type).sides[0]
 
 
 def submit_selfie(db: Session, tenant: TenantContext, session_id: UUID, data: bytes, engine, store,

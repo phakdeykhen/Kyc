@@ -109,6 +109,14 @@ class ResultDecision(BaseModel):
     assessed_at: datetime
 
 
+class ResultReview(BaseModel):
+    """The human outcome of MANUAL_REVIEW. Reviewer identity and notes stay inside the review system."""
+
+    action: Literal["APPROVE", "REJECT", "REQUEST_RECAPTURE"]
+    reason_code: str
+    decided_at: datetime
+
+
 class VerifyResponse(BaseModel):
     session_id: UUID
     status: SessionStatus
@@ -126,6 +134,7 @@ class SessionResult(BaseModel):
     review_flags: list[str] = Field(default_factory=list, description="Reason codes that a reviewer or the risk engine must consider.")
     fraud_signals: list[FraudSignalSummary] = Field(default_factory=list, description="Signals from the fraud engine (Phase 12). Evidence, not a verdict.")
     decision: ResultDecision | None = Field(default=None, description="Set only by the deterministic risk engine (Phase 13).")
+    review: ResultReview | None = Field(default=None, description="Latest manual review outcome (Phase 14), if any.")
 
 
 DocumentSide = Literal["FRONT", "BACK", "DATA_PAGE"]

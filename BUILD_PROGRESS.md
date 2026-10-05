@@ -1,8 +1,51 @@
 # Build progress — Universal Identity Platform
 
 Updated: 6 October 2026. The full requirements in `Document.md` control the build.
-Phases 1–13 are implemented. Work is paused at the Phase 13 approval gate; Phase 14
-(authorized manual review dashboard) has not started.
+Phases 1–14 are implemented. Work is paused at the Phase 14 approval gate; Phase 15
+(multi-tenant API and credential provisioning) has not started.
+
+## Phase 14 implementation (6 October 2026)
+
+Implemented the authorized manual review dashboard (`/review/`) and the reviewer API
+(`/v1/review/queue`, `/{session}`, `/{session}/images/{id}`, `/{session}/decision`).
+
+Reviewers:
+- They are tenant-scoped accounts with hashed bearer tokens, created by
+  `scripts/create_reviewer.py`.
+- Client and reviewer credentials never cross, so an app cannot approve its own sessions.
+- REVIEWER sees identity and photos and decides. AUDITOR sees evidence only.
+
+Decisions:
+- Each needs a fixed reason code, an encrypted note and the case version the reviewer saw.
+- Approval is refused when required evidence is missing or failed, or when tamper proof exists.
+- Recapture clears stale photos, fields and templates but keeps history.
+- Views, photo views and decisions are audited. The client result shows the review
+  outcome but not the note.
+
+Migration `0008_phase14` adds `reviewers` (forced RLS) and links each review to the case
+version and assessment.
+Design: [architecture-phase14.md](docs/architecture-phase14.md).
+
+### Phase 14 validation evidence
+
+- **344 tests: 344 passed, 0 skipped, 0 failures** with live PostgreSQL 18.6 (RLS on
+  `reviewers` and `manual_reviews`) and native face models
+  ([artifacts/phase14-tests.txt](artifacts/phase14-tests.txt)).
+- Live run with provisioned reviewers and real pipeline cases
+  ([artifacts/phase14-live-e2e.json](artifacts/phase14-live-e2e.json)):
+  - blocked approval → recapture → redo through real OCR
+  - reviewer vs auditor visibility
+  - stale-version refusal
+  - approval → VERIFIED with the note kept private and encrypted
+  - `kyc_app` cannot rewrite reviews
+- Chrome: a real case was opened and rejected in the dashboard
+  ([artifacts/phase14-dashboard.jpg](artifacts/phase14-dashboard.jpg)). The UI test found
+  and fixed a text-overflow bug.
+
+### Phase 14 limits
+
+No four-eyes approval or case claiming; tokens have no expiry/rotation and no SSO/MFA
+(Phases 15/17); 403 attempts are not audited; no search/filters; webhooks are Phase 16.
 
 ## Phase 13 implementation (6 October 2026)
 
@@ -556,8 +599,8 @@ does not claim production readiness or functioning verification engines.
 | 11 | ePassport NFC mobile architecture | Complete; 300/300 tests; PA + AA server-side; clone/tamper detected; live PostgreSQL passed; no physical chip yet |
 | 12 | Cross-checks and fraud signals | Complete; 318/318 tests; 7 detectors + cross-check matrix; live PostgreSQL E2E passed; forensics models not included |
 | 13 | Deterministic risk engine | Complete; 333/333 tests; tighten-only policy; live PostgreSQL E2E passed; uncalibrated biometrics → MANUAL_REVIEW |
-| 14 | Authorized manual review dashboard | Waiting for approval |
-| 15 | Multi-tenant API and credential provisioning | Not started |
+| 14 | Authorized manual review dashboard | Complete; 344/344 tests; role-based views, guarded decisions, audited; live + browser E2E passed |
+| 15 | Multi-tenant API and credential provisioning | Waiting for approval |
 | 16 | Signed webhooks and SDKs | Not started |
 | 17 | Security/privacy hardening | Not started |
 | 18 | Load/performance testing | Not started |
@@ -567,8 +610,8 @@ does not claim production readiness or functioning verification engines.
 ## Approval requirement
 
 `Document.md`, section 31, states: **“Stop and wait for approval before next
-phase.”** The user's request authorized Phases 8 and 9 together, then Phases 10–11, then Phase 12, then Phase 13.
-Phase 14 requires separate approval.
+phase.”** The user's request authorized Phases 8 and 9 together, then Phases 10–11, then Phases 12, 13 and 14 in turn.
+Phase 15 requires separate approval.
 
 ## Earlier reference work
 

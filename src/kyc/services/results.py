@@ -6,9 +6,9 @@ from datetime import date, datetime, timezone
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from kyc.api.schemas import FaceComparisonSummary, FraudSignalSummary, ResultDecision, ResultDocument, ResultIdentity, ResultMRZ, SessionResult
+from kyc.api.schemas import FaceComparisonSummary, FraudSignalSummary, ResultDecision, ResultDocument, ResultReview, ResultIdentity, ResultMRZ, SessionResult
 from kyc.core.crypto import FieldCipher
-from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceComparison, FaceQualityCheck, FraudSignal, IdentityDocument, KYCSession, LivenessCheck, MRZResult, NFCResult, RiskAssessmentRecord
+from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceComparison, FaceQualityCheck, FraudSignal, IdentityDocument, KYCSession, LivenessCheck, ManualReview, MRZResult, NFCResult, RiskAssessmentRecord
 from kyc.domain.enums import CheckResult
 from kyc.services.captures import side_progress
 
@@ -145,14 +145,22 @@ def latest_decision(db: Session, record: KYCSession) -> ResultDecision | None:
                           assessed_at=row.created_at)
 
 
+def latest_review(db: Session, record: KYCSession) -> ResultReview | None:
+    row = db.scalar(sa.select(ManualReview).where(ManualReview.organization_id == record.organization_id,
+                                                  ManualReview.session_id == record.id)
+                    .order_by(ManualReview.created_at.desc()).limit(1))
+    return None if row is None else ResultReview(action=row.action.value, reason_code=row.reason_code,
+                                                 decided_at=row.created_at)
+
+
 def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) -> SessionResult:
     evidence = collect_evidence(db, record)
     checks, flags, summary, signals, document = (evidence.checks, evidence.flags, evidence.face_comparison,
                                                  evidence.signals, evidence.document)
-    decision = latest_decision(db, record)
+    decision, review = latest_decision(db, record), latest_review(db, record)
     if document is None or cipher is None:
         return SessionResult(session_id=record.id, status=record.status, checks=checks, fraud_signals=signals,
-                             face_comparison=summary, review_flags=sorted(set(flags)), decision=decision)
+                             face_comparison=summary, review_flags=sorted(set(flags)), decision=decision, review=review)
 
     values: dict[str, str] = {}
     for field in db.scalars(sa.select(DocumentField).where(DocumentField.organization_id == record.organization_id,
@@ -168,7 +176,7 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) ->
                                              MRZResult.document_id == document.id))
     return SessionResult(
         session_id=record.id, status=record.status, checks=checks, review_flags=sorted(set(flags)), face_comparison=summary,
-        fraud_signals=signals, decision=decision,
+        fraud_signals=signals, decision=decision, review=review,
         document=ResultDocument(country=document.issuing_country, type=document.document_type,
                                 document_number_masked=mask(values.get("document_number")), expiry_status=expiry_status),
         identity=ResultIdentity(full_name=values.get("full_name"), full_name_local=values.get("full_name_local"),
