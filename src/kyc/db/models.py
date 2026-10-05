@@ -176,9 +176,22 @@ class NFCResult(SessionArtifact, Base):
     passive_authentication: Mapped[bool | None] = mapped_column(sa.Boolean)
     chip_authentication: Mapped[bool | None] = mapped_column(sa.Boolean)
     trust_store_version: Mapped[str | None] = mapped_column(sa.String(120))
+    active_authentication: Mapped[bool | None] = mapped_column(sa.Boolean)
     data_group_checks: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
     evidence_metadata: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
     __table_args__ = document_constraints(__tablename__)
+
+
+class NFCChallenge(SessionArtifact, Base):
+    """Single-use Active Authentication nonce (not secret; freshness is what matters)."""
+
+    __tablename__ = "nfc_challenges"
+    challenge: Mapped[bytes] = mapped_column(sa.LargeBinary)
+    expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = artifact_constraints(__tablename__,
+        sa.CheckConstraint("length(challenge) = 8", name="challenge_length"),
+        sa.Index("ix_nfc_challenges_session_created", "organization_id", "session_id", "created_at"))
 
 
 class SelfieCapture(SessionArtifact, Base):

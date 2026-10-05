@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile, status
@@ -11,6 +11,7 @@ from kyc.domain.enums import DocumentType
 from kyc.services.captures import CaptureLimits, submit_capture
 from kyc.services.biometrics import SelfieLimits, submit_selfie
 from kyc.services.liveness import LivenessLimits, issue_challenge, submit_liveness
+from kyc.services.nfc import NFCLimits, issue_nfc_challenge, submit_nfc
 from kyc.services.results import build_result
 from kyc.services.sessions import create_session, get_session, respond
 
@@ -143,6 +144,53 @@ def upload_liveness(session_id: UUID, request: Request, tenant: Tenant, db: Data
     return submit_liveness(db, tenant, session_id, challenge_id, nonce, data, steps, state.face_engine,
                            state.biometric_cipher, state.face_match_policy, state.liveness_policy, limits,
                            request.state.request_id)
+
+
+def _nfc_limits(settings) -> NFCLimits:
+    return NFCLimits(settings.nfc_challenge_ttl_seconds, settings.max_nfc_attempts)
+
+
+@router.post("/kyc/{session_id}/nfc/challenge", responses={
+    409: {"model": CaptureError, "description": "Session is not waiting for the chip step."},
+    429: {"model": CaptureError, "description": "Chip attempt limit reached."},
+})
+def nfc_challenge(session_id: UUID, request: Request, tenant: Tenant, db: Database):
+    """Issue a fresh 8-byte Active Authentication challenge for the chip to sign."""
+    return issue_nfc_challenge(db, tenant, session_id, _nfc_limits(request.app.state.settings), request.state.request_id)
+
+
+def _optional_file(upload: UploadFile | None, limit: int) -> bytes | None:
+    if upload is None:
+        return None
+    data = upload.file.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(413, detail="Chip file is too large.")
+    return data or None
+
+
+@router.post("/kyc/{session_id}/nfc", responses={
+    409: {"model": CaptureError, "description": "Challenge invalid, or session not waiting for the chip step."},
+    413: {"description": "Upload exceeds the size limit."},
+    429: {"model": CaptureError, "description": "Chip attempt limit reached."},
+})
+def upload_nfc(session_id: UUID, request: Request, tenant: Tenant, db: Database,
+               read_status: Annotated[Literal["READ", "NOT_SUPPORTED", "NOT_AVAILABLE", "FAILED"], Form()] = "READ",
+               access_protocol: Annotated[Literal["PACE", "BAC"] | None, Form()] = None,
+               challenge_id: Annotated[UUID | None, Form()] = None,
+               aa_signature: Annotated[str | None, Form(max_length=2048, pattern=r"^[0-9a-fA-F]*$")] = None,
+               sod: Annotated[UploadFile | None, File(description="EF.SOD as read from the chip")] = None,
+               dg1: Annotated[UploadFile | None, File(description="EF.DG1 (MRZ)")] = None,
+               dg2: Annotated[UploadFile | None, File(description="EF.DG2 (portrait)")] = None,
+               dg15: Annotated[UploadFile | None, File(description="EF.DG15 (Active Authentication key)")] = None):
+    """Verify chip data server-side (Passive + Active Authentication). Raw chip data is not stored."""
+    state, settings = request.app.state, request.app.state.settings
+    limit = settings.max_nfc_bytes
+    groups = {number: data for number, data in ((1, _optional_file(dg1, limit)), (2, _optional_file(dg2, limit)),
+                                                (15, _optional_file(dg15, limit))) if data}
+    signature = bytes.fromhex(aa_signature) if aa_signature else None
+    return submit_nfc(db, tenant, session_id, read_status, access_protocol, groups, _optional_file(sod, limit),
+                      challenge_id, signature, state.csca_trust, state.field_cipher, state.face_engine,
+                      state.biometric_cipher, state.face_match_policy, _nfc_limits(settings), request.state.request_id)
 
 
 @router.get("/document-types")

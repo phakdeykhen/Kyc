@@ -20,6 +20,7 @@ from kyc.core.crypto import FieldCipher, decode_key
 from kyc.engines.capture_quality import HeuristicDocumentQualityEngine
 from kyc.barcode.signatures import TrustStore
 from kyc.liveness.active import ActiveLivenessPolicy
+from kyc.nfc.trust import CSCATrustStore
 from kyc.ocr.tesseract import TesseractOCREngine
 from kyc.services.documents import DocumentProcessor
 from kyc.storage.captures import LocalEncryptedCaptureStore, parse_keyring
@@ -28,6 +29,7 @@ from kyc.storage.biometrics import BiometricCipher
 UPLOAD_PATH = re.compile(r"^/v1/kyc/[^/]+/documents(/front|/back)?$")
 SELFIE_PATH = re.compile(r"^/v1/kyc/[^/]+/selfie$")
 LIVENESS_PATH = re.compile(r"^/v1/kyc/[^/]+/liveness$")
+NFC_PATH = re.compile(r"^/v1/kyc/[^/]+/nfc$")
 JSON_BODY_LIMIT = 64 * 1024
 MULTIPART_OVERHEAD = 256 * 1024
 # Every request is bounded before form parsing. Keep permitted captures in RAM
@@ -78,6 +80,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
         application.state.face_engine = OpenCVFaceEngine(
             configuration.face_models_dir / "face_detection_yunet_2023mar.onnx",
             configuration.face_models_dir / "face_recognition_sface_2021dec.onnx")
+        application.state.csca_trust = CSCATrustStore.load(configuration.nfc_csca_trust_store)
         application.state.liveness_policy = ActiveLivenessPolicy(
             version=configuration.liveness_policy_version, calibrated=configuration.liveness_calibrated)
         application.state.face_match_policy = FaceMatchPolicy(
@@ -95,7 +98,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
                 engine.dispose()
 
     application = FastAPI(title="Universal Identity Platform", version=__version__, lifespan=lifespan,
-                          description="KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison and active liveness (phases 1–10).")
+                          description="KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness and ePassport chip verification (phases 1–11).")
     application.state.settings = settings
 
     @application.middleware("http")
@@ -107,6 +110,8 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
                 limit = request.app.state.settings.max_selfie_bytes + MULTIPART_OVERHEAD
             elif LIVENESS_PATH.match(request.url.path):
                 limit = request.app.state.settings.max_liveness_bytes + MULTIPART_OVERHEAD
+            elif NFC_PATH.match(request.url.path):
+                limit = request.app.state.settings.max_nfc_bytes + MULTIPART_OVERHEAD
             else:
                 limit = request.app.state.settings.max_capture_bytes + MULTIPART_OVERHEAD if upload else JSON_BODY_LIMIT
             length = request.headers.get("content-length")
@@ -151,7 +156,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
 
     @application.get("/health/live", tags=["health"])
     def live():
-        return {"status": "ok", "phase": 10, "implemented_phases": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "version": __version__}
+        return {"status": "ok", "phase": 11, "implemented_phases": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], "version": __version__}
 
     @application.get("/health/ready", tags=["health"])
     def ready():

@@ -43,7 +43,10 @@ with engine.begin() as connection:
     # Phase 10 liveness: challenges are marked used (UPDATE); checks hold evidence only.
     connection.execute(sa.text("GRANT SELECT, INSERT, UPDATE, DELETE ON liveness_challenges TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON liveness_checks TO kyc_app"))
+    # Phase 11 ePassport chip: AA challenges are marked used (UPDATE); nfc_results hold evidence only.
+    connection.execute(sa.text("GRANT SELECT, INSERT, UPDATE, DELETE ON nfc_challenges TO kyc_app"))
+    connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON nfc_results TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON selfie_captures, face_quality_checks, biometric_templates, face_comparisons TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT ON consents TO kyc_app"))
 engine.dispose()
-print("Migrations through phase 10 applied and local organization provisioned.")
+print("Migrations through phase 11 applied and local organization provisioned.")

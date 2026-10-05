@@ -1193,9 +1193,9 @@ Design this as:
 
 ## Implementation progress — 5 October 2026
 
-The original specification above is preserved. Phases 1–9 have been implemented
-at this workspace root. The user authorized Phases 8 and 9 together; their final
-validation passed. Phase 10 has not started.
+The original specification above is preserved. Phases 1–11 have been implemented
+at this workspace root. The user authorized Phases 8 and 9 together, then Phases 10
+and 11; their validation passed. Phase 12 has not started.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -1208,9 +1208,9 @@ validation passed. Phase 10 has not started.
 | 7 | QR/barcode engine | Complete; 264/264 tests; live PostgreSQL passed; Docker pending |
 | 8 | Face detection + quality | Complete; native inference and tenant isolation verified; quality limits documented |
 | 9 | Face embeddings + 1:1 comparison | Complete; 264/264 tests; full document→selfie pipeline verified; default REVIEW |
-| 10 | Liveness / anti-spoof integration | Complete; 281/281 tests; photo attacks blocked; uncalibrated REVIEW |
-| 11 | ePassport NFC mobile architecture | Waiting for approval |
-| 12 | Cross-check + fraud signals | Not started |
+| 10 | Liveness / anti-spoof integration | Complete; re-tested 5 Oct (300/300); photo attacks blocked; uncalibrated REVIEW |
+| 11 | ePassport NFC mobile architecture | Complete; 300/300 tests; server-side PA + AA; clone/tamper detected; no physical chip yet |
+| 12 | Cross-check + fraud signals | Waiting for approval |
 | 13 | Risk engine | Not started |
 | 14 | Manual review dashboard | Not started |
 | 15 | Multi-tenant API + API keys | Not started |

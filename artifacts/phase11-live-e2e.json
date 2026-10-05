@@ -1,0 +1,249 @@
+{
+ "run": "2026-10-05T23:05:55+0700",
+ "server": "uvicorn, PostgreSQL 18.6 as kyc_app (forced RLS)",
+ "models": "YuNet 2023mar + SFace 2021dec (native)",
+ "fixtures": "SPECIMEN KH passport, OpenCV lena.jpg / messi5.jpg; fictional test CSCA",
+ "phase10_photo_attack": {
+  "session_id": "d222bf8c-a6de-4f51-95e5-b11217901e40",
+  "selfie_status": "LIVENESS_REQUIRED",
+  "attempts": [
+   {
+    "challenge_steps": [
+     "LOOK_STRAIGHT",
+     "LOOK_DOWN",
+     "TURN_RIGHT",
+     "TURN_LEFT"
+    ],
+    "http": 200,
+    "result": "REVIEW",
+    "status": "LIVENESS_REQUIRED",
+    "retry_allowed": true,
+    "reason_codes": [
+     "CHALLENGE_NOT_COMPLETED"
+    ],
+    "completed_moves": null
+   },
+   {
+    "challenge_steps": [
+     "LOOK_STRAIGHT",
+     "TURN_RIGHT",
+     "LOOK_DOWN",
+     "TURN_LEFT"
+    ],
+    "http": 200,
+    "result": "REVIEW",
+    "status": "LIVENESS_REQUIRED",
+    "retry_allowed": true,
+    "reason_codes": [
+     "CHALLENGE_NOT_COMPLETED"
+    ],
+    "completed_moves": null
+   },
+   {
+    "challenge_steps": [
+     "LOOK_STRAIGHT",
+     "LOOK_UP",
+     "TURN_RIGHT",
+     "TURN_LEFT"
+    ],
+    "http": 200,
+    "result": "REVIEW",
+    "status": "LIVENESS_REQUIRED",
+    "retry_allowed": true,
+    "reason_codes": [
+     "CHALLENGE_NOT_COMPLETED"
+    ],
+    "completed_moves": null
+   },
+   {
+    "challenge_steps": [
+     "LOOK_STRAIGHT",
+     "TURN_LEFT",
+     "LOOK_DOWN",
+     "LOOK_UP"
+    ],
+    "http": 200,
+    "result": "REVIEW",
+    "status": "LIVENESS_REQUIRED",
+    "retry_allowed": true,
+    "reason_codes": [
+     "CHALLENGE_NOT_COMPLETED"
+    ],
+    "completed_moves": null
+   },
+   {
+    "challenge_steps": [
+     "LOOK_STRAIGHT",
+     "TURN_RIGHT",
+     "LOOK_UP",
+     "TURN_LEFT"
+    ],
+    "http": 200,
+    "result": "REVIEW",
+    "status": "LIVENESS_REQUIRED",
+    "retry_allowed": false,
+    "reason_codes": [
+     "CHALLENGE_NOT_COMPLETED"
+    ],
+    "completed_moves": null
+   },
+   {
+    "challenge_http": 429,
+    "reason_code": "LIVENESS_ATTEMPTS_EXCEEDED"
+   }
+  ],
+  "reused_challenge": {
+   "http": 409,
+   "reason_code": "CHALLENGE_ALREADY_USED"
+  },
+  "final_session_status": "LIVENESS_REQUIRED"
+ },
+ "phase11_chip": {
+  "nfc_switched_off_then_retry": {
+   "http": 200,
+   "status": "NFC_REQUIRED",
+   "nfc_status": "NFC_NOT_AVAILABLE",
+   "passive_authentication": null,
+   "active_authentication": null,
+   "document_consistency": null,
+   "chip_face_match": null,
+   "reason_codes": [
+    "CLIENT_REPORTED_NOT_AVAILABLE"
+   ],
+   "retry_allowed": true
+  },
+  "genuine_chip": {
+   "http": 200,
+   "status": "PROCESSING",
+   "nfc_status": "NFC_VERIFIED",
+   "passive_authentication": true,
+   "active_authentication": true,
+   "document_consistency": {
+    "document_number": "MATCH",
+    "date_of_birth": "MATCH",
+    "sex": "MATCH",
+    "expiry_date": "MATCH",
+    "full_name": "MATCH",
+    "mrz_data_lines": "MATCH"
+   },
+   "chip_face_match": {
+    "score": 0.8679901088146167,
+    "result": "REVIEW",
+    "policy_version": "SFACE-COSINE-UNCALIBRATED-2026.10.1",
+    "calibrated": false
+   },
+   "reason_codes": [],
+   "retry_allowed": false
+  },
+  "genuine_result_checks": {
+   "nfc": "PASS",
+   "nfc_status": "NFC_VERIFIED",
+   "chip_document_consistency": "PASS",
+   "chip_active_authentication": "PASS",
+   "chip_face_match": "REVIEW",
+   "face_match": "REVIEW"
+  },
+  "genuine_result_decision": null,
+  "cloned_chip_wrong_aa_key": {
+   "http": 200,
+   "status": "PROCESSING",
+   "nfc_status": "NFC_FAILED",
+   "passive_authentication": true,
+   "active_authentication": false,
+   "document_consistency": {
+    "document_number": "MATCH",
+    "date_of_birth": "MATCH",
+    "sex": "MATCH",
+    "expiry_date": "MATCH",
+    "full_name": "MATCH",
+    "mrz_data_lines": "MATCH"
+   },
+   "chip_face_match": null,
+   "reason_codes": [
+    "ACTIVE_AUTHENTICATION_FAILED"
+   ],
+   "retry_allowed": false
+  },
+  "tampered_dg1": {
+   "http": 200,
+   "status": "PROCESSING",
+   "nfc_status": "NFC_FAILED",
+   "passive_authentication": false,
+   "active_authentication": true,
+   "document_consistency": {
+    "document_number": "MATCH",
+    "date_of_birth": "MATCH",
+    "sex": "MATCH",
+    "expiry_date": "MATCH",
+    "full_name": "MISMATCH",
+    "mrz_data_lines": "MATCH"
+   },
+   "chip_face_match": null,
+   "reason_codes": [
+    "DATA_GROUP_HASH_MISMATCH",
+    "CHIP_DOCUMENT_MISMATCH"
+   ],
+   "retry_allowed": false
+  },
+  "genuine_chip_of_another_passport": {
+   "http": 200,
+   "status": "PROCESSING",
+   "nfc_status": "NFC_VERIFIED",
+   "passive_authentication": true,
+   "active_authentication": true,
+   "document_consistency": {
+    "document_number": "MISMATCH",
+    "date_of_birth": "MISMATCH",
+    "sex": "MISMATCH",
+    "expiry_date": "MATCH",
+    "full_name": "MISMATCH",
+    "mrz_data_lines": "MISMATCH"
+   },
+   "chip_face_match": {
+    "score": 0.15155004527147198,
+    "result": "REVIEW",
+    "policy_version": "SFACE-COSINE-UNCALIBRATED-2026.10.1",
+    "calibrated": false
+   },
+   "reason_codes": [
+    "CHIP_DOCUMENT_MISMATCH"
+   ],
+   "retry_allowed": false
+  },
+  "chip_signed_by_untrusted_csca": {
+   "http": 200,
+   "status": "PROCESSING",
+   "nfc_status": "NFC_READ",
+   "passive_authentication": false,
+   "active_authentication": true,
+   "document_consistency": {
+    "document_number": "MATCH",
+    "date_of_birth": "MATCH",
+    "sex": "MATCH",
+    "expiry_date": "MATCH",
+    "full_name": "MATCH",
+    "mrz_data_lines": "MATCH"
+   },
+   "chip_face_match": null,
+   "reason_codes": [
+    "DOCUMENT_SIGNER_NOT_TRUSTED"
+   ],
+   "retry_allowed": false
+  },
+  "superseded_challenge_replay": {
+   "http": 409,
+   "reason_code": "CHALLENGE_ALREADY_USED"
+  },
+  "kyc_app_rows_without_tenant": 0,
+  "nfc_results_rows": 12,
+  "stored_contains_identity_or_raw": false,
+  "challenges_left_unused": 2,
+  "chip_portrait_templates": 5,
+  "liveness_frames_retained_any": 0
+ },
+ "notes": [
+  "Phase 10 session: real YuNet/SFace on a printed-photo attack (moved, rotated, perspective-tilted per challenge step).",
+  "Phase 11 sessions reached NFC_REQUIRED via a migrator UPDATE because a photo cannot pass liveness; every chip call is real HTTP as kyc_app.",
+  "Chips are synthetic, signed by a fictional test CSCA from scripts/nfc_simulator.py. No real passport or chip was read."
+ ]
+}

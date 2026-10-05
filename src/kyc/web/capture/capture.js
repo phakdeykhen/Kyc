@@ -208,6 +208,14 @@ async function followSession() {
       $("next").textContent = "Selfie done. Next, a short movement check shows that you are present.";
       await startCamera();
     }
+  } else if (status === "NFC_REQUIRED") {
+    // Browsers cannot reach passport chips (Web NFC is NDEF-only); the mobile SDK performs this step.
+    stopPolling();
+    stopCamera();
+    state.current = null;
+    setMode("processing");
+    $("processing-info").textContent = "Next, read your passport chip with the mobile app. Hold the passport against the back of your phone when the app asks.";
+    $("next").textContent = "Chip reading needs the mobile app. Use Check progress after the app has finished.";
   } else if (status === "DOCUMENT_PROCESSING") {
     stopCamera();
     setMode("processing");

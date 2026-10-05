@@ -7,9 +7,13 @@ from sqlalchemy.orm import Session
 
 from kyc.api.schemas import FaceComparisonSummary, ResultDocument, ResultIdentity, ResultMRZ, SessionResult
 from kyc.core.crypto import FieldCipher
-from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceComparison, FaceQualityCheck, IdentityDocument, KYCSession, LivenessCheck, MRZResult
+from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceComparison, FaceQualityCheck, IdentityDocument, KYCSession, LivenessCheck, MRZResult, NFCResult
 from kyc.domain.enums import CheckResult
 from kyc.services.captures import side_progress
+
+# NFC_VERIFIED means signed by a trusted issuer and unaltered; it is still evidence, not a decision.
+NFC_CHECK = {"NFC_VERIFIED": "PASS", "NFC_READ": "REVIEW", "NFC_FAILED": "FAIL", "NFC_NOT_AVAILABLE": "REVIEW",
+             "NFC_NOT_SUPPORTED": "NOT_APPLICABLE"}
 
 SEVERITY = {CheckResult.FAIL: 3, CheckResult.REVIEW: 2, CheckResult.PASS: 1, CheckResult.NOT_APPLICABLE: 0}
 CHECK_GROUPS = {"CLASSIFICATION": "document_classification", "EXPIRY": "expiry", "MRZ": "mrz", "PORTRAIT": "document_portrait",
@@ -47,6 +51,22 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) ->
                                     "SEVERE_OCCLUSION": "FACE_OCCLUSION_UNVERIFIED"}
                 flags.extend(unverified_codes[item] for item in quality.evidence_metadata.get("unverified_checks", [])
                              if item in unverified_codes)
+    nfc = next((row for row in db.scalars(sa.select(NFCResult).where(
+        NFCResult.organization_id == record.organization_id, NFCResult.session_id == record.id)
+        .order_by(NFCResult.created_at.desc())) if not row.evidence_metadata.get("retryable")), None)
+    if nfc is not None:
+        checks["nfc"] = NFC_CHECK[nfc.status.value]
+        checks["nfc_status"] = nfc.status.value
+        consistency = nfc.evidence_metadata.get("document_consistency") or {}
+        if consistency:
+            checks["chip_document_consistency"] = "FAIL" if "MISMATCH" in consistency.values() else "PASS"
+        if nfc.active_authentication is not None:
+            checks["chip_active_authentication"] = "PASS" if nfc.active_authentication else "FAIL"
+        face = nfc.evidence_metadata.get("chip_face_match")
+        if face:
+            checks["chip_face_match"] = face["result"]
+        if checks["nfc"] in ("REVIEW", "FAIL") or "MISMATCH" in consistency.values():
+            flags.extend(f"NFC_{code}" for code in nfc.evidence_metadata.get("reason_codes", []))
     # Retry-only attempts (challenge not completed) are not results; report the latest final one.
     liveness = next((row for row in db.scalars(sa.select(LivenessCheck).where(
         LivenessCheck.organization_id == record.organization_id, LivenessCheck.session_id == record.id)

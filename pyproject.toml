@@ -20,6 +20,7 @@ dependencies = [
   "pillow>=11,<13",
   "cryptography>=44,<47",
   "zxing-cpp>=2.3,<4",
+  "asn1crypto>=1.5,<2",
   "opencv-python-headless>=4.10,<5",
 ]
 

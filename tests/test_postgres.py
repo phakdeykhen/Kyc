@@ -101,6 +101,13 @@ class PostgreSQLIsolationTests(unittest.TestCase):
                        challenge_hash, evidence_metadata)
                       VALUES (:id, :org, :session, 'ACTIVE_LIVENESS', 'REVIEW', 1.0, 'test geometry', 'test-v1',
                               :sha, '{}')"""),
+                    # Phase 11: AA challenges and chip verification evidence (no raw chip data).
+                    "nfc_challenges": sa.text("""INSERT INTO nfc_challenges (id, organization_id, session_id, challenge, expires_at)
+                      VALUES (:id, :org, :session, '\\x0102030405060708', now() + interval '2 minutes')"""),
+                    "nfc_results": sa.text("""INSERT INTO nfc_results
+                      (id, organization_id, session_id, document_id, status, passive_authentication, active_authentication,
+                       trust_store_version, data_group_checks, evidence_metadata)
+                      VALUES (:id, :org, :session, :document, 'NFC_READ', false, null, 'csca-test', '{}', '{}')"""),
                     "consents": sa.text("""INSERT INTO consents
                       (id, organization_id, session_id, user_id, scope, policy_version, granted)
                       VALUES (:id, :org, :session, 'postgres-test', 'BIOMETRIC_PROCESSING', 'consent-test-v1', true)"""),

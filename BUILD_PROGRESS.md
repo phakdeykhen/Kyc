@@ -1,8 +1,42 @@
 # Build progress — Universal Identity Platform
 
 Updated: 5 October 2026. The full requirements in `Document.md` control the build.
-Phases 1–10 are implemented. Work is paused at the Phase 10 approval gate; Phase 11
-(ePassport NFC) has not started.
+Phases 1–11 are implemented. Work is paused at the Phase 11 approval gate; Phase 12
+(cross-checks and fraud signals) has not started.
+
+## Phase 11 implementation (5 October 2026)
+
+Implemented the ePassport NFC step for `DOCUMENT_FACE_LIVENESS_NFC` sessions. The mobile
+app reads the chip (PACE/BAC from the MRZ) and uploads EF.SOD, DG1, DG2 and DG15 plus the
+chip's answer to a server-issued 8-byte Active Authentication nonce. The server re-verifies
+everything: Passive Authentication in five recorded steps (SOD parse, messageDigest, DSC
+signature, DSC → CSCA chain and validity, data-group hashes) and Active Authentication
+(ISO 9796-2 RSA, plain ECDSA). It reports the spec's five statuses, compares DG1 with the
+printed page, and compares a verified chip portrait with the selfie. Raw chip data is
+never stored. `NFC_VERIFIED` is evidence, not a decision. Migration `0006_phase11` adds
+`nfc_challenges` (forced RLS). The capture page hands the step to the mobile app, and
+`scripts/nfc_simulator.py` plays the app with a fictional test PKI.
+Design: [architecture-phase11.md](docs/architecture-phase11.md).
+
+### Phase 11 validation evidence
+
+- **300 tests: 300 passed, 0 skipped, 0 failures** with live PostgreSQL 18.6 and native
+  face models ([artifacts/phase11-tests.txt](artifacts/phase11-tests.txt)).
+- Live HTTP as `kyc_app` ([artifacts/phase11-live-e2e.json](artifacts/phase11-live-e2e.json)):
+  genuine chip `NFC_VERIFIED` with all consistency checks matching; clone `NFC_FAILED`
+  (Active Authentication); DG1 edited after signing `NFC_FAILED` (hash mismatch); another
+  passport's genuine chip `CHIP_DOCUMENT_MISMATCH`; untrusted signer `NFC_READ`; replayed
+  challenge 409; NFC switched off is retryable; nothing identifying stored.
+- **Phase 10 re-tested** in the same run with real YuNet/SFace: a printed photo moved and
+  tilted for each step failed all 5 attempts (`CHALLENGE_NOT_COMPLETED`). The session
+  stayed `LIVENESS_REQUIRED`, the 6th challenge got 429, a reused challenge got 409, and
+  no frames were kept.
+
+### Phase 11 limits
+
+No physical chip read (synthetic chips, fictional CSCA); mobile SDK specified, not built;
+no production CSCA master list or revocation checks; Chip/Terminal Authentication not
+verified server-side; NFC E2E sessions were advanced past liveness in the database.
 
 ## Phase 10 implementation (5 October 2026)
 
@@ -438,9 +472,9 @@ does not claim production readiness or functioning verification engines.
 | 7 | QR/barcode engine | Complete; 264/264 tests; real decode end-to-end and live PostgreSQL passed; Docker pending |
 | 8 | Face detection and quality | Complete; native inference, live PostgreSQL and full document→selfie pipeline verified |
 | 9 | Face embeddings and 1:1 comparison | Complete; 264/264 tests; full pipeline E2E (same 0.69–0.84 vs different 0.22); uncalibrated REVIEW |
-| 10 | Liveness/anti-spoof integration | Complete; 281/281 tests; real photo attack blocked; live PostgreSQL passed; uncalibrated REVIEW |
-| 11 | ePassport NFC mobile architecture | Waiting for approval |
-| 12 | Cross-checks and fraud signals | Not started |
+| 10 | Liveness/anti-spoof integration | Complete; re-tested 5 Oct (300/300, live HTTP); real photo attack blocked; live PostgreSQL passed; uncalibrated REVIEW |
+| 11 | ePassport NFC mobile architecture | Complete; 300/300 tests; PA + AA server-side; clone/tamper detected; live PostgreSQL passed; no physical chip yet |
+| 12 | Cross-checks and fraud signals | Waiting for approval |
 | 13 | Deterministic risk engine | Not started |
 | 14 | Authorized manual review dashboard | Not started |
 | 15 | Multi-tenant API and credential provisioning | Not started |
@@ -453,8 +487,8 @@ does not claim production readiness or functioning verification engines.
 ## Approval requirement
 
 `Document.md`, section 31, states: **“Stop and wait for approval before next
-phase.”** The user's request authorized Phases 8 and 9 together. Phase 10 requires
-separate approval.
+phase.”** The user's request authorized Phases 8 and 9 together, then Phases 10–11.
+Phase 12 requires separate approval.
 
 ## Earlier reference work
 

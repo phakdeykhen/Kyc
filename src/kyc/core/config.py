@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     max_liveness_bytes: int = Field(default=16 * 1024 * 1024, ge=500_000, le=64 * 1024 * 1024)
     liveness_policy_version: str = Field(default="ACTIVE-GEOMETRY-2026.10.1", min_length=1, max_length=80)
     liveness_calibrated: bool = False
+    # Phase 11 ePassport chip. Directory of trusted CSCA certificates (PEM/DER), e.g. from the ICAO PKD.
+    nfc_csca_trust_store: Path | None = None
+    nfc_challenge_ttl_seconds: int = Field(default=120, ge=30, le=600)
+    max_nfc_attempts: int = Field(default=3, ge=1, le=10)
+    max_nfc_bytes: int = Field(default=512 * 1024, ge=16 * 1024, le=4 * 1024 * 1024)
     biometric_consent_policy_version: str = Field(default="BIOMETRIC-CONSENT-2026.10.1", min_length=1, max_length=80)
     face_match_policy_version: str = Field(default="SFACE-COSINE-UNCALIBRATED-2026.10.1", min_length=1, max_length=120)
     face_match_calibrated: bool = False
