@@ -108,6 +108,10 @@ class PostgreSQLIsolationTests(unittest.TestCase):
                       (id, organization_id, session_id, document_id, status, passive_authentication, active_authentication,
                        trust_store_version, data_group_checks, evidence_metadata)
                       VALUES (:id, :org, :session, :document, 'NFC_READ', false, null, 'csca-test', '{}', '{}')"""),
+                    # Phase 12: derived fraud signals carry codes and categories, never identity values.
+                    "fraud_signals": sa.text("""INSERT INTO fraud_signals
+                      (id, organization_id, session_id, signal, severity, category, evidence_metadata)
+                      VALUES (:id, :org, :session, 'MRZ_VISUAL_DOB_MISMATCH', 'HIGH', 'CONSISTENCY', '{}')"""),
                     "consents": sa.text("""INSERT INTO consents
                       (id, organization_id, session_id, user_id, scope, policy_version, granted)
                       VALUES (:id, :org, :session, 'postgres-test', 'BIOMETRIC_PROCESSING', 'consent-test-v1', true)"""),

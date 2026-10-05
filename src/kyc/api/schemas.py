@@ -96,6 +96,12 @@ class FaceComparisonSummary(BaseModel):
     calibrated: bool
 
 
+class FraudSignalSummary(BaseModel):
+    signal: str
+    severity: Literal["LOW", "MEDIUM", "HIGH"]
+    category: str
+
+
 class SessionResult(BaseModel):
     session_id: UUID
     status: SessionStatus
@@ -105,6 +111,7 @@ class SessionResult(BaseModel):
     face_comparison: FaceComparisonSummary | None = None
     checks: dict[str, str] = Field(default_factory=dict)
     review_flags: list[str] = Field(default_factory=list, description="Reason codes that a reviewer or the risk engine must consider.")
+    fraud_signals: list[FraudSignalSummary] = Field(default_factory=list, description="Signals from the fraud engine (Phase 12). Evidence, not a verdict.")
     decision: None = Field(default=None, description="Set by the risk engine (Phase 13); never by extraction alone.")
 
 

@@ -46,7 +46,9 @@ with engine.begin() as connection:
     # Phase 11 ePassport chip: AA challenges are marked used (UPDATE); nfc_results hold evidence only.
     connection.execute(sa.text("GRANT SELECT, INSERT, UPDATE, DELETE ON nfc_challenges TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON nfc_results TO kyc_app"))
+    # Phase 12: signals are re-derived on every analysis, so the previous set is deleted and replaced.
+    connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON fraud_signals TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON selfie_captures, face_quality_checks, biometric_templates, face_comparisons TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT ON consents TO kyc_app"))
 engine.dispose()
-print("Migrations through phase 11 applied and local organization provisioned.")
+print("Migrations through phase 12 applied and local organization provisioned.")

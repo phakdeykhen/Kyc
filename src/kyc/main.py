@@ -21,6 +21,7 @@ from kyc.engines.capture_quality import HeuristicDocumentQualityEngine
 from kyc.barcode.signatures import TrustStore
 from kyc.liveness.active import ActiveLivenessPolicy
 from kyc.nfc.trust import CSCATrustStore
+from kyc.services.fraud import FraudAnalyzer
 from kyc.ocr.tesseract import TesseractOCREngine
 from kyc.services.documents import DocumentProcessor
 from kyc.storage.captures import LocalEncryptedCaptureStore, parse_keyring
@@ -66,6 +67,11 @@ def build_biometric_cipher(settings: Settings) -> BiometricCipher | None:
         settings.biometric_encryption_keys.get_secret_value())
 
 
+def build_fraud_analyzer(settings: Settings, factory, field_cipher, biometric_cipher, capture_store, face_policy) -> FraudAnalyzer:
+    return FraudAnalyzer(factory, field_cipher, biometric_cipher, capture_store, face_policy,
+                         settings.fraud_duplicate_window_hours, settings.fraud_velocity_limit)
+
+
 def create_app(settings: Settings | None = None, database_engine: sa.Engine | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI):
@@ -91,6 +97,9 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
             calibration_reference=configuration.face_match_calibration_reference)
         application.state.document_processor = build_document_processor(
             configuration, application.state.session_factory, application.state.capture_store, application.state.field_cipher)
+        application.state.fraud_analyzer = build_fraud_analyzer(
+            configuration, application.state.session_factory, application.state.field_cipher,
+            application.state.biometric_cipher, application.state.capture_store, application.state.face_match_policy)
         try:
             yield
         finally:
@@ -98,7 +107,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
                 engine.dispose()
 
     application = FastAPI(title="Universal Identity Platform", version=__version__, lifespan=lifespan,
-                          description="KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness and ePassport chip verification (phases 1–11).")
+                          description="KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness, ePassport chip verification, cross-checks and fraud signals (phases 1–12).")
     application.state.settings = settings
 
     @application.middleware("http")
@@ -156,7 +165,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
 
     @application.get("/health/live", tags=["health"])
     def live():
-        return {"status": "ok", "phase": 11, "implemented_phases": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], "version": __version__}
+        return {"status": "ok", "phase": 12, "implemented_phases": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "version": __version__}
 
     @application.get("/health/ready", tags=["health"])
     def ready():

@@ -116,7 +116,8 @@ class DocumentImage(SessionArtifact, Base):
         sa.CheckConstraint("side IN ('FRONT', 'BACK', 'DATA_PAGE', 'PORTRAIT')", name="document_side"),
         # One current capture per side; a recapture replaces the row.
         sa.UniqueConstraint("organization_id", "session_id", "document_id", "side", name="uq_document_images_document_side"),
-        sa.Index("ix_document_images_org_delete_after", "organization_id", "delete_after"))
+        sa.Index("ix_document_images_org_delete_after", "organization_id", "delete_after"),
+        sa.Index("ix_document_images_org_sha256", "organization_id", "sha256"))
 
 
 class DocumentField(SessionArtifact, Base):
@@ -206,6 +207,7 @@ class SelfieCapture(SessionArtifact, Base):
     __table_args__ = artifact_constraints(__tablename__,
         sa.UniqueConstraint("organization_id", "session_id", name="uq_selfie_captures_session"),
         sa.Index("ix_selfie_captures_org_delete_after", "organization_id", "delete_after"),
+        sa.Index("ix_selfie_captures_org_sha256", "organization_id", "sha256"),
         sa.CheckConstraint("length(sha256) = 64", name="sha256_length"),
     )
 
@@ -301,8 +303,11 @@ class FraudSignal(SessionArtifact, Base):
     __tablename__ = "fraud_signals"
     signal: Mapped[str] = mapped_column(sa.String(120))
     severity: Mapped[str] = mapped_column(sa.String(8))
+    category: Mapped[str] = mapped_column(sa.String(20), default="CONSISTENCY", server_default="CONSISTENCY")
     evidence_metadata: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
-    __table_args__ = artifact_constraints(__tablename__, sa.CheckConstraint("severity IN ('LOW', 'MEDIUM', 'HIGH')", name="severity_level"))
+    __table_args__ = artifact_constraints(__tablename__, sa.CheckConstraint("severity IN ('LOW', 'MEDIUM', 'HIGH')", name="severity_level"),
+        sa.CheckConstraint("category IN ('CONSISTENCY', 'TAMPER', 'VALIDITY', 'DUPLICATE', 'METADATA', 'PORTRAIT', 'CONTEXT')",
+                           name="signal_category"))
 
 
 class RiskAssessmentRecord(SessionArtifact, Base):

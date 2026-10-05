@@ -132,7 +132,9 @@ class StatusTests(unittest.TestCase):
         self.assertIn("ACTIVE_AUTHENTICATION_NOT_SUPPORTED_BY_CHIP", plain.reasons)
 
 
-class NFCAPITests(BiometricAPICase):
+class NFCAPICase(BiometricAPICase):
+    """Session at NFC_REQUIRED with a genuine test chip; shared with the Phase 12 tests."""
+
     async def asyncSetUp(self):
         await super().asyncSetUp()
         self.chip = fx.make_chip()
@@ -173,6 +175,9 @@ class NFCAPITests(BiometricAPICase):
         raw, content_type = multipart(fields, files)
         return await call(self.app, f"/v1/kyc/{session_id}/nfc", "POST", raw=raw, content_type=content_type, headers=self.headers)
 
+
+
+class NFCAPITests(NFCAPICase):
     async def test_genuine_chip_is_verified_matched_and_never_stored(self):
         session_id = await self.at_nfc()
         code, issued, _ = await self.challenge(session_id)

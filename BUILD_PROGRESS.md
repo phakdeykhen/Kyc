@@ -1,8 +1,51 @@
 # Build progress — Universal Identity Platform
 
 Updated: 5 October 2026. The full requirements in `Document.md` control the build.
-Phases 1–11 are implemented. Work is paused at the Phase 11 approval gate; Phase 12
-(cross-checks and fraud signals) has not started.
+Phases 1–12 are implemented. Work is paused at the Phase 12 approval gate; Phase 13
+(deterministic risk engine) has not started.
+
+## Phase 12 implementation (5 October 2026)
+
+Implemented the cross-check engine and a pluggable fraud-signal pipeline. When a session
+reaches `PROCESSING`, a post-commit task builds a field-by-field matrix across the visual
+zone, MRZ, barcodes and the passport chip. It includes a new MRZ↔barcode comparison, and
+it names a lone disagreeing source as the outlier without ever choosing a value. Seven
+detectors then emit coded signals with severity and category:
+- consistency
+- validity (expiry, impossible dates, check digits)
+- cryptographic tamper (barcode signatures, chip hashes, clones)
+- duplicates (same document number by another user, replayed photo or selfie files, velocity)
+- upload metadata (editing software, screenshots)
+- printed portrait vs chip portrait
+- context
+
+The result gains `checks.cross_check`, `checks.fraud` and `fraud_signals`, while
+`decision` stays null. A coverage map states which spec §17 signals are not detected
+(font, layout, pixel forensics). Migration `0007_phase12` adds `fraud_signals.category`
+and sha256 lookup indexes.
+Design: [architecture-phase12.md](docs/architecture-phase12.md).
+
+### Phase 12 validation evidence
+
+- **318 tests: 318 passed, 0 skipped, 0 failures** with live PostgreSQL 18.6 (RLS now
+  covers `fraud_signals`) and native face models
+  ([artifacts/phase12-tests.txt](artifacts/phase12-tests.txt)).
+- Live HTTP as `kyc_app` with real OCR and models
+  ([artifacts/phase12-live-e2e.json](artifacts/phase12-live-e2e.json)):
+  - A genuine first use was clean.
+  - The same passport presented by another user gave `DOCUMENT_USED_BY_ANOTHER_USER`.
+  - A replayed file gave `DOCUMENT_CAPTURE_REUSED` plus `DOCUMENT_VELOCITY`.
+  - A Photoshop-tagged upload gave `EDITING_SOFTWARE_IN_METADATA`.
+  - Another passport's chip gave HIGH `NFC_VISUAL_*` mismatches with the chip named as outlier.
+  - A cloned chip made `fraud = FAIL`.
+  - A document-only session was analyzed from the OCR path.
+  - 7 analyses, 0 failures, no identity values stored.
+
+### Phase 12 limits
+
+No font/layout/pixel/moiré forensics; duplicate checks are per organization and within
+retention; no 1:N face search; portrait signal uncalibrated (MEDIUM); metadata is
+spoofable, so only its presence counts; severities need review against real fraud cases.
 
 ## Phase 11 implementation (5 October 2026)
 
@@ -474,8 +517,8 @@ does not claim production readiness or functioning verification engines.
 | 9 | Face embeddings and 1:1 comparison | Complete; 264/264 tests; full pipeline E2E (same 0.69–0.84 vs different 0.22); uncalibrated REVIEW |
 | 10 | Liveness/anti-spoof integration | Complete; re-tested 5 Oct (300/300, live HTTP); real photo attack blocked; live PostgreSQL passed; uncalibrated REVIEW |
 | 11 | ePassport NFC mobile architecture | Complete; 300/300 tests; PA + AA server-side; clone/tamper detected; live PostgreSQL passed; no physical chip yet |
-| 12 | Cross-checks and fraud signals | Waiting for approval |
-| 13 | Deterministic risk engine | Not started |
+| 12 | Cross-checks and fraud signals | Complete; 318/318 tests; 7 detectors + cross-check matrix; live PostgreSQL E2E passed; forensics models not included |
+| 13 | Deterministic risk engine | Waiting for approval |
 | 14 | Authorized manual review dashboard | Not started |
 | 15 | Multi-tenant API and credential provisioning | Not started |
 | 16 | Signed webhooks and SDKs | Not started |
@@ -487,8 +530,8 @@ does not claim production readiness or functioning verification engines.
 ## Approval requirement
 
 `Document.md`, section 31, states: **“Stop and wait for approval before next
-phase.”** The user's request authorized Phases 8 and 9 together, then Phases 10–11.
-Phase 12 requires separate approval.
+phase.”** The user's request authorized Phases 8 and 9 together, then Phases 10–11, then Phase 12.
+Phase 13 requires separate approval.
 
 ## Earlier reference work
 

@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     nfc_challenge_ttl_seconds: int = Field(default=120, ge=30, le=600)
     max_nfc_attempts: int = Field(default=3, ge=1, le=10)
     max_nfc_bytes: int = Field(default=512 * 1024, ge=16 * 1024, le=4 * 1024 * 1024)
+    # Phase 12 fraud signals: duplicate-document velocity window and the session count that raises a signal.
+    fraud_duplicate_window_hours: int = Field(default=24, ge=1, le=24 * 30)
+    fraud_velocity_limit: int = Field(default=3, ge=2, le=100)
     biometric_consent_policy_version: str = Field(default="BIOMETRIC-CONSENT-2026.10.1", min_length=1, max_length=80)
     face_match_policy_version: str = Field(default="SFACE-COSINE-UNCALIBRATED-2026.10.1", min_length=1, max_length=120)
     face_match_calibrated: bool = False

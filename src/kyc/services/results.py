@@ -5,9 +5,9 @@ from datetime import date, datetime, timezone
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from kyc.api.schemas import FaceComparisonSummary, ResultDocument, ResultIdentity, ResultMRZ, SessionResult
+from kyc.api.schemas import FaceComparisonSummary, FraudSignalSummary, ResultDocument, ResultIdentity, ResultMRZ, SessionResult
 from kyc.core.crypto import FieldCipher
-from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceComparison, FaceQualityCheck, IdentityDocument, KYCSession, LivenessCheck, MRZResult, NFCResult
+from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceComparison, FaceQualityCheck, FraudSignal, IdentityDocument, KYCSession, LivenessCheck, MRZResult, NFCResult
 from kyc.domain.enums import CheckResult
 from kyc.services.captures import side_progress
 
@@ -17,7 +17,8 @@ NFC_CHECK = {"NFC_VERIFIED": "PASS", "NFC_READ": "REVIEW", "NFC_FAILED": "FAIL",
 
 SEVERITY = {CheckResult.FAIL: 3, CheckResult.REVIEW: 2, CheckResult.PASS: 1, CheckResult.NOT_APPLICABLE: 0}
 CHECK_GROUPS = {"CLASSIFICATION": "document_classification", "EXPIRY": "expiry", "MRZ": "mrz", "PORTRAIT": "document_portrait",
-                "MRZ_CONSISTENCY": "mrz_consistency", "BARCODE": "barcode", "ISSUING_COUNTRY": "issuing_country"}
+                "MRZ_CONSISTENCY": "mrz_consistency", "BARCODE": "barcode", "ISSUING_COUNTRY": "issuing_country",
+                "CROSS_CHECK": "cross_check", "FRAUD_ANALYSIS": "fraud"}
 DATA_CHECKS = {"REQUIRED_FIELDS", "DOCUMENT_NUMBER_FORMAT", "NATIONAL_ID_NUMBER_FORMAT", "DATE_CONSISTENCY",
                "OCR_CONFIDENCE", "SCRIPT_CONSISTENCY"}
 
@@ -100,8 +101,13 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) ->
     document = db.scalar(sa.select(IdentityDocument).where(IdentityDocument.organization_id == record.organization_id,
                                                            IdentityDocument.session_id == record.id,
                                                            IdentityDocument.processed_at.is_not(None)))
+    order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+    signals = [FraudSignalSummary(signal=row.signal, severity=row.severity, category=row.category)
+               for row in sorted(db.scalars(sa.select(FraudSignal).where(FraudSignal.organization_id == record.organization_id,
+                                                                         FraudSignal.session_id == record.id)),
+                                 key=lambda row: (order[row.severity], row.signal))]
     if document is None or cipher is None:
-        return SessionResult(session_id=record.id, status=record.status, checks=checks,
+        return SessionResult(session_id=record.id, status=record.status, checks=checks, fraud_signals=signals,
                              face_comparison=summary, review_flags=sorted(set(flags)))
 
     rows = db.scalars(sa.select(DocumentCheck).where(DocumentCheck.organization_id == record.organization_id,
@@ -132,6 +138,7 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) ->
                                              MRZResult.document_id == document.id))
     return SessionResult(
         session_id=record.id, status=record.status, checks=checks, review_flags=sorted(set(flags)), face_comparison=summary,
+        fraud_signals=signals,
         document=ResultDocument(country=document.issuing_country, type=document.document_type,
                                 document_number_masked=mask(values.get("document_number")), expiry_status=expiry_status),
         identity=ResultIdentity(full_name=values.get("full_name"), full_name_local=values.get("full_name_local"),

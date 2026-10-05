@@ -45,7 +45,19 @@ def read_result(session_id: UUID, request: Request, tenant: Tenant, db: Database
 
 
 def _process_after_commit(state, organization_id: UUID, session_id: UUID, request_id: UUID) -> None:
-    state.document_processor.process(organization_id, session_id, request_id)
+    outcome = state.document_processor.process(organization_id, session_id, request_id)
+    if outcome.status == "ACCEPTED":
+        # Document-only sessions reach PROCESSING here; the analyzer ignores any other status.
+        state.fraud_analyzer.analyze(organization_id, session_id, request_id)
+
+
+def _analyze_if_processing(outcome, background: BackgroundTasks, request: Request, tenant, session_id: UUID):
+    """Cross-checks and fraud signals run after the transaction that reached PROCESSING commits."""
+    status_value = outcome.get("status") if isinstance(outcome, dict) else getattr(outcome, "status", None)
+    if str(getattr(status_value, "value", status_value)) == "PROCESSING":
+        background.add_task(request.app.state.fraud_analyzer.analyze, tenant.organization_id, session_id,
+                            request.state.request_id)
+    return outcome
 
 
 def _capture(session_id: UUID, side: str, file: UploadFile, request: Request, tenant: Tenant, db: Database,
@@ -91,17 +103,18 @@ def upload_back(session_id: UUID, request: Request, tenant: Tenant, db: Database
     429: {"model": CaptureError, "description": "Selfie attempt limit reached."},
     503: {"description": "Models, encrypted storage, or document portrait unavailable."},
 })
-def upload_selfie(session_id: UUID, request: Request, tenant: Tenant, db: Database,
+def upload_selfie(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
                   file: Annotated[UploadFile, File()], biometric_consent: Annotated[bool, Form()]):
     """Assess one selfie and compare it only to this session's document portrait."""
     state, settings = request.app.state, request.app.state.settings
     data = file.file.read(settings.max_selfie_bytes + 1)
     limits = SelfieLimits(settings.max_selfie_bytes, settings.max_selfie_pixels,
                           settings.max_selfie_attempts, settings.max_capture_pixels)
-    return submit_selfie(db, tenant, session_id, data, state.face_engine, state.capture_store,
-                         state.biometric_cipher, state.face_match_policy, limits, request.state.request_id,
-                         biometric_consent=biometric_consent,
-                         consent_policy_version=settings.biometric_consent_policy_version)
+    outcome = submit_selfie(db, tenant, session_id, data, state.face_engine, state.capture_store,
+                            state.biometric_cipher, state.face_match_policy, limits, request.state.request_id,
+                            biometric_consent=biometric_consent,
+                            consent_policy_version=settings.biometric_consent_policy_version)
+    return _analyze_if_processing(outcome, background, request, tenant, session_id)
 
 
 def _liveness_limits(settings) -> LivenessLimits:
@@ -127,7 +140,7 @@ def liveness_challenge(session_id: UUID, request: Request, tenant: Tenant, db: D
     422: {"description": "Frames unreadable or not matched to steps."},
     503: {"description": "Face models unavailable."},
 })
-def upload_liveness(session_id: UUID, request: Request, tenant: Tenant, db: Database,
+def upload_liveness(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
                     challenge_id: Annotated[UUID, Form()], nonce: Annotated[str, Form(max_length=128)],
                     frame_steps: Annotated[str, Form(max_length=200, description="Comma-separated step index per frame")],
                     frames: Annotated[list[UploadFile], File(description="Raw (unmirrored) camera frames")]):
@@ -141,9 +154,10 @@ def upload_liveness(session_id: UUID, request: Request, tenant: Tenant, db: Data
     if len(frames) > state.liveness_policy.max_frames:
         raise HTTPException(422, detail="Too many frames.")
     data = [upload.file.read(limits.max_frame_bytes + 1) for upload in frames]
-    return submit_liveness(db, tenant, session_id, challenge_id, nonce, data, steps, state.face_engine,
-                           state.biometric_cipher, state.face_match_policy, state.liveness_policy, limits,
-                           request.state.request_id)
+    outcome = submit_liveness(db, tenant, session_id, challenge_id, nonce, data, steps, state.face_engine,
+                              state.biometric_cipher, state.face_match_policy, state.liveness_policy, limits,
+                              request.state.request_id)
+    return _analyze_if_processing(outcome, background, request, tenant, session_id)
 
 
 def _nfc_limits(settings) -> NFCLimits:
@@ -173,7 +187,7 @@ def _optional_file(upload: UploadFile | None, limit: int) -> bytes | None:
     413: {"description": "Upload exceeds the size limit."},
     429: {"model": CaptureError, "description": "Chip attempt limit reached."},
 })
-def upload_nfc(session_id: UUID, request: Request, tenant: Tenant, db: Database,
+def upload_nfc(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
                read_status: Annotated[Literal["READ", "NOT_SUPPORTED", "NOT_AVAILABLE", "FAILED"], Form()] = "READ",
                access_protocol: Annotated[Literal["PACE", "BAC"] | None, Form()] = None,
                challenge_id: Annotated[UUID | None, Form()] = None,
@@ -188,9 +202,10 @@ def upload_nfc(session_id: UUID, request: Request, tenant: Tenant, db: Database,
     groups = {number: data for number, data in ((1, _optional_file(dg1, limit)), (2, _optional_file(dg2, limit)),
                                                 (15, _optional_file(dg15, limit))) if data}
     signature = bytes.fromhex(aa_signature) if aa_signature else None
-    return submit_nfc(db, tenant, session_id, read_status, access_protocol, groups, _optional_file(sod, limit),
-                      challenge_id, signature, state.csca_trust, state.field_cipher, state.face_engine,
-                      state.biometric_cipher, state.face_match_policy, _nfc_limits(settings), request.state.request_id)
+    outcome = submit_nfc(db, tenant, session_id, read_status, access_protocol, groups, _optional_file(sod, limit),
+                         challenge_id, signature, state.csca_trust, state.field_cipher, state.face_engine,
+                         state.biometric_cipher, state.face_match_policy, _nfc_limits(settings), request.state.request_id)
+    return _analyze_if_processing(outcome, background, request, tenant, session_id)
 
 
 @router.get("/document-types")

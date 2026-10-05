@@ -1,0 +1,297 @@
+{
+ "run": "2026-10-05T23:38:40+0700",
+ "server": "uvicorn, PostgreSQL 18.6 as kyc_app (forced RLS), migration 0007_phase12",
+ "pipeline": "real Tesseract OCR + YuNet/SFace; synthetic SPECIMEN KH passport; fictional test CSCA",
+ "cases": {
+  "1_genuine_first_use": {
+   "status": "PROCESSING",
+   "cross_check": "PASS",
+   "fraud": "PASS",
+   "signals": [],
+   "decision": null
+  },
+  "2_same_passport_other_user": {
+   "status": "PROCESSING",
+   "cross_check": "PASS",
+   "fraud": "REVIEW",
+   "signals": [
+    "DOCUMENT_USED_BY_ANOTHER_USER:HIGH"
+   ],
+   "decision": null
+  },
+  "3_replayed_file_third_session_in_24h": {
+   "status": "PROCESSING",
+   "cross_check": "PASS",
+   "fraud": "REVIEW",
+   "signals": [
+    "DOCUMENT_CAPTURE_REUSED:HIGH",
+    "DOCUMENT_USED_BY_ANOTHER_USER:HIGH",
+    "DOCUMENT_VELOCITY:MEDIUM"
+   ],
+   "decision": null
+  },
+  "4_photoshop_tagged_upload_same_user_again": {
+   "status": "PROCESSING",
+   "cross_check": "PASS",
+   "fraud": "REVIEW",
+   "signals": [
+    "DOCUMENT_USED_BY_ANOTHER_USER:HIGH",
+    "DOCUMENT_VELOCITY:MEDIUM",
+    "EDITING_SOFTWARE_IN_METADATA:MEDIUM",
+    "DOCUMENT_PREVIOUSLY_USED:LOW"
+   ],
+   "decision": null
+  },
+  "5_genuine_chip_of_another_passport": {
+   "status": "PROCESSING",
+   "cross_check": "REVIEW",
+   "fraud": "REVIEW",
+   "signals": [
+    "DOCUMENT_USED_BY_ANOTHER_USER:HIGH",
+    "NFC_MRZ_DATA_MISMATCH:HIGH",
+    "NFC_OUTLIER_DOB:HIGH",
+    "NFC_OUTLIER_DOCUMENT_NUMBER:HIGH",
+    "NFC_VISUAL_DOB_MISMATCH:HIGH",
+    "NFC_VISUAL_DOCUMENT_NUMBER_MISMATCH:HIGH",
+    "DOCUMENT_VELOCITY:MEDIUM",
+    "NFC_OUTLIER_NAME:MEDIUM",
+    "NFC_OUTLIER_SEX:MEDIUM",
+    "NFC_VISUAL_NAME_MISMATCH:MEDIUM",
+    "NFC_VISUAL_SEX_MISMATCH:MEDIUM",
+    "PORTRAIT_DIFFERS_FROM_CHIP:MEDIUM"
+   ],
+   "decision": null
+  },
+  "6_cloned_chip": {
+   "status": "PROCESSING",
+   "cross_check": "PASS",
+   "fraud": "FAIL",
+   "signals": [
+    "DOCUMENT_USED_BY_ANOTHER_USER:HIGH",
+    "NFC_CHIP_CLONE_SUSPECTED:HIGH",
+    "DOCUMENT_VELOCITY:MEDIUM"
+   ],
+   "decision": null
+  },
+  "7_document_only_real_ocr": {
+   "status": "PROCESSING",
+   "cross_check": "PASS",
+   "fraud": "REVIEW",
+   "signals": [
+    "DOCUMENT_USED_BY_ANOTHER_USER:HIGH",
+    "DOCUMENT_VELOCITY:MEDIUM"
+   ],
+   "decision": null
+  }
+ },
+ "kyc_app_rows_without_tenant": 0,
+ "stored_contains_identity_values": false,
+ "fraud_signal_rows": 25,
+ "analyses": 7,
+ "analysis_failures": 0,
+ "cross_check_matrices": {
+  "1_genuine_first_use": {
+   "sex": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH",
+     "NFC~VISUAL": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": [
+     "NFC"
+    ]
+   },
+   "full_name": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH",
+     "NFC~VISUAL": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": [
+     "NFC"
+    ]
+   },
+   "expiry_date": {
+    "pairs": {
+     "NFC~VISUAL": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": [
+     "NFC"
+    ]
+   },
+   "nationality": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": []
+   },
+   "date_of_birth": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH",
+     "NFC~VISUAL": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": [
+     "NFC",
+     "MRZ"
+    ]
+   },
+   "mrz_data_lines": {
+    "pairs": {
+     "NFC~MRZ": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": [
+     "NFC"
+    ]
+   },
+   "document_number": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH",
+     "NFC~VISUAL": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": [
+     "NFC",
+     "MRZ"
+    ]
+   }
+  },
+  "5_genuine_chip_of_another_passport": {
+   "sex": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH",
+     "NFC~VISUAL": "MISMATCH"
+    },
+    "status": "CONFLICT",
+    "outlier": "NFC",
+    "protected_sources": [
+     "NFC"
+    ]
+   },
+   "full_name": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH",
+     "NFC~VISUAL": "MISMATCH"
+    },
+    "status": "CONFLICT",
+    "outlier": "NFC",
+    "protected_sources": [
+     "NFC"
+    ]
+   },
+   "expiry_date": {
+    "pairs": {
+     "NFC~VISUAL": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": [
+     "NFC"
+    ]
+   },
+   "nationality": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": []
+   },
+   "date_of_birth": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH",
+     "NFC~VISUAL": "MISMATCH"
+    },
+    "status": "CONFLICT",
+    "outlier": "NFC",
+    "protected_sources": [
+     "NFC",
+     "MRZ"
+    ]
+   },
+   "mrz_data_lines": {
+    "pairs": {
+     "NFC~MRZ": "MISMATCH"
+    },
+    "status": "CONFLICT",
+    "outlier": null,
+    "protected_sources": [
+     "NFC"
+    ]
+   },
+   "document_number": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH",
+     "NFC~VISUAL": "MISMATCH"
+    },
+    "status": "CONFLICT",
+    "outlier": "NFC",
+    "protected_sources": [
+     "NFC",
+     "MRZ"
+    ]
+   }
+  },
+  "7_document_only_real_ocr": {
+   "sex": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": []
+   },
+   "full_name": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": []
+   },
+   "nationality": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": []
+   },
+   "date_of_birth": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": [
+     "MRZ"
+    ]
+   },
+   "document_number": {
+    "pairs": {
+     "MRZ~VISUAL": "MATCH"
+    },
+    "status": "CONSISTENT",
+    "outlier": null,
+    "protected_sources": [
+     "MRZ"
+    ]
+   }
+  }
+ },
+ "notes": [
+  "NFC sessions were moved past liveness with a migrator UPDATE (a photo cannot pass liveness); every other call is real HTTP as kyc_app.",
+  "Each session used a fresh JPEG encoding except case 3, which replays case 2's exact bytes.",
+  "Signals are evidence; decision stays null until the Phase 13 risk engine."
+ ]
+}
