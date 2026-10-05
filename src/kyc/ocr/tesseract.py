@@ -64,7 +64,10 @@ class TesseractOCREngine:
         image.save(buffer, "PNG")
         tsv = self._run([self.command, "stdin", "stdout", "-l", "+".join(languages), "--psm", str(self.psm), "tsv"],
                         buffer.getvalue())
-        width, height = image.size
+        return self._lines_from_tsv(tsv, image.size)
+
+    def _lines_from_tsv(self, tsv: str, size: tuple[int, int]) -> list[OCRLine]:
+        width, height = size
         groups: dict[tuple[int, int, int, int], list[tuple[str, float, int, int, int, int]]] = defaultdict(list)
         for row in tsv.splitlines()[1:]:
             parts = row.split("\t")
@@ -106,3 +109,22 @@ class TesseractOCREngine:
         if not words:
             return "", 0.0
         return "".join(word for word, _ in words), round(min(conf for _, conf in words) / 100, 3)
+
+    def read_region(self, image: Image.Image, bbox: tuple[float, float, float, float], languages: Sequence[str],
+                    alphabet: str | None = None, mode: int = 6) -> list[OCRLine]:
+        """Multi-line read of a region (optionally with a constrained character set); boxes stay full-image relative."""
+        width, height = image.size
+        left, top = round(bbox[0] * width), round(bbox[1] * height)
+        crop = image.crop((left, top, round(bbox[2] * width), round(bbox[3] * height)))
+        buffer = BytesIO()
+        crop.save(buffer, "PNG")
+        options = ["-c", f"tessedit_char_whitelist={alphabet}"] if alphabet else []
+        tsv = self._run([self.command, "stdin", "stdout", "-l", "+".join(languages), "--psm", str(mode), *options, "tsv"],
+                        buffer.getvalue())
+        lines = self._lines_from_tsv(tsv, crop.size)
+        scale_x, scale_y = crop.size[0] / width, crop.size[1] / height
+        offset_x, offset_y = left / width, top / height
+        place = lambda b: (round(offset_x + b[0] * scale_x, 4), round(offset_y + b[1] * scale_y, 4),  # noqa: E731
+                           round(offset_x + b[2] * scale_x, 4), round(offset_y + b[3] * scale_y, 4))
+        return [line.model_copy(update={"bbox": place(line.bbox), "words": tuple(
+            word.model_copy(update={"bbox": place(word.bbox)}) for word in line.words)}) for line in lines]

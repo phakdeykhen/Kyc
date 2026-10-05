@@ -92,4 +92,6 @@ def document_types(tenant: Tenant):
 
 @router.get("/countries")
 def countries(tenant: Tenant):
-    return {"countries": sorted(COUNTRY_CODES), "verification_adapters_available": ["KH"]}
+    # Country-specific adapters, plus document types read from their ICAO MRZ whatever the issuing country.
+    return {"countries": sorted(COUNTRY_CODES), "verification_adapters_available": ["KH"],
+            "any_country_document_types": ["PASSPORT"]}

@@ -1,4 +1,4 @@
-# Universal Identity Platform — Phases 1–4
+# Universal Identity Platform — Phases 1–5
 
 Phase 1 implements the architecture contracts, a 17-table PostgreSQL schema with
 tenant policies, a frozen Alembic migration, and the KYC session state machine.
@@ -20,8 +20,16 @@ Phase 4 adds the Cambodia NSSF member card. Phase 3's extraction became a shared
 Khmer label engine (`KhmerLabelAdapter`), so each card type is now a small
 `CardLayout`. Each adapter also detects when the photo shows the other Khmer card.
 
+Phase 5 adds Cambodia passport visual fields, a TD1/TD2/TD3 MRZ engine, and
+`GenericMRZAdapter` for MRZ-only passport extraction. It validates MRZ check digits,
+compares visual fields with the MRZ, encrypts MRZ text and records consistency
+metadata. The national ID's back MRZ now uses the same engine. Passing checks mean
+the reading is consistent; they do not establish authenticity or a final decision.
+Phase 6's international passport visual-zone adapter has not started.
+
 See the design docs ([Phase 1](docs/architecture-phase1.md), [Phase 2](docs/architecture-phase2.md),
-[Phase 3](docs/architecture-phase3.md), [Phase 4](docs/architecture-phase4.md))
+[Phase 3](docs/architecture-phase3.md), [Phase 4](docs/architecture-phase4.md),
+[Phase 5](docs/architecture-phase5.md))
 and [build progress](BUILD_PROGRESS.md).
 The original requirements are preserved in [Document.md](Document.md).
 
@@ -60,9 +68,10 @@ The original requirements are preserved in [Document.md](Document.md).
 │   ├── services/retention.py     expiry purge and orphan sweep (Phase 2)
 │   ├── services/documents.py     document engine orchestration (Phase 3)
 │   ├── services/results.py       masked client result (Phase 3)
-│   ├── documents/adapters/       khmer_label.py engine; kh_national_id.py (P3), kh_nssf.py (P4)
+│   ├── documents/adapters/       shared engine; national ID, NSSF, KH passport, generic MRZ
 │   ├── documents/{khmer,preprocess,refine}.py  normalization, rectification, digit re-read
 │   ├── ocr/tesseract.py          Khmer/Latin OCR engine (Phase 3)
+│   ├── mrz/{parser,reader}.py    TD1/TD2/TD3 parsing, dedicated MRZ OCR (Phase 5)
 │   ├── core/crypto.py            keyrings and encrypted PII fields (Phase 3)
 │   └── web/capture/              development camera client at /capture (Phase 2)
 ├── scripts/
@@ -72,7 +81,7 @@ The original requirements are preserved in [Document.md](Document.md).
 │   └── process_documents.py      processes or retries sessions in DOCUMENT_PROCESSING
 ├── infra/postgres-init.sh         restricted application database role
 ├── tests/                        state, ASGI API, schema, and migration tests
-├── requests/phase{1..4}.postman.json  runnable API checks
+├── requests/phase{1..5}.postman.json  runnable API checks
 ├── artifacts/                    generated OpenAPI, PostgreSQL SQL, test report
 └── prototypes/local-review/       earlier reference prototype, outside Phase 1
 ```
@@ -122,6 +131,10 @@ PYTHONPATH=src .venv/bin/python -m uvicorn kyc.main:app --host 127.0.0.1 --port 
 
 Schema changes run as an explicit migration operation. The API uses only the
 restricted database role. An API start does not create tables or organizations.
+Phase 5 keeps schema revision `0003_phase3`; rerun the bootstrap command above for
+existing installations to grant `kyc_app` access to the existing `mrz_results` table.
+Alembic alone does not apply these role grants. No dependency, environment or
+Docker configuration changes are required for Phase 5.
 
 ## Environment variables
 
@@ -180,6 +193,10 @@ Quality-gate tests use synthetic, non-personal document images generated in
 end-to-end test renders a fictional SPECIMEN Cambodian ID with system Khmer fonts and
 reads it with real Tesseract. It is skipped automatically when Tesseract `khm` or the
 fonts are missing.
+Phase 5 also renders fictional Cambodia and foreign passport data pages and tests
+real MRZ OCR. These fixtures require the macOS Khmer Sangam MN, Arial and Courier
+New Bold fonts, plus Pillow RAQM. Docker supplies OCR models but does not supply
+those fixture fonts. Synthetic OCR tests do not establish real-document accuracy.
 
 ## Curl checks
 
@@ -235,8 +252,9 @@ curl --silent --show-error "http://127.0.0.1:8000/v1/kyc/$KYC_SESSION_ID/documen
 After both sides pass, the upload response shows `DOCUMENT_PROCESSING`. The document
 engine then runs, and a few seconds later the session reads `SELFIE_REQUIRED`. `/result`
 then contains the masked document number, identity fields, per-check results
-(`document_classification`, `document_data`, `expiry`, with `mrz`/`barcode` as
-`UNAVAILABLE`), `review_flags` and `decision: null`. A card that isn't a Cambodian ID
+(`document_classification`, `document_data`, `expiry`, `mrz`, and
+`mrz_consistency` when MRZ parsing succeeds; `barcode` remains `UNAVAILABLE`),
+`review_flags` and `decision: null`. A card that isn't a Cambodian ID
 returns the session to `DOCUMENT_REQUIRED` for new photos. Passports
 use `-F side=DATA_PAGE`. A poor photo returns `"capture_status": "RECAPTURE"` and
 an instruction such as `HOLD_STILL`, and nothing is stored. Further uploads after
@@ -246,9 +264,58 @@ For an NSSF card, create the session with `"expected_document_type":"KH_NSSF"`. 
 result reports `expiry_status: NOT_APPLICABLE` and `mrz: NOT_APPLICABLE`, because the
 card prints neither.
 
-Import `requests/phase4.postman.json` to run the equivalent checks. Set the private
-collection variables `api_key` and `organization_id`; the collection captures the
-session ID after creation. Never export a collection with real credentials.
+### Passport data-page workflow
+
+Create a Cambodia passport session, then upload one full data-page photograph with
+the entire MRZ visible. Use the same authenticated result endpoint as above:
+
+```sh
+curl --fail --silent --show-error http://127.0.0.1:8000/v1/kyc/sessions \
+  -H "X-API-Key: $DEVELOPMENT_API_KEY" \
+  -H "X-Organization-ID: $DEVELOPMENT_ORGANIZATION_ID" \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"demo-passport-holder","country":"KH","expected_document_type":"KH_PASSPORT","verification_level":"DOCUMENT_FACE_LIVENESS"}' \
+  -o /tmp/kyc-passport-session-response.json
+KYC_PASSPORT_SESSION_ID=$(python3 -c 'import json; print(json.load(open("/tmp/kyc-passport-session-response.json"))["session_id"])')
+curl --fail --silent --show-error "http://127.0.0.1:8000/v1/kyc/$KYC_PASSPORT_SESSION_ID/documents" \
+  -H "X-API-Key: $DEVELOPMENT_API_KEY" \
+  -H "X-Organization-ID: $DEVELOPMENT_ORGANIZATION_ID" \
+  -F side=DATA_PAGE -F file=@passport-data-page.jpg
+curl --fail --silent --show-error "http://127.0.0.1:8000/v1/kyc/$KYC_PASSPORT_SESSION_ID" \
+  -H "X-API-Key: $DEVELOPMENT_API_KEY" \
+  -H "X-Organization-ID: $DEVELOPMENT_ORGANIZATION_ID"
+curl --fail --silent --show-error "http://127.0.0.1:8000/v1/kyc/$KYC_PASSPORT_SESSION_ID/result" \
+  -H "X-API-Key: $DEVELOPMENT_API_KEY" \
+  -H "X-Organization-ID: $DEVELOPMENT_ORGANIZATION_ID"
+```
+
+For another country's passport, create a new session with `"country":"TH"` (or its
+appropriate ISO alpha-2 code) and `"expected_document_type":"PASSPORT"`, then upload
+`side=DATA_PAGE`. This selects `GenericMRZAdapter`, which extracts a TD3 passport
+MRZ only. International visual-zone extraction belongs to Phase 6. The creation
+country is client-supplied and does not verify the issuing state.
+`/v1/countries` reports country-specific adapters under
+`verification_adapters_available` (`KH`) and MRZ-only passport support under
+`any_country_document_types` (`PASSPORT`).
+
+Accepted capture hands off to `DOCUMENT_PROCESSING`. Poll session/result again if
+processing has not finished; in deferred mode run
+`PYTHONPATH=src .venv/bin/python scripts/process_documents.py`. A readable passport
+moves to `SELFIE_REQUIRED`. The result includes `checks.mrz`, available
+`checks.mrz_consistency`, an alphanumeric masked number such as `*****02C3`, permitted
+identity fields, review flags and `decision: null`. A nullable `mrz` object exposes
+format, validity, check-digit outcomes and field consistency. Raw MRZ and per-field
+provenance are not returned. Generic MRZ-only extraction reports
+`checks.mrz_consistency: NOT_APPLICABLE` because it has no independent visual fields.
+Visual/MRZ disagreements remain review flags; a generic passport with an unreadable
+or invalid MRZ returns to `DOCUMENT_REQUIRED` for recapture.
+
+Import `requests/phase5.postman.json` for separate Cambodia and generic passport
+workflows. Set the private collection variables `api_key` and `organization_id`,
+adjust `passport_country` for the generic session, and select a file in each
+`Upload DATA_PAGE` request. Each workflow captures its own session ID after creation.
+Earlier phase collections remain available for the card workflows. Never export a
+collection with real credentials.
 
 ## Security concerns and next phase
 
@@ -264,5 +331,11 @@ Extracted identity fields are encrypted with a separate PII keyring and never lo
 The adapter's layout assumptions and thresholds are uncalibrated. See
 [Phase 3 security concerns](docs/architecture-phase3.md#4-security-concerns).
 
-Phase 5 adds the passport and MRZ engine. Per `Document.md`, work pauses after Phase 4
-until approval.
+MRZ text is encrypted under the PII keyring; `mrz_results` contains only format,
+validity, digit outcomes and field-consistency metadata. See
+[Phase 5 security concerns](docs/architecture-phase5.md#5-security-concerns-and-limits)
+for unconfirmed passport layout assumptions, date-century heuristics and unsupported
+MRZ deviations. The Phase 5 suite passed 172/172 tests with live PostgreSQL; MRZ tenant
+RLS and restricted-role real-OCR passport workflows passed. See
+[PostgreSQL passport evidence](artifacts/phase5-postgres-e2e.json). Per `Document.md`, work stops
+after Phase 5; Phase 6 requires separate approval.

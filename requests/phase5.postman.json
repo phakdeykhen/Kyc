@@ -1,0 +1,776 @@
+{
+  "info": {
+    "name": "Universal KYC — Phase 5 Passport + MRZ",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Set private api_key and organization_id from .env, and passport_country for the generic session. Run either separate workflow and select a local DATA_PAGE image. Cambodia passport uses visual OCR plus TD3 MRZ. PASSPORT uses GenericMRZAdapter (MRZ only); Phase 6 international visual extraction has not started. Check digits measure consistency, not authenticity. Extraction never sets a decision. Existing databases must rerun bootstrap for mrz_results grants. Never export real credentials or private document paths."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "api_key",
+      "value": ""
+    },
+    {
+      "key": "organization_id",
+      "value": ""
+    },
+    {
+      "key": "passport_country",
+      "value": "TH"
+    },
+    {
+      "key": "kh_passport_session_id",
+      "value": ""
+    },
+    {
+      "key": "generic_passport_session_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Liveness",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health/live",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health",
+            "live"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Live\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Migration readiness",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health/ready",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health",
+            "ready"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Ready\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Document adapter inventory",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/document-types",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "document-types"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Inventory found\", () => pm.response.to.have.status(200));",
+              "const types = pm.response.json().document_types;",
+              "pm.test(\"Implemented adapters available\", () => { [\"KH_NATIONAL_ID\", \"KH_NSSF\", \"KH_PASSPORT\", \"PASSPORT\"].forEach(type => pm.expect(types.find(item => item.type === type).adapter_status).to.eql(\"AVAILABLE\")); });",
+              "pm.test(\"Passport data-page sides\", () => { [\"KH_PASSPORT\", \"PASSPORT\"].forEach(type => pm.expect(types.find(item => item.type === type).required_sides).to.eql([\"DATA_PAGE\"])); });",
+              "pm.test(\"Other adapters remain planned\", () => { [\"NATIONAL_ID\", \"RESIDENCE_CARD\", \"DRIVING_LICENSE\", \"UNKNOWN\"].forEach(type => pm.expect(types.find(item => item.type === type).adapter_status).to.eql(\"PLANNED\")); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Country inventory and MRZ-only capability",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/countries",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "countries"
+          ]
+        },
+        "description": "Country-specific adapters remain KH. PASSPORT is an any-country MRZ-only capability, without claiming Phase 6 international visual-zone extraction."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Country inventory found\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test(\"249 ISO country codes\", () => pm.expect(body.countries.length).to.eql(249));",
+              "pm.test(\"Country-specific adapters\", () => pm.expect(body.verification_adapters_available).to.eql([\"KH\"]));",
+              "pm.test(\"MRZ-only passport capability\", () => pm.expect(body.any_country_document_types).to.eql([\"PASSPORT\"]));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Credentials required",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/v1/document-types",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "document-types"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Unauthorized\", () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Client status rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/kyc/sessions",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "kyc",
+            "sessions"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": \"postman-invalid-status\",\n  \"country\": \"KH\",\n  \"expected_document_type\": \"KH_PASSPORT\",\n  \"status\": \"VERIFIED\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Client cannot supply status\", () => pm.response.to.have.status(422));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cambodia passport — visual zone + TD3 MRZ",
+      "description": "Run in order. Select a high-quality, full passport data-page file in Upload DATA_PAGE. Repeat Read session and Result after processing until SELFIE_REQUIRED or DOCUMENT_REQUIRED. RECAPTURE requires a new photograph. A PASS MRZ check proves internal consistency only; decision remains null.",
+      "item": [
+        {
+          "name": "Create KH_PASSPORT session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Organization-ID",
+                "value": "{{organization_id}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/kyc/sessions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "kyc",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"postman-kh_passport-specimen\",\n  \"country\": \"KH\",\n  \"expected_document_type\": \"KH_PASSPORT\",\n  \"verification_level\": \"DOCUMENT_FACE_LIVENESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Created\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"kh_passport_session_id\", body.session_id);",
+                  "pm.test(\"Initial status\", () => pm.expect(body.status).to.eql(\"CREATED\"));",
+                  "pm.test(\"UUID4\", () => pm.expect(body.session_id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pending result",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Organization-ID",
+                "value": "{{organization_id}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/kyc/{{kh_passport_session_id}}/result",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "kyc",
+                "{{kh_passport_session_id}}",
+                "result"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Result found\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No asserted verification\", () => { const body = pm.response.json(); pm.expect(body.decision).to.eql(null); pm.expect(body.identity).to.eql(null); pm.expect(body.mrz).to.eql(null); pm.expect(body.checks).to.eql({}); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload DATA_PAGE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Organization-ID",
+                "value": "{{organization_id}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/kyc/{{kh_passport_session_id}}/documents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "kyc",
+                "{{kh_passport_session_id}}",
+                "documents"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "side",
+                  "value": "DATA_PAGE",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "description": "Select a local passport data-page image. Keep all MRZ lines and page edges visible. Do not export private document file paths or credentials."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Capture assessed\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Quality gate result\", () => { pm.expect([\"ACCEPTED\", \"RECAPTURE\"]).to.include(body.capture_status); pm.expect(body.quality).to.have.property(\"overall_quality\"); });",
+                  "pm.test(\"One required data page\", () => pm.expect(Object.keys(body.sides)).to.eql([\"DATA_PAGE\"]));",
+                  "pm.test(\"Accepted data page hands off\", () => { if (body.capture_status === \"ACCEPTED\") pm.expect(body.status).to.eql(\"DOCUMENT_PROCESSING\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read session (repeat after handoff)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Organization-ID",
+                "value": "{{organization_id}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/kyc/{{kh_passport_session_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "kyc",
+                "{{kh_passport_session_id}}"
+              ]
+            },
+            "description": "Poll until document processing finishes. In deferred mode run scripts/process_documents.py. SELFIE_REQUIRED is extraction handoff, not final verification."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Session found\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Tenant bound\", () => pm.expect(pm.response.json().organization_id).to.eql(pm.collectionVariables.get(\"organization_id\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Result after processing (repeat if pending)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Organization-ID",
+                "value": "{{organization_id}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/kyc/{{kh_passport_session_id}}/result",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "kyc",
+                "{{kh_passport_session_id}}",
+                "result"
+              ]
+            },
+            "description": "Read checks.mrz, checks.mrz_consistency, the typed non-PII mrz object, review_flags and masked identity result. Conditional extraction tests do not claim processing completed; inspect status. GenericMRZAdapter has no independent visual-zone extraction and reports MRZ consistency NOT_APPLICABLE."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Result found\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Extraction leaves the decision null\", () => pm.expect(body.decision).to.eql(null));",
+                  "pm.test(\"Masked number when extracted\", () => { if (body.document && body.document.document_number_masked) pm.expect(body.document.document_number_masked).to.match(/^\\*+[A-Z0-9]{4}$/); });",
+                  "pm.test(\"MRZ metadata excludes raw identity values\", () => { if (body.mrz) { pm.expect(Object.keys(body.mrz).sort()).to.eql([\"check_digit_results\", \"field_consistency\", \"format\", \"mrz_valid\"]); Object.values(body.mrz.check_digit_results).forEach(digit => { pm.expect(Object.keys(digit).sort()).to.eql([\"computed\", \"expected\", \"valid\"]); pm.expect(digit.expected).to.match(/^[A-Z0-9<]$/); pm.expect(digit.computed).to.match(/^[0-9]$/); pm.expect(digit.valid).to.be.a(\"boolean\"); }); Object.values(body.mrz.field_consistency).forEach(state => pm.expect([\"MATCH\", \"MISMATCH\", \"MRZ_ONLY\", \"VIZ_ONLY\"]).to.include(state)); } if (body.document) pm.expect(body.document).to.not.have.property(\"document_number\"); });",
+                  "pm.test(\"Completed extraction exposes MRZ outcome\", () => { if (body.status === \"SELFIE_REQUIRED\") pm.expect([\"PASS\", \"REVIEW\"]).to.include(body.checks.mrz); });",
+                  "pm.test(\"Parsed MRZ metadata has a supported format\", () => { if (body.mrz) { pm.expect([\"TD1\", \"TD2\", \"TD3\", \"UNKNOWN\"]).to.include(body.mrz.format); pm.expect(body.mrz.mrz_valid).to.be.a(\"boolean\"); } });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Generic passport — MRZ only",
+      "description": "Run in order. Select a high-quality, full passport data-page file in Upload DATA_PAGE. Repeat Read session and Result after processing until SELFIE_REQUIRED or DOCUMENT_REQUIRED. RECAPTURE requires a new photograph. A PASS MRZ check proves internal consistency only; decision remains null.",
+      "item": [
+        {
+          "name": "Create PASSPORT session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Organization-ID",
+                "value": "{{organization_id}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/kyc/sessions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "kyc",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"postman-passport-specimen\",\n  \"country\": \"{{passport_country}}\",\n  \"expected_document_type\": \"PASSPORT\",\n  \"verification_level\": \"DOCUMENT_FACE_LIVENESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Created\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"generic_passport_session_id\", body.session_id);",
+                  "pm.test(\"Initial status\", () => pm.expect(body.status).to.eql(\"CREATED\"));",
+                  "pm.test(\"UUID4\", () => pm.expect(body.session_id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pending result",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Organization-ID",
+                "value": "{{organization_id}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/kyc/{{generic_passport_session_id}}/result",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "kyc",
+                "{{generic_passport_session_id}}",
+                "result"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Result found\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No asserted verification\", () => { const body = pm.response.json(); pm.expect(body.decision).to.eql(null); pm.expect(body.identity).to.eql(null); pm.expect(body.mrz).to.eql(null); pm.expect(body.checks).to.eql({}); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload DATA_PAGE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Organization-ID",
+                "value": "{{organization_id}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/kyc/{{generic_passport_session_id}}/documents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "kyc",
+                "{{generic_passport_session_id}}",
+                "documents"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "side",
+                  "value": "DATA_PAGE",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "description": "Select a local passport data-page image. Keep all MRZ lines and page edges visible. Do not export private document file paths or credentials."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Capture assessed\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Quality gate result\", () => { pm.expect([\"ACCEPTED\", \"RECAPTURE\"]).to.include(body.capture_status); pm.expect(body.quality).to.have.property(\"overall_quality\"); });",
+                  "pm.test(\"One required data page\", () => pm.expect(Object.keys(body.sides)).to.eql([\"DATA_PAGE\"]));",
+                  "pm.test(\"Accepted data page hands off\", () => { if (body.capture_status === \"ACCEPTED\") pm.expect(body.status).to.eql(\"DOCUMENT_PROCESSING\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read session (repeat after handoff)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Organization-ID",
+                "value": "{{organization_id}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/kyc/{{generic_passport_session_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "kyc",
+                "{{generic_passport_session_id}}"
+              ]
+            },
+            "description": "Poll until document processing finishes. In deferred mode run scripts/process_documents.py. SELFIE_REQUIRED is extraction handoff, not final verification."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Session found\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Tenant bound\", () => pm.expect(pm.response.json().organization_id).to.eql(pm.collectionVariables.get(\"organization_id\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Result after processing (repeat if pending)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Organization-ID",
+                "value": "{{organization_id}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/kyc/{{generic_passport_session_id}}/result",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "kyc",
+                "{{generic_passport_session_id}}",
+                "result"
+              ]
+            },
+            "description": "Read checks.mrz, checks.mrz_consistency, the typed non-PII mrz object, review_flags and masked identity result. Conditional extraction tests do not claim processing completed; inspect status. GenericMRZAdapter has no independent visual-zone extraction and reports MRZ consistency NOT_APPLICABLE."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Result found\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Extraction leaves the decision null\", () => pm.expect(body.decision).to.eql(null));",
+                  "pm.test(\"Masked number when extracted\", () => { if (body.document && body.document.document_number_masked) pm.expect(body.document.document_number_masked).to.match(/^\\*+[A-Z0-9]{4}$/); });",
+                  "pm.test(\"MRZ metadata excludes raw identity values\", () => { if (body.mrz) { pm.expect(Object.keys(body.mrz).sort()).to.eql([\"check_digit_results\", \"field_consistency\", \"format\", \"mrz_valid\"]); Object.values(body.mrz.check_digit_results).forEach(digit => { pm.expect(Object.keys(digit).sort()).to.eql([\"computed\", \"expected\", \"valid\"]); pm.expect(digit.expected).to.match(/^[A-Z0-9<]$/); pm.expect(digit.computed).to.match(/^[0-9]$/); pm.expect(digit.valid).to.be.a(\"boolean\"); }); Object.values(body.mrz.field_consistency).forEach(state => pm.expect([\"MATCH\", \"MISMATCH\", \"MRZ_ONLY\", \"VIZ_ONLY\"]).to.include(state)); } if (body.document) pm.expect(body.document).to.not.have.property(\"document_number\"); });",
+                  "pm.test(\"Completed extraction exposes MRZ outcome\", () => { if (body.status === \"SELFIE_REQUIRED\") pm.expect([\"PASS\", \"REVIEW\"]).to.include(body.checks.mrz); });",
+                  "pm.test(\"Generic completed extraction has valid MRZ\", () => { if (body.status === \"SELFIE_REQUIRED\") pm.expect(body.checks.mrz).to.eql(\"PASS\"); });",
+                  "pm.test(\"Parsed MRZ metadata has a supported format\", () => { if (body.mrz) { pm.expect([\"TD1\", \"TD2\", \"TD3\", \"UNKNOWN\"]).to.include(body.mrz.format); pm.expect(body.mrz.mrz_valid).to.be.a(\"boolean\"); } });",
+                  "pm.test(\"Generic extraction has no independent visual comparison\", () => { if (body.status === \"SELFIE_REQUIRED\") pm.expect(body.checks.mrz_consistency).to.eql(\"NOT_APPLICABLE\"); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

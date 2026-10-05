@@ -1,0 +1,107 @@
+test_configuration_errors_omit_secret_values (test_api.ConfigurationTests.test_configuration_errors_omit_secret_values) ... ok
+test_production_and_sqlite_development_are_rejected (test_api.ConfigurationTests.test_production_and_sqlite_development_are_rejected) ... ok
+test_short_credential_is_rejected (test_api.ConfigurationTests.test_short_credential_is_rejected) ... ok
+test_audit_metadata_omits_identity_fields (test_api.SessionAPITests.test_audit_metadata_omits_identity_fields) ... ok
+test_create_fetch_and_pending_result (test_api.SessionAPITests.test_create_fetch_and_pending_result) ... ok
+test_credentials_and_organization_binding (test_api.SessionAPITests.test_credentials_and_organization_binding) ... ok
+test_cross_tenant_session_is_not_visible (test_api.SessionAPITests.test_cross_tenant_session_is_not_visible) ... ok
+test_expiry_is_persisted_and_audited_once (test_api.SessionAPITests.test_expiry_is_persisted_and_audited_once) ... ok
+test_health_and_inventory_are_honest (test_api.SessionAPITests.test_health_and_inventory_are_honest) ... ok
+test_invalid_payload_and_client_status_assertions (test_api.SessionAPITests.test_invalid_payload_and_client_status_assertions) ... ok
+test_no_public_transition_endpoint (test_api.SessionAPITests.test_no_public_transition_endpoint) ... ok
+test_readiness_requires_the_expected_migration (test_api.SessionAPITests.test_readiness_requires_the_expected_migration) ... ok
+test_verified_terminal_session_does_not_expire (test_api.SessionAPITests.test_verified_terminal_session_does_not_expire) ... ok
+test_exif_orientation_is_applied_and_metadata_dropped (test_capture_quality.DecodeTests.test_exif_orientation_is_applied_and_metadata_dropped) ... ok
+test_rejects_unusable_inputs (test_capture_quality.DecodeTests.test_rejects_unusable_inputs) ... ok
+test_dark_frames_are_not_misreported_as_motion_blur (test_capture_quality.QualityGateTests.test_dark_frames_are_not_misreported_as_motion_blur) ... ok
+test_png_and_compressed_jpeg_are_accepted (test_capture_quality.QualityGateTests.test_png_and_compressed_jpeg_are_accepted) ... ok
+test_policy_is_versioned_and_marked_uncalibrated (test_capture_quality.QualityGateTests.test_policy_is_versioned_and_marked_uncalibrated) ... ok
+test_portrait_orientation_is_reported_not_rejected (test_capture_quality.QualityGateTests.test_portrait_orientation_is_reported_not_rejected) ... ok
+test_unusable_captures_request_recapture_with_instructions (test_capture_quality.QualityGateTests.test_unusable_captures_request_recapture_with_instructions) ... ok
+test_usable_captures_are_accepted (test_capture_quality.QualityGateTests.test_usable_captures_are_accepted) ... ok
+test_wrong_document_shape_is_flagged (test_capture_quality.QualityGateTests.test_wrong_document_shape_is_flagged) ... ok
+test_ciphertext_is_bound_to_tenant_session_and_object (test_capture_store.CaptureStoreTests.test_ciphertext_is_bound_to_tenant_session_and_object) ... ok
+test_delete_removes_object_and_empty_directories (test_capture_store.CaptureStoreTests.test_delete_removes_object_and_empty_directories) ... ok
+test_keyring_validation (test_capture_store.CaptureStoreTests.test_keyring_validation) ... ok
+test_references_cannot_escape_the_storage_root (test_capture_store.CaptureStoreTests.test_references_cannot_escape_the_storage_root) ... ok
+test_rotated_keys_still_decrypt_older_objects (test_capture_store.CaptureStoreTests.test_rotated_keys_still_decrypt_older_objects) ... ok
+test_round_trip_is_encrypted_at_rest_with_private_permissions (test_capture_store.CaptureStoreTests.test_round_trip_is_encrypted_at_rest_with_private_permissions) ... ok
+test_tampered_ciphertext_fails_authentication (test_capture_store.CaptureStoreTests.test_tampered_ciphertext_fails_authentication) ... ok
+test_capture_page_is_served_with_a_strict_policy (test_captures_api.CaptureAPITests.test_capture_page_is_served_with_a_strict_policy) ... ok
+test_cross_tenant_session_cannot_receive_captures (test_captures_api.CaptureAPITests.test_cross_tenant_session_cannot_receive_captures) ... ok
+test_document_only_level_still_waits_for_the_document_engine (test_captures_api.CaptureAPITests.test_document_only_level_still_waits_for_the_document_engine) ... ok
+test_document_types_list_required_sides (test_captures_api.CaptureAPITests.test_document_types_list_required_sides) ... Executing <Task finished name='Task-115' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.160 seconds
+ok
+test_expired_session_is_persisted_as_expired (test_captures_api.CaptureAPITests.test_expired_session_is_persisted_as_expired) ... Executing <Task finished name='Task-121' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.116 seconds
+ok
+test_front_and_back_complete_capture_and_hand_off (test_captures_api.CaptureAPITests.test_front_and_back_complete_capture_and_hand_off) ... ok
+test_invalid_side_and_invalid_files (test_captures_api.CaptureAPITests.test_invalid_side_and_invalid_files) ... ok
+test_oversized_and_unbounded_uploads_are_refused_before_parsing (test_captures_api.CaptureAPITests.test_oversized_and_unbounded_uploads_are_refused_before_parsing) ... ok
+test_passport_uses_a_single_data_page (test_captures_api.CaptureAPITests.test_passport_uses_a_single_data_page) ... ok
+test_poor_capture_requests_recapture_and_stores_no_image (test_captures_api.CaptureAPITests.test_poor_capture_requests_recapture_and_stores_no_image) ... Executing <Task finished name='Task-181' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.325 seconds
+ok
+test_recapture_of_a_side_replaces_the_previous_image (test_captures_api.CaptureAPITests.test_recapture_of_a_side_replaces_the_previous_image) ... ok
+test_same_image_cannot_satisfy_both_sides (test_captures_api.CaptureAPITests.test_same_image_cannot_satisfy_both_sides) ... ok
+test_stored_capture_decrypts_to_the_original_upload (test_captures_api.CaptureAPITests.test_stored_capture_decrypts_to_the_original_upload) ... ok
+test_unauthenticated_upload_is_rejected (test_captures_api.CaptureAPITests.test_unauthenticated_upload_is_rejected) ... ok
+test_attempt_limit_is_enforced_and_audited (test_captures_api.CaptureLimitTests.test_attempt_limit_is_enforced_and_audited) ... ok
+test_expired_captures_and_orphans_are_purged_without_touching_live_ones (test_captures_api.RetentionTests.test_expired_captures_and_orphans_are_purged_without_touching_live_ones) ... ok
+test_expired_document_cascades_to_its_images_and_checks (test_captures_api.RetentionTests.test_expired_document_cascades_to_its_images_and_checks) ... Executing <Task finished name='Task-263' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.102 seconds
+ok
+test_upload_is_unavailable_without_capture_keys (test_captures_api.UnconfiguredStorageTests.test_upload_is_unavailable_without_capture_keys) ... ok
+test_document_only_level_goes_straight_to_processing (test_documents_api.DocumentProcessingTests.test_document_only_level_goes_straight_to_processing) ... ok
+test_document_type_without_an_adapter_waits_honestly (test_documents_api.DocumentProcessingTests.test_document_type_without_an_adapter_waits_honestly) ... ok
+test_expired_card_is_accepted_as_evidence_and_flagged (test_documents_api.DocumentProcessingTests.test_expired_card_is_accepted_as_evidence_and_flagged) ... ok
+test_fields_are_encrypted_bound_and_absent_from_audit_and_checks (test_documents_api.DocumentProcessingTests.test_fields_are_encrypted_bound_and_absent_from_audit_and_checks) ... ok
+test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it (test_documents_api.DocumentProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it) ... Document processing failed for a session: OCRUnavailable
+Executing <Task finished name='Task-331' coro=<DocumentProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:177> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.958 seconds
+ok
+test_processor_cannot_reach_another_tenants_session (test_documents_api.DocumentProcessingTests.test_processor_cannot_reach_another_tenants_session) ... ok
+test_recapture_reasons (test_documents_api.DocumentProcessingTests.test_recapture_reasons) ... ok
+test_sides_uploaded_the_wrong_way_round_are_handled (test_documents_api.DocumentProcessingTests.test_sides_uploaded_the_wrong_way_round_are_handled) ... ok
+test_valid_card_is_extracted_and_session_advances_to_selfie (test_documents_api.DocumentProcessingTests.test_valid_card_is_extracted_and_session_advances_to_selfie) ... ok
+test_wrong_document_type_requests_recapture_and_clears_captures (test_documents_api.DocumentProcessingTests.test_wrong_document_type_requests_recapture_and_clears_captures) ... ok
+test_document_only_level_goes_straight_to_processing (test_documents_api.NSSFProcessingTests.test_document_only_level_goes_straight_to_processing) ... ok
+test_document_type_without_an_adapter_waits_honestly (test_documents_api.NSSFProcessingTests.test_document_type_without_an_adapter_waits_honestly) ... ok
+test_expired_card_is_accepted_as_evidence_and_flagged (test_documents_api.NSSFProcessingTests.test_expired_card_is_accepted_as_evidence_and_flagged) ... Executing <Task finished name='Task-436' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.126 seconds
+ok
+test_fields_are_encrypted_bound_and_absent_from_audit_and_checks (test_documents_api.NSSFProcessingTests.test_fields_are_encrypted_bound_and_absent_from_audit_and_checks) ... ok
+test_nssf_card_is_extracted_without_expiry_or_mrz (test_documents_api.NSSFProcessingTests.test_nssf_card_is_extracted_without_expiry_or_mrz) ... ok
+test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it (test_documents_api.NSSFProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it) ... Executing <Task finished name='Task-472' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.102 seconds
+Document processing failed for a session: OCRUnavailable
+Executing <Task finished name='Task-473' coro=<DocumentProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:177> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 1.729 seconds
+ok
+test_processor_cannot_reach_another_tenants_session (test_documents_api.NSSFProcessingTests.test_processor_cannot_reach_another_tenants_session) ... Executing <Task finished name='Task-484' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.100 seconds
+ok
+test_recapture_reasons (test_documents_api.NSSFProcessingTests.test_recapture_reasons) ... ok
+test_sides_uploaded_the_wrong_way_round_are_handled (test_documents_api.NSSFProcessingTests.test_sides_uploaded_the_wrong_way_round_are_handled) ... ok
+test_valid_card_is_extracted_and_session_advances_to_selfie (test_documents_api.NSSFProcessingTests.test_valid_card_is_extracted_and_session_advances_to_selfie) ... ok
+test_wrong_document_type_requests_recapture_and_clears_captures (test_documents_api.NSSFProcessingTests.test_wrong_document_type_requests_recapture_and_clears_captures) ... ok
+test_wrong_khmer_card_for_the_claimed_type_is_sent_back (test_documents_api.NSSFProcessingTests.test_wrong_khmer_card_for_the_claimed_type_is_sent_back) ... ok
+test_bad_checksum_is_stored_as_review_with_visual_fields_preserved (test_documents_api.PassportProcessingTests.test_bad_checksum_is_stored_as_review_with_visual_fields_preserved) ... ok
+test_cambodian_passport_is_extracted_and_mrz_result_stored (test_documents_api.PassportProcessingTests.test_cambodian_passport_is_extracted_and_mrz_result_stored) ... ok
+test_document_only_level_goes_straight_to_processing (test_documents_api.PassportProcessingTests.test_document_only_level_goes_straight_to_processing) ... ok
+test_document_type_without_an_adapter_waits_honestly (test_documents_api.PassportProcessingTests.test_document_type_without_an_adapter_waits_honestly) ... ok
+test_expired_card_is_accepted_as_evidence_and_flagged (test_documents_api.PassportProcessingTests.test_expired_card_is_accepted_as_evidence_and_flagged) ... ok
+test_fields_are_encrypted_bound_and_absent_from_audit_and_checks (test_documents_api.PassportProcessingTests.test_fields_are_encrypted_bound_and_absent_from_audit_and_checks) ... ok
+test_foreign_passport_uses_the_generic_mrz_adapter (test_documents_api.PassportProcessingTests.test_foreign_passport_uses_the_generic_mrz_adapter) ... ok
+test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it (test_documents_api.PassportProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it) ... Document processing failed for a session: OCRUnavailable
+Executing <Task finished name='Task-651' coro=<DocumentProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:177> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 1.004 seconds
+ok
+test_passport_shown_in_an_id_card_session_is_sent_back (test_documents_api.PassportProcessingTests.test_passport_shown_in_an_id_card_session_is_sent_back) ... ok
+test_processor_cannot_reach_another_tenants_session (test_documents_api.PassportProcessingTests.test_processor_cannot_reach_another_tenants_session) ... ok
+test_raw_mrz_is_encrypted_and_evidence_contains_no_identity_values (test_documents_api.PassportProcessingTests.test_raw_mrz_is_encrypted_and_evidence_contains_no_identity_values) ... ok
+test_recapture_reasons (test_documents_api.PassportProcessingTests.test_recapture_reasons) ... ok
+test_sides_uploaded_the_wrong_way_round_are_handled (test_documents_api.PassportProcessingTests.test_sides_uploaded_the_wrong_way_round_are_handled) ... ok
+test_unreadable_mrz_on_a_foreign_passport_means_recapture (test_documents_api.PassportProcessingTests.test_unreadable_mrz_on_a_foreign_passport_means_recapture) ... ok
+test_valid_card_is_extracted_and_session_advances_to_selfie (test_documents_api.PassportProcessingTests.test_valid_card_is_extracted_and_session_advances_to_selfie) ... ok
+test_visual_mrz_disagreement_reaches_the_result_as_a_review_flag (test_documents_api.PassportProcessingTests.test_visual_mrz_disagreement_reaches_the_result_as_a_review_flag) ... ok
+test_wrong_document_type_requests_recapture_and_clears_captures (test_documents_api.PassportProcessingTests.test_wrong_document_type_requests_recapture_and_clears_captures) ... Executing <Task finished name='Task-760' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.158 seconds
+ok
+test_extraction_is_unavailable_and_nothing_is_stored (test_documents_api.ProcessingWithoutPIIKeysTests.test_extraction_is_unavailable_and_nothing_is_stored) ... ok
+test_card_without_identity_text_is_sent_back (test_documents_api.RealOCREndToEndTests.test_card_without_identity_text_is_sent_back) ... ok
+test_photographed_cambodian_passport_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_cambodian_passport_is_read_by_real_ocr) ... Executing <Task pending name='Task-799' coro=<RealOCREndToEndTests.test_photographed_cambodian_passport_is_read_by_real_ocr() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:405> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.362 seconds
+ok
+test_photographed_foreign_passport_is_read_from_its_mrz (test_documents_api.RealOCREndToEndTests.test_photographed_foreign_passport_is_read_from_its_mrz) ... Executing <Task pending name='Task-809' coro=<RealOCREndToEndTests.test_photographed_foreign_passport_is_read_from_its_mrz() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:422> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.116 seconds
+ok
+test_photographed_nssf_specimen_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_nssf_specimen_is_read_by_real_ocr) ... 

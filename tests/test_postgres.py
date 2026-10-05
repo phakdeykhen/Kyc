@@ -28,7 +28,10 @@ class PostgreSQLIsolationTests(unittest.TestCase):
             with engine.begin() as connection:
                 connection.exec_driver_sql(f'CREATE SCHEMA "{schema}"')
                 schema_created = True
-                connection.exec_driver_sql(f'SET LOCAL search_path TO "{schema}", public')
+                # Keep the live deployment's public alembic_version and evidence out
+                # of this test. Otherwise Alembic may see a migrated public schema
+                # and skip creating this test's fresh tables.
+                connection.exec_driver_sql(f'SET LOCAL search_path TO "{schema}"')
                 config = Config(str(ROOT / "alembic.ini"))
                 config.attributes.update(connection=connection, database_url=TEST_URL)
                 command.upgrade(config, "head")
@@ -60,15 +63,27 @@ class PostgreSQLIsolationTests(unittest.TestCase):
                   encrypted_object_ref, key_version, media_type, sha256, quality_scores, quality_policy_version, delete_after)
                   VALUES (:id, :org, :session, :document, 'FRONT', 'local://ref', 'v1', 'image/jpeg', :sha, '{}', 'test', now() + interval '1 hour')"""),
                   {"id": uuid4(), "org": org_a, "session": sessions[org_a], "document": document, "sha": "0" * 64})
+                connection.execute(sa.text("""INSERT INTO mrz_results
+                  (id, organization_id, session_id, document_id, format, mrz_valid, check_digit_results, field_consistency)
+                  VALUES (:id, :org, :session, :document, 'TD1', true, '{}', '{}')"""),
+                  {"id": uuid4(), "org": org_a, "session": sessions[org_a], "document": document})
+                self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM mrz_results")).scalar_one(), 1)
                 # Row policy WITH CHECK refuses evidence written under another tenant's identifier.
                 with self.assertRaises(sa.exc.ProgrammingError), connection.begin_nested():
                     connection.execute(sa.text("""INSERT INTO identity_documents (id, organization_id, session_id, document_type, delete_after)
                       VALUES (:id, :org, :session, 'KH_NATIONAL_ID', now() + interval '1 day')"""),
                       {"id": uuid4(), "org": org_b, "session": sessions[org_b]})
+                with self.assertRaises(sa.exc.ProgrammingError), connection.begin_nested():
+                    connection.execute(sa.text("""INSERT INTO mrz_results
+                      (id, organization_id, session_id, document_id, format, mrz_valid, check_digit_results, field_consistency)
+                      VALUES (:id, :org, :session, :document, 'TD1', true, '{}', '{}')"""),
+                      {"id": uuid4(), "org": org_b, "session": sessions[org_a], "document": document})
                 connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_b)})
                 self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM document_images")).scalar_one(), 0)
+                self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM mrz_results")).scalar_one(), 0)
                 connection.execute(sa.text("SELECT set_config('app.organization_id', '', true)"))
                 self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM kyc_sessions")).scalar_one(), 0)
+                self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM mrz_results")).scalar_one(), 0)
                 connection.exec_driver_sql("RESET ROLE")
         finally:
             with engine.begin() as connection:

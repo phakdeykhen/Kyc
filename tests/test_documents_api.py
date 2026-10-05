@@ -8,7 +8,7 @@ from cryptography.exceptions import InvalidTag
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from kyc.db.models import AuditLog, DocumentCheck, DocumentField, DocumentImage, IdentityDocument, KYCSession
+from kyc.db.models import AuditLog, DocumentCheck, DocumentField, DocumentImage, IdentityDocument, KYCSession, MRZResult
 from kyc.ocr.tesseract import OCRUnavailable, TesseractOCREngine
 from kyc.services.documents import pending_sessions
 from tests import images
@@ -16,6 +16,8 @@ from tests.helpers import call
 from tests.test_captures_api import GOOD, GOOD_BACK, PASSPORT, CaptureAPICase
 from tests.test_capture_store import keyring
 from tests.test_kh_national_id import BACK, NSSF_BACK, front_lines, line, nssf_front
+from tests.test_mrz import ICAO_TD3, kh_passport_page, page_line
+from tests.mrz_build import td3
 
 PII_SETTINGS = {"pii_encryption_keys": keyring("pii-test-v1"), "pii_hmac_key": base64.b64encode(os.urandom(32)).decode()}
 PII_VALUES = ("SOPHEA", "010203040", "សុខ", "ភ្នំពេញ", "1990-03-15")
@@ -75,8 +77,8 @@ class DocumentProcessingTests(CaptureAPICase):
         self.assertEqual(result["identity"], {"full_name": "SOK SOPHEA", "full_name_local": "សុខ សុភា",
                                               "date_of_birth": "1990-03-15", "sex": "F", "nationality": "KH"})
         self.assertEqual(result["checks"], {"document_quality": "PASS", "document_classification": "PASS",
-                                            "document_data": "PASS", "expiry": "PASS", "mrz": "UNAVAILABLE",
-                                            "barcode": "UNAVAILABLE"})
+                                            "document_data": "PASS", "expiry": "PASS", "mrz": "PASS",
+                                            "mrz_consistency": "PASS", "barcode": "UNAVAILABLE"})
         self.assertEqual(result["review_flags"], [])
         self.assertIsNone(result["decision"])  # extraction never decides
 
@@ -136,7 +138,7 @@ class DocumentProcessingTests(CaptureAPICase):
 
     async def test_recapture_reasons(self):
         cases = [
-            ((front_lines(number="១២៣៤"), BACK), "CRITICAL_FIELD_UNREADABLE"),
+            ((front_lines(number="១២៣៤"), []), "CRITICAL_FIELD_UNREADABLE"),  # no MRZ to fall back on
             (([line("hello", 0.1)], BACK), "DOCUMENT_NOT_RECOGNIZED"),
             ((front_lines(), front_lines()), "BACK_SIDE_EXPECTED"),
         ]
@@ -160,8 +162,11 @@ class DocumentProcessingTests(CaptureAPICase):
 
     async def test_document_type_without_an_adapter_waits_honestly(self):
         self.use_ocr()
-        session_id = await self.create("PASSPORT")
-        code, body, _ = await self.upload(session_id, PASSPORT, None, side="DATA_PAGE")
+        code, body, _ = await call(self.app, "/v1/kyc/sessions", "POST", {"user_id": "u", "country": "TH",
+                                   "expected_document_type": "NATIONAL_ID"}, self.headers)
+        session_id = body["session_id"]
+        await self.upload(session_id, GOOD, "front")
+        await self.upload(session_id, GOOD_BACK, "back")
         self.assertEqual((await self.session(session_id))["status"], "DOCUMENT_PROCESSING")
         outcome = self.app.state.document_processor.process(self.org, UUID(session_id), uuid4())
         self.assertEqual(outcome.status, "NO_ADAPTER")
@@ -222,6 +227,117 @@ class NSSFProcessingTests(DocumentProcessingTests):
                 self.assertEqual(check.evidence_metadata["reason_codes"], ["DOCUMENT_TYPE_MISMATCH"])
 
 
+PASSPORT_PHOTO = images.encode(images.passport_page())
+
+
+class PassportProcessingTests(DocumentProcessingTests):
+    async def capture_page(self, document_type, level="DOCUMENT_FACE_LIVENESS"):
+        session_id = await self.create(document_type, level) if document_type.startswith("KH_") else await self._create_foreign(level)
+        code, body, _ = await self.upload(session_id, PASSPORT_PHOTO, None, side="DATA_PAGE")
+        self.assertEqual(body["status"], "DOCUMENT_PROCESSING", body)
+        return session_id
+
+    async def _create_foreign(self, level):
+        code, body, _ = await call(self.app, "/v1/kyc/sessions", "POST", {"user_id": "traveller", "country": "TH",
+                                   "expected_document_type": "PASSPORT", "verification_level": level}, self.headers)
+        return body["session_id"]
+
+    async def test_cambodian_passport_is_extracted_and_mrz_result_stored(self):
+        self.use_ocr(kh_passport_page())
+        session_id = await self.capture_page("KH_PASSPORT")
+        self.assertEqual((await self.session(session_id))["status"], "SELFIE_REQUIRED")
+        result = await self.result(session_id)
+        self.assertEqual(result["document"]["type"], "KH_PASSPORT")
+        self.assertEqual(result["document"]["document_number_masked"], "*****4567")
+        self.assertEqual(result["identity"]["full_name"], "SOPHEA SOK")
+        self.assertEqual((result["checks"]["mrz"], result["checks"]["mrz_consistency"]), ("PASS", "PASS"))
+        with Session(self.engine) as db:
+            stored = db.scalar(sa.select(MRZResult))
+        self.assertEqual((stored.format, stored.mrz_valid), ("TD3", True))
+        self.assertTrue(all(item["valid"] for item in stored.check_digit_results.values()))
+        self.assertEqual(stored.field_consistency["document_number"], "MATCH")
+        self.assertEqual(result["mrz"], {"format": stored.format, "mrz_valid": True,
+                                         "check_digit_results": stored.check_digit_results,
+                                         "field_consistency": stored.field_consistency})
+        self.assertNotIn("N01234567", json.dumps(stored.check_digit_results) + json.dumps(stored.field_consistency))
+
+    async def test_visual_mrz_disagreement_reaches_the_result_as_a_review_flag(self):
+        self.use_ocr(kh_passport_page(number="NO1234567"))
+        session_id = await self.capture_page("KH_PASSPORT")
+        result = await self.result(session_id)
+        self.assertEqual(result["checks"]["mrz_consistency"], "REVIEW")
+        self.assertIn("MRZ_VISUAL_DOCUMENT_NUMBER_MISMATCH", result["review_flags"])
+        self.assertIsNone(result["decision"])
+
+    async def test_raw_mrz_is_encrypted_and_evidence_contains_no_identity_values(self):
+        self.use_ocr(kh_passport_page())
+        session_id = await self.capture_page("KH_PASSPORT")
+        result = await self.result(session_id)
+        with Session(self.engine) as db:
+            document = db.scalar(sa.select(IdentityDocument))
+            fields = db.scalars(sa.select(DocumentField)).all()
+            mrz = next(item for item in fields if item.field_name == "mrz")
+            checks = db.scalars(sa.select(DocumentCheck)).all()
+            audits = db.scalars(sa.select(AuditLog)).all()
+            stored = db.scalar(sa.select(MRZResult))
+        context = f"field/{self.org}/{session_id}/{document.id}/mrz/normalized"
+        self.assertEqual(self.app.state.field_cipher.open(mrz.normalized_value_ciphertext, mrz.key_version, context),
+                         "\n".join(td3()))
+        self.assertEqual(mrz.side, "DATA_PAGE")
+        self.assertTrue(all(item.side in (None, "DATA_PAGE") for item in fields))
+        ciphertext = b"".join((item.raw_value_ciphertext or b"") + (item.normalized_value_ciphertext or b"")
+                              for item in fields)
+        metadata = json.dumps([c.evidence_metadata for c in checks] +
+                              [[a.event_metadata, a.reason_codes] for a in audits] +
+                              [stored.check_digit_results, stored.field_consistency])
+        for value in ("N01234567", "SOPHEA", "1990-03-15", *td3()):
+            self.assertNotIn(value.encode(), ciphertext)
+            self.assertNotIn(value, metadata)
+        self.assertNotIn("P<KHM", json.dumps(result))
+        self.assertEqual(document.document_number_hmac,
+                         self.app.state.field_cipher.lookup_hash("N01234567", "KH_PASSPORT"))
+
+    async def test_bad_checksum_is_stored_as_review_with_visual_fields_preserved(self):
+        broken = td3()
+        broken[1] = broken[1][:19] + "9" + broken[1][20:]
+        self.use_ocr(kh_passport_page(mrz=broken))
+        session_id = await self.capture_page("KH_PASSPORT")
+        result = await self.result(session_id)
+        self.assertEqual(result["status"], "SELFIE_REQUIRED")
+        self.assertEqual(result["checks"]["mrz"], "REVIEW")
+        self.assertIn("MRZ_CHECK_DIGIT_FAILED", result["review_flags"])
+        self.assertEqual(result["identity"]["date_of_birth"], "1990-03-15")
+        self.assertIsNone(result["decision"])
+        with Session(self.engine) as db:
+            stored = db.scalar(sa.select(MRZResult))
+        self.assertFalse(stored.mrz_valid)
+        self.assertFalse(stored.check_digit_results["date_of_birth"]["valid"])
+        self.assertFalse(result["mrz"]["mrz_valid"])
+
+    async def test_foreign_passport_uses_the_generic_mrz_adapter(self):
+        current = td3(state="UTO", number="L898902C3", nationality="UTO", birth="740812", sex="F", expiry="340415",
+                      surname="ERIKSSON", given="ANNA MARIA")
+        self.use_ocr([page_line("UTOPIA PASSPORT", 0.05)] + [page_line(t, 0.85 + i * 0.06, 0.0, ("MRZ_PASS",)) for i, t in enumerate(current)])
+        session_id = await self.capture_page("PASSPORT")
+        self.assertEqual((await self.session(session_id))["status"], "SELFIE_REQUIRED")
+        result = await self.result(session_id)
+        self.assertEqual(result["identity"]["full_name"], "ANNA MARIA ERIKSSON")
+        self.assertEqual(result["identity"]["nationality"], "UTO")
+        self.assertEqual(result["document"]["expiry_status"], "VALID")
+
+    async def test_unreadable_mrz_on_a_foreign_passport_means_recapture(self):
+        self.use_ocr([page_line("UTOPIA PASSPORT", 0.05), page_line("Surname ERIKSSON", 0.2)])
+        session_id = await self.capture_page("PASSPORT")
+        self.assertEqual((await self.session(session_id))["status"], "DOCUMENT_REQUIRED")
+
+    async def test_passport_shown_in_an_id_card_session_is_sent_back(self):
+        self.use_ocr(kh_passport_page(), [])
+        session_id = await self.capture_both("KH_NATIONAL_ID")
+        with Session(self.engine) as db:
+            check = db.scalar(sa.select(DocumentCheck).where(DocumentCheck.check_type == "DOCUMENT_PROCESSING"))
+        self.assertEqual(check.evidence_metadata["reason_codes"], ["DOCUMENT_TYPE_MISMATCH"])
+
+
 class ProcessingWithoutPIIKeysTests(CaptureAPICase):
     async def test_extraction_is_unavailable_and_nothing_is_stored(self):
         session_id = await self.create()
@@ -258,6 +374,8 @@ class RealOCREndToEndTests(CaptureAPICase):
         self.assertEqual(result["identity"]["date_of_birth"], "1990-03-15")
         self.assertEqual(result["identity"]["sex"], "F")
         self.assertEqual(result["checks"]["document_classification"], "PASS")
+        # Phase 5: the back MRZ is read by the dedicated pass, validated, and agrees with the front.
+        self.assertEqual((result["checks"]["mrz"], result["checks"]["mrz_consistency"]), ("PASS", "PASS"))
         with Session(self.engine) as db:
             fields = {f.field_name: f for f in db.scalars(sa.select(DocumentField))}
         # Anything the engine was unsure about is visibly flagged, never silently accepted.
@@ -280,6 +398,34 @@ class RealOCREndToEndTests(CaptureAPICase):
         self.assertEqual(result["identity"]["date_of_birth"], "1988-07-02")
         self.assertEqual(result["identity"]["sex"], "M")
         self.assertEqual(result["checks"]["document_classification"], "PASS")
+
+    @unittest.skipUnless(images.passport_fonts_available(), "Passport specimen fonts are required.")
+    async def test_photographed_cambodian_passport_is_read_by_real_ocr(self):
+        session_id = await self.create("KH_PASSPORT")
+        code, body, _ = await self.upload(session_id, images.encode(images.photographed(images.kh_passport())), None, side="DATA_PAGE")
+        self.assertEqual(body["capture_status"], "ACCEPTED", body)
+        code, session, _ = await call(self.app, f"/v1/kyc/{session_id}", headers=self.headers)
+        self.assertEqual(session["status"], "SELFIE_REQUIRED")
+        code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual(result["checks"]["mrz"], "PASS")
+        self.assertEqual(result["identity"]["full_name"], "SOPHEA SOK")
+        self.assertEqual(result["identity"]["date_of_birth"], "1990-03-15")
+        # Whatever the visual OCR misread is surfaced by the MRZ cross-check, never silently accepted.
+        if result["checks"]["mrz_consistency"] == "REVIEW":
+            self.assertTrue(any(code.startswith("MRZ_VISUAL_") for code in result["review_flags"]))
+
+    @unittest.skipUnless(images.passport_fonts_available(), "Passport specimen fonts are required.")
+    async def test_photographed_foreign_passport_is_read_from_its_mrz(self):
+        code, body, _ = await call(self.app, "/v1/kyc/sessions", "POST", {"user_id": "traveller", "country": "TH",
+                                   "expected_document_type": "PASSPORT"}, self.headers)
+        session_id = body["session_id"]
+        await self.upload(session_id, images.encode(images.photographed(images.foreign_passport())), None, side="DATA_PAGE")
+        code, session, _ = await call(self.app, f"/v1/kyc/{session_id}", headers=self.headers)
+        self.assertEqual(session["status"], "SELFIE_REQUIRED")
+        code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual(result["identity"]["full_name"], "ANNA MARIA ERIKSSON")
+        self.assertEqual(result["document"]["document_number_masked"], "*****02C3")
+        self.assertEqual(result["checks"]["mrz"], "PASS")
 
     async def test_card_without_identity_text_is_sent_back(self):
         session_id = await self.create()

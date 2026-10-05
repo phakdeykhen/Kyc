@@ -2,7 +2,7 @@
 
 Layout assumptions to confirm against official specimens before production: the label
 set below, the unlabelled 9-digit number at the top, Khmer numerals, a single validity
-label holding "issue … expiry", and an "IDKHM" MRZ on the back.
+label holding "issue … expiry", and an "IDKHM" TD1 MRZ on the lower back.
 """
 
 from kyc.documents.adapters.khmer_label import (  # noqa: F401  (find_label re-exported)
@@ -30,6 +30,10 @@ LAYOUT = CardLayout(
     multiline={"place_of_birth": 1, "address": 2},
     validity_label="validity",
     back_marker="IDKHM",
+    mrz_formats=("TD1",),
+    mrz_regions={"BACK": (0.0, 0.45, 1.0, 1.0)},
+    mrz_document_code="ID",
+    mrz_issuing_state="KHM",
 )
 
 

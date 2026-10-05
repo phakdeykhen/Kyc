@@ -5,14 +5,15 @@ from datetime import date
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from kyc.api.schemas import ResultDocument, ResultIdentity, SessionResult
+from kyc.api.schemas import ResultDocument, ResultIdentity, ResultMRZ, SessionResult
 from kyc.core.crypto import FieldCipher
-from kyc.db.models import DocumentCheck, DocumentField, IdentityDocument, KYCSession
+from kyc.db.models import DocumentCheck, DocumentField, IdentityDocument, KYCSession, MRZResult
 from kyc.domain.enums import CheckResult
 from kyc.services.captures import side_progress
 
 SEVERITY = {CheckResult.FAIL: 3, CheckResult.REVIEW: 2, CheckResult.PASS: 1, CheckResult.NOT_APPLICABLE: 0}
-CHECK_GROUPS = {"CLASSIFICATION": "document_classification", "EXPIRY": "expiry", "MRZ": "mrz", "BARCODE": "barcode"}
+CHECK_GROUPS = {"CLASSIFICATION": "document_classification", "EXPIRY": "expiry", "MRZ": "mrz",
+                "MRZ_CONSISTENCY": "mrz_consistency", "BARCODE": "barcode"}
 DATA_CHECKS = {"REQUIRED_FIELDS", "DOCUMENT_NUMBER_FORMAT", "NATIONAL_ID_NUMBER_FORMAT", "DATE_CONSISTENCY",
                "OCR_CONFIDENCE", "SCRIPT_CONSISTENCY"}
 
@@ -60,10 +61,15 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) ->
     expiry = values.get("expiry_date")
     expiry_status = ("NOT_APPLICABLE" if checks.get("expiry") == "NOT_APPLICABLE" else "UNKNOWN") if not expiry \
         else "EXPIRED" if date.fromisoformat(expiry) < date.today() else "VALID"
+    mrz = db.scalar(sa.select(MRZResult).where(MRZResult.organization_id == record.organization_id,
+                                             MRZResult.session_id == record.id,
+                                             MRZResult.document_id == document.id))
     return SessionResult(
         session_id=record.id, status=record.status, checks=checks, review_flags=sorted(set(flags)),
         document=ResultDocument(country=document.issuing_country, type=document.document_type,
                                 document_number_masked=mask(values.get("document_number")), expiry_status=expiry_status),
         identity=ResultIdentity(full_name=values.get("full_name"), full_name_local=values.get("full_name_local"),
                                 date_of_birth=values.get("date_of_birth"), sex=values.get("sex"),
-                                nationality=values.get("nationality")))
+                                nationality=values.get("nationality")),
+        mrz=ResultMRZ(format=mrz.format, mrz_valid=mrz.mrz_valid, check_digit_results=mrz.check_digit_results,
+                      field_consistency=mrz.field_consistency) if mrz else None)

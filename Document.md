@@ -1193,7 +1193,7 @@ Design this as:
 
 ## Implementation progress — 5 October 2026
 
-The original specification above is preserved. Phases 1–4 have been
+The original specification above is preserved. Phases 1–5 have been
 implemented at this workspace root. Later phases have not started.
 
 | Phase | Deliverable | Status |
@@ -1202,8 +1202,8 @@ implemented at this workspace root. Later phases have not started.
 | 2 | Camera/document upload + quality pipeline | Complete; live PostgreSQL end-to-end passed; Docker pending |
 | 3 | Cambodia National ID adapter | Complete; real-OCR end-to-end passed; Docker pending |
 | 4 | Cambodia NSSF adapter | Complete; 109/109 tests; real-OCR end-to-end passed; Docker pending |
-| 5 | Passport + MRZ engine | Waiting for approval |
-| 6 | International generic passport adapter | Not started |
+| 5 | Passport + MRZ engine | Complete; 172/172 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
+| 6 | International generic passport adapter | Waiting for approval |
 | 7 | QR/barcode engine | Not started |
 | 8 | Face detection + quality | Not started |
 | 9 | Face embeddings + 1:1 comparison | Not started |
@@ -1276,5 +1276,24 @@ are in [BUILD_PROGRESS.md](BUILD_PROGRESS.md); the design is in
   the national ID and NSSF cards.
 - No migration needed; design in [docs/architecture-phase4.md](docs/architecture-phase4.md).
 
-**Approval gate:** Section 31 requires stopping after each phase. Work is paused
-after Phase 4 until approval to proceed to Phase 5.
+### Phase 5 deliverables
+
+- Cambodia passport adapter: Khmer/English visual labels, Latin names, passport
+  number and dates, with TD3 MRZ extraction and visual/MRZ disagreement review flags.
+- Reusable TD1/TD2/TD3 MRZ parser and dedicated OCR passes; the national ID back MRZ
+  now uses the same engine. Check digits establish reading consistency only.
+- `GenericMRZAdapter` supplies MRZ-only passport fields; Phase 6 international
+  visual-zone extraction remains unstarted.
+- Encrypted MRZ text and field values; non-PII validity/check/consistency metadata in
+  existing tenant-scoped `mrz_results`. No migration or new dependencies; existing
+  installations rerun bootstrap for restricted-role MRZ grants.
+- Typed client MRZ metadata: format, validity, check-digit outcomes and field
+  consistency; raw MRZ stays private. Generic MRZ-only consistency is NOT_APPLICABLE.
+- DATA_PAGE curl/Postman workflows and synthetic parser/API/real-OCR coverage.
+  172/172 tests passed with live PostgreSQL; MRZ tenant RLS and restricted-role
+  real-OCR passport workflows passed. Docker remains unexecuted. Evidence:
+  [artifacts/phase5-postgres-e2e.json](artifacts/phase5-postgres-e2e.json).
+- Design and security limits in [docs/architecture-phase5.md](docs/architecture-phase5.md).
+
+**Approval gate:** Section 31 requires stopping after each phase. Phase 5 was
+approved; work stops after Phase 5 until separate approval to proceed to Phase 6.

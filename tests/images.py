@@ -193,7 +193,8 @@ def kh_id_back(width=1600):
     draw = ImageDraw.Draw(image)
     draw.rectangle((60, 60, 420, 460), outline=(120, 120, 120), width=3)  # fingerprint box
     mono = ImageFont.truetype("/System/Library/Fonts/Supplemental/Courier New Bold.ttf", 56)
-    for index, line in enumerate(("IDKHM0102030401<<<<<<<<<<<<<<<", "9003155F2912316KHM<<<<<<<<<<<0", "SOK<<SOPHEA<<<<<<<<<<<<<<<<<<<")):
+    from tests.mrz_build import td1
+    for index, line in enumerate(td1()):
         draw.text((60, height - 300 + index * 85), line, font=mono, fill=(10, 10, 10))
     return image
 
@@ -253,3 +254,57 @@ def kh_nssf_back(width=1600):
                 draw.rectangle((width - 400 + column * 40, height - 400 + row * 40,
                                 width - 370 + column * 40, height - 370 + row * 40), fill=(240, 240, 240))
     return image
+
+
+# --- Phase 5: fictional passport data pages (synthetic data, marked SPECIMEN) ---
+MONO_FONT = "/System/Library/Fonts/Supplemental/Courier New Bold.ttf"
+
+
+def passport_fonts_available():
+    from pathlib import Path
+    return fonts_available() and Path(MONO_FONT).exists()
+
+
+def passport_data_page(rows, mrz_lines, header=(), width=1600):
+    """rows: (label, value) pairs printed label-above-value; mrz_lines: two TD3 lines."""
+    from PIL import ImageFont
+    height = round(width / PASSPORT_RATIO)
+    image = Image.new("RGB", (width, height), (238, 234, 222))
+    draw = ImageDraw.Draw(image)
+    km = lambda size: ImageFont.truetype(KHMER_FONT, size, layout_engine=ImageFont.Layout.RAQM)  # noqa: E731
+    latin = lambda size: ImageFont.truetype(LATIN_FONT, size)  # noqa: E731
+    for index, text in enumerate(header):
+        draw.text((width // 2, 20 + index * 58), text, font=km(36), fill=(30, 40, 70), anchor="mt")
+    draw.rectangle((50, 190, 400, 640), fill=(214, 222, 232), outline=(140, 150, 160), width=3)
+    draw.ellipse((140, 240, 310, 430), fill=(170, 140, 120))
+    y = 170
+    for label, value in rows:
+        draw.text((440, y), label, font=km(26), fill=(90, 90, 90))
+        draw.text((440, y + 34), value, font=latin(36), fill=(10, 10, 10))
+        y += 82
+    mono = ImageFont.truetype(MONO_FONT, 52)
+    for index, line in enumerate(mrz_lines):
+        draw.text((40, height - 190 + index * 80), line, font=mono, fill=(10, 10, 10))
+    draw.text((60, 660), "SPECIMEN", font=latin(28), fill=(180, 60, 60))
+    return image
+
+
+def kh_passport(**overrides):
+    from tests.mrz_build import td3
+    values = {"number": "N01234567", "surname": "SOK", "given": "SOPHEA", "dob": "15 MAR 1990", "sex": "F",
+              "issue": "11 AUG 2020", "expiry": "11 AUG 2030", "mrz": td3()} | overrides
+    rows = [("Passport No / លេខលិខិតឆ្លងដែន", values["number"]), ("Surname / នាមត្រកូល", values["surname"]),
+            ("Given names / នាមខ្លួន", values["given"]), ("Nationality / សញ្ជាតិ", "CAMBODIAN"),
+            ("Date of birth / ថ្ងៃខែឆ្នាំកំណើត", values["dob"]), ("Sex / ភេទ", values["sex"]),
+            ("Date of issue / ថ្ងៃចេញ", values["issue"]), ("Date of expiry / ថ្ងៃផុតកំណត់", values["expiry"])]
+    return passport_data_page(rows, values["mrz"], header=("ព្រះរាជាណាចក្រកម្ពុជា KINGDOM OF CAMBODIA", "លិខិតឆ្លងដែន PASSPORT"))
+
+
+def foreign_passport():
+    """ICAO 9303's fictional Utopia holder, with a future expiry so the document is current."""
+    from tests.mrz_build import td3
+    mrz = td3(state="UTO", number="L898902C3", nationality="UTO", birth="740812", sex="F", expiry="340415",
+              surname="ERIKSSON", given="ANNA MARIA")
+    rows = [("Passport No", "L898902C3"), ("Surname", "ERIKSSON"), ("Given names", "ANNA MARIA"),
+            ("Nationality", "UTOPIAN"), ("Date of birth", "12 AUG 1974"), ("Sex", "F"), ("Date of expiry", "15 APR 2034")]
+    return passport_data_page(rows, mrz, header=("UTOPIA", "PASSPORT"))

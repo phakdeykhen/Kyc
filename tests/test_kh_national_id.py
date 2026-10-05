@@ -7,6 +7,7 @@ from kyc.documents.adapters.kh_national_id import find_label
 from kyc.documents.refine import NumericRefinement, refine_numeric_words
 from kyc.domain.enums import CheckResult, DocumentType
 from kyc.domain.identity import OCRLine, OCRWord
+from tests.mrz_build import td1
 
 TODAY = date(2026, 10, 5)
 
@@ -26,7 +27,7 @@ def front_lines(**overrides):
             line("ភិនភាគ: ប្រជ្រុយ", 0.78)]
 
 
-BACK = [line("IDKHM0102030401<<<<<<<<<<<<<<<", 0.7), line("9003155F2912316KHM<<<<<<<<<<<0", 0.78)]
+BACK = [line(text, 0.7 + index * 0.08) for index, text in enumerate(td1())]  # valid ICAO TD1
 
 
 class KhmerNormalizationTests(unittest.TestCase):
@@ -61,7 +62,7 @@ class AdapterTests(unittest.TestCase):
 
     def test_registry_only_claims_implemented_adapters(self):
         self.assertIsNotNone(self.adapter)
-        self.assertIsNone(adapter_for(DocumentType.PASSPORT))
+        self.assertIsNone(adapter_for(DocumentType.NATIONAL_ID))  # generic IDs arrive in Phase 6
         self.assertEqual(self.adapter.required_sides(), ("FRONT", "BACK"))
 
     def test_classification_of_sides_and_other_documents(self):
@@ -71,7 +72,7 @@ class AdapterTests(unittest.TestCase):
         back = self.adapter.classify(BACK, "BACK")
         self.assertEqual(back.document_side, "BACK")
         passport = self.adapter.classify([line("KINGDOM OF CAMBODIA PASSPORT", 0.1), line("P<KHMSOK<<SOPHEA<<<<<<<<<<<<<<<<<<<<<<<<<<<", 0.8)], "FRONT")
-        self.assertEqual(passport.document_type, DocumentType.PASSPORT)
+        self.assertEqual(passport.document_type, DocumentType.KH_PASSPORT)  # the more specific card type
         unknown = self.adapter.classify([line("hello world", 0.1)], "FRONT")
         self.assertEqual((unknown.document_type, unknown.confidence), (DocumentType.UNKNOWN, 0.0))
 
@@ -85,12 +86,12 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(document.place_of_birth, "ភ្នំពេញ")
         self.assertEqual(document.address, "ផ្ទះលេខ ១២ ផ្លូវ ២៧១ សង្កាត់ ទឹកល្អក់")
         self.assertEqual((str(document.issue_date), str(document.expiry_date)), ("2020-01-01", "2029-12-31"))
-        self.assertTrue(document.mrz.startswith("IDKHM"))
+        self.assertTrue(document.mrz.startswith("IDKHM010203040"))
         self.assertIsNone(document.issuing_authority)  # not on the card: null, never invented
         fields = {item.field: item for item in document.fields}
         self.assertEqual(fields["date_of_birth"].raw_value, "១៥.០៣.១៩៩០")
         self.assertEqual(fields["nationality"].source, "DERIVED")
-        self.assertEqual(fields["mrz"].flags, ("UNPARSED_UNTIL_PHASE_5",))
+        self.assertIn("CHECK_DIGITS_VALID", fields["mrz"].flags)
         self.assertTrue(all(item.bbox for item in document.fields if item.source == "OCR" and item.normalized_value))
 
     def test_clean_card_validates_and_engines_not_built_are_unavailable(self):
@@ -98,9 +99,10 @@ class AdapterTests(unittest.TestCase):
         results = {check.check_type: check.result for check in self.adapter.validate_fields(document, TODAY)}
         for name in ("REQUIRED_FIELDS", "DOCUMENT_NUMBER_FORMAT", "DATE_CONSISTENCY", "EXPIRY", "OCR_CONFIDENCE", "SCRIPT_CONSISTENCY"):
             self.assertEqual(results[name], CheckResult.PASS, name)
-        for name in ("MRZ", "BARCODE", "PORTRAIT"):
+        self.assertEqual(results["MRZ"], CheckResult.PASS)  # check digits valid: consistent, not "authentic"
+        self.assertEqual(results["MRZ_CONSISTENCY"], CheckResult.PASS)
+        for name in ("BARCODE", "PORTRAIT"):
             self.assertEqual(results[name], CheckResult.UNAVAILABLE)
-        self.assertNotIn(CheckResult.PASS, [results[name] for name in ("MRZ", "BARCODE", "PORTRAIT")])
 
     def test_wrapped_value_takes_the_weakest_line_confidence(self):
         document = self.adapter.extract_fields({"FRONT": front_lines(address_conf=0.5), "BACK": BACK})
@@ -120,10 +122,35 @@ class AdapterTests(unittest.TestCase):
         ]
         for overrides, check_type, result, code in cases:
             with self.subTest(code=code, overrides=overrides):
-                document = self.adapter.extract_fields({"FRONT": front_lines(**overrides), "BACK": BACK})
+                # No MRZ on this back, so the MRZ cannot stand in for unreadable front fields.
+                document = self.adapter.extract_fields({"FRONT": front_lines(**overrides), "BACK": []})
                 check = {c.check_type: c for c in self.adapter.validate_fields(document, TODAY)}[check_type]
                 self.assertEqual(check.result, result)
                 self.assertIn(code, check.reason_codes)
+
+    def test_mrz_fills_an_unreadable_visual_field_and_says_so(self):
+        document = self.adapter.extract_fields({"FRONT": front_lines(number="១២៣៤"), "BACK": BACK})
+        number = {item.field: item for item in document.fields}["document_number"]
+        self.assertEqual((number.normalized_value, number.source), ("010203040", "MRZ"))
+        self.assertIn("FROM_MRZ", number.flags)
+        checks = {c.check_type: c for c in self.adapter.validate_fields(document, TODAY)}
+        self.assertEqual(checks["REQUIRED_FIELDS"].result, CheckResult.PASS)
+
+    def test_mrz_visual_disagreement_is_reported_not_resolved(self):
+        document = self.adapter.extract_fields({"FRONT": front_lines(dob="១៥.០៣.១៩៩១"), "BACK": BACK})
+        self.assertEqual(str(document.date_of_birth), "1991-03-15")  # the visual value is kept
+        check = {c.check_type: c for c in self.adapter.validate_fields(document, TODAY)}["MRZ_CONSISTENCY"]
+        self.assertEqual(check.result, CheckResult.REVIEW)
+        self.assertEqual(check.reason_codes, ("MRZ_VISUAL_DATE_OF_BIRTH_MISMATCH",))
+        self.assertEqual(check.details["field_consistency"]["document_number"], "MATCH")
+
+    def test_corrupted_mrz_fails_its_check_digits(self):
+        corrupted = [line(text.replace("900315", "900316"), 0.8) for text in td1()]
+        document = self.adapter.extract_fields({"FRONT": front_lines(), "BACK": corrupted})
+        check = {c.check_type: c for c in self.adapter.validate_fields(document, TODAY)}["MRZ"]
+        self.assertEqual(check.result, CheckResult.REVIEW)
+        self.assertIn("MRZ_CHECK_DIGIT_FAILED", check.reason_codes)
+        self.assertFalse(check.details["check_digit_results"]["date_of_birth"]["valid"])
 
     def test_label_value_on_the_next_line(self):
         lines = front_lines()

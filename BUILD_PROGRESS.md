@@ -1,10 +1,53 @@
 # Build progress — Universal Identity Platform
 
 Updated: 5 October 2026. The full requirements in `Document.md` control the build.
-Phases 2–4 were approved and are implemented. Work is paused at the Phase 4
-approval gate; Phase 5 has not started.
+Phases 2–5 were approved and are implemented. Work is paused at the Phase 5
+approval gate; Phase 6 has not started.
 
-## Phase 4 implementation (5 October 2026)
+## Phase 5 implementation (5 October 2026)
+
+Implemented the passport and MRZ engine. `kyc/mrz/parser.py` parses ICAO 9303 TD1,
+TD2 and TD3 blocks, validates the document number, birth date, expiry, optional data
+and composite check digits, and compares the MRZ field by field with the visual zone.
+`kyc/mrz/reader.py` reads the MRZ band four ways (ICAO alphabet, unconstrained,
+enlarged and column segmentation). The assembler keeps the candidate block whose
+check digits validate, so lines from different OCR passes can be combined.
+OCR look-alikes are substituted only in numeric positions, restored filler and
+filler noise in names are flagged, and visual values are never overwritten to match
+the MRZ. New adapters: `CambodiaPassportAdapter` (bilingual visual zone + TD3; the
+visual zone is read without the ICAO portrait area) and `GenericMRZAdapter` for
+`PASSPORT` sessions from any country. The national ID's back MRZ (TD1) now uses the
+same engine. No migration was needed (`mrz_results` existed since Phase 1); bootstrap
+grants were added. Design: [architecture-phase5.md](docs/architecture-phase5.md).
+
+### Phase 5 validation evidence
+
+- **172 tests: 172 passed, 0 skipped, 0 failures** with live PostgreSQL 18.6
+  ([artifacts/phase5-tests.txt](artifacts/phase5-tests.txt)).
+- The parser validates the published ICAO 9303 specimens in all three formats and
+  catches a single corrupted digit.
+- **Real OCR (Tesseract 5.5.3) on synthetic SPECIMEN pages**, as PNG and JPEG: the
+  Cambodian passport, a foreign (ICAO Utopia) passport and the national ID back all
+  produced a check-digit-valid MRZ with correct names and numbers. Each MRZ read
+  takes about 1.7 s.
+- **Live PostgreSQL over HTTP** as `kyc_app` after bootstrap: the Cambodian passport,
+  foreign passport and national ID reached `SELFIE_REQUIRED` with `mrz: PASS`. The ID
+  MRZ matched the front on all six compared fields. A passport uploaded to an ID
+  session was sent back. `mrz_results` rows held TD3/TD3/TD1 with no identity values
+  ([artifacts/phase5-postgres-e2e.json](artifacts/phase5-postgres-e2e.json)).
+- Problems found and fixed during validation: Khmer-digit re-reading damaged
+  passports' Latin digits (now per layout); the portrait was read as text (visual-zone
+  region); a fuzzy label beat an exact one; title words were taken as passport numbers;
+  TD1 lines could be mis-padded into TD3; MRZ filler misreads polluted names.
+
+### Phase 5 limits
+
+Passport label layout, the passport-number pattern and the MRZ/visual crop geometry
+are assumptions awaiting official specimens and consented samples. MRZ century rules
+are heuristics. Check digits prove a consistent reading, not authenticity. Generic
+passports have no visual-zone extraction until Phase 6. Docker is still unexecuted here.
+
+## Phase 4 record (5 October 2026)
 
 Implemented the Cambodia NSSF member card adapter. Phase 3's extraction code became a
 shared `KhmerLabelAdapter` engine driven by declarative `CardLayout`s; the national ID
@@ -198,9 +241,9 @@ does not claim production readiness or functioning verification engines.
 | 1 | Architecture, database schema, KYC session state machine | Complete; live PostgreSQL RLS verified 5 Oct; Docker pending |
 | 2 | Camera/document upload and quality pipeline | Complete; live PostgreSQL E2E passed; Docker pending |
 | 3 | Cambodia National ID adapter | Complete; real-OCR and live PostgreSQL E2E passed; Docker pending |
-| 4 | Cambodia NSSF adapter | Complete; 109/109 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
-| 5 | Passport and MRZ engine | Waiting for approval |
-| 6 | International generic passport adapter | Not started |
+| 4 | Cambodia NSSF adapter | Complete; real-OCR and live PostgreSQL E2E passed; Docker pending |
+| 5 | Passport and MRZ engine | Complete; 172/172 tests; real-OCR and live PostgreSQL E2E passed; Docker pending |
+| 6 | International generic passport adapter | Waiting for approval |
 | 7 | QR/barcode engine | Not started |
 | 8 | Face detection and quality | Not started |
 | 9 | Face embeddings and 1:1 comparison | Not started |
@@ -219,7 +262,7 @@ does not claim production readiness or functioning verification engines.
 ## Approval requirement
 
 `Document.md`, section 31, states: **“Stop and wait for approval before next
-phase.”** Phase 5 will begin only after that approval.
+phase.”** Phase 6 will begin only after that approval.
 
 ## Earlier reference work
 

@@ -137,7 +137,7 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
     async def test_health_and_inventory_are_honest(self):
         code, body, _ = await call(self.app, "/health/live")
         self.assertEqual(code, 200)
-        self.assertEqual(body["phase"], 4)
+        self.assertEqual(body["phase"], 5)
         code, body, _ = await call(self.app, "/health/ready")
         self.assertEqual(code, 503)  # create_all is not a migration deployment.
         code, body, _ = await call(self.app, "/v1/document-types", headers=self.headers)
@@ -145,11 +145,14 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
         statuses = {row["type"]: row["adapter_status"] for row in body["document_types"]}
         self.assertEqual(statuses.pop("KH_NATIONAL_ID"), "AVAILABLE")
         self.assertEqual(statuses.pop("KH_NSSF"), "AVAILABLE")
+        self.assertEqual(statuses.pop("KH_PASSPORT"), "AVAILABLE")
+        self.assertEqual(statuses.pop("PASSPORT"), "AVAILABLE")
         self.assertTrue(all(value == "PLANNED" for value in statuses.values()))
         code, body, _ = await call(self.app, "/v1/countries", headers=self.headers)
         self.assertEqual(code, 200)
         self.assertEqual(len(body["countries"]), 249)
         self.assertEqual(body["verification_adapters_available"], ["KH"])
+        self.assertEqual(body["any_country_document_types"], ["PASSPORT"])
 
     async def test_no_public_transition_endpoint(self):
         identity = (await self.create())["session_id"]

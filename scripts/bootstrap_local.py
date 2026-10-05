@@ -36,5 +36,7 @@ with engine.begin() as connection:
     # Phase 3 extraction writes encrypted fields and processing metadata on the document.
     connection.execute(sa.text("GRANT UPDATE ON identity_documents TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON document_fields TO kyc_app"))
+    # Phase 5 MRZ engine results.
+    connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON mrz_results TO kyc_app"))
 engine.dispose()
-print("Migrations through Phase 3 applied and local organization provisioned.")
+print("Migrations through Phase 5 applied and local organization provisioned.")

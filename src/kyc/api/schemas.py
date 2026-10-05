@@ -69,11 +69,29 @@ class ResultIdentity(BaseModel):
     nationality: str | None = None
 
 
+class MRZCheckDigit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected: str = Field(min_length=1, max_length=1)
+    computed: str = Field(pattern=r"^[0-9]$")
+    valid: bool
+
+
+class ResultMRZ(BaseModel):
+    """Internal consistency evidence; raw MRZ and optional personal data stay encrypted."""
+
+    model_config = ConfigDict(extra="forbid")
+    format: Literal["TD1", "TD2", "TD3", "UNKNOWN"]
+    mrz_valid: bool
+    check_digit_results: dict[str, MRZCheckDigit]
+    field_consistency: dict[str, Literal["MATCH", "MISMATCH", "MRZ_ONLY", "VIZ_ONLY"]]
+
+
 class SessionResult(BaseModel):
     session_id: UUID
     status: SessionStatus
     document: ResultDocument | None = None
     identity: ResultIdentity | None = None
+    mrz: ResultMRZ | None = None
     checks: dict[str, str] = Field(default_factory=dict)
     review_flags: list[str] = Field(default_factory=list, description="Reason codes that a reviewer or the risk engine must consider.")
     decision: None = Field(default=None, description="Set by the risk engine (Phase 13); never by extraction alone.")

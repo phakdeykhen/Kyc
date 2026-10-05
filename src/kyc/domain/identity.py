@@ -33,7 +33,7 @@ class OCRField(BaseModel):
     confidence: float = Field(ge=0, le=1)
     bbox: tuple[float, float, float, float] | None = None
     side: str | None = None
-    source: Literal["OCR", "DERIVED"] = "OCR"
+    source: Literal["OCR", "DERIVED", "MRZ"] = "OCR"
     flags: tuple[str, ...] = ()
 
 

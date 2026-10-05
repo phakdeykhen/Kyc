@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from kyc.api.dependencies import TenantContext
 from kyc.core.crypto import FieldCipher
-from kyc.db.models import AuditLog, DocumentCheck, DocumentField, DocumentImage, IdentityDocument, KYCSession
+from kyc.db.models import AuditLog, DocumentCheck, DocumentField, DocumentImage, IdentityDocument, KYCSession, MRZResult
 from kyc.db.session import set_tenant
 from kyc.documents.adapters import adapter_for
 from kyc.documents.preprocess import prepare_side
@@ -30,6 +30,7 @@ from kyc.domain.identity import OCRLine
 from kyc.domain.state_machine import Event, TERMINAL_STATUSES
 from kyc.engines.capture_quality import HeuristicDocumentQualityEngine, decode_capture
 from kyc.engines.contracts import CheckEvidence
+from kyc.mrz.reader import read_mrz_lines
 from kyc.services.sessions import apply_event, aware
 from kyc.storage.captures import CaptureStore
 
@@ -124,10 +125,17 @@ class DocumentProcessor:
             data = self.store.get(image.encrypted_object_ref, record.organization_id, record.id, image.id)
             capture = decode_capture(data, max_bytes=len(data), max_pixels=self.max_pixels)
             prepared, located[side] = prepare_side(capture.pixels, aspect, self.quality)
-            read = self.ocr.read_lines(prepared, self.languages)
+            layout = getattr(adapter, "layout", None)
+            viz = layout.viz_regions.get(side) if layout else None
+            read = (self.ocr.read_region(prepared, viz, self.languages) if viz and hasattr(self.ocr, "read_region")
+                    else self.ocr.read_lines(prepared, self.languages))
             refinement = getattr(adapter, "numeric_refinement", None)
             if refinement and set(refinement.languages) <= self.ocr.available_languages():
                 read = refine_numeric_words(self.ocr, prepared, read, refinement)
+            region = layout.mrz_regions.get(side) if layout else None
+            if region and hasattr(self.ocr, "read_region"):
+                # Dedicated MRZ pass: ICAO alphabet only, so '<' fillers survive.
+                read = read + read_mrz_lines(self.ocr, prepared, region)
             lines[side] = read
 
         classifications = {side: adapter.classify(lines[side], side) for side in sides}
@@ -169,6 +177,16 @@ class DocumentProcessor:
         document.processed_at = datetime.now(timezone.utc)
         if extracted.document_number:
             document.document_number_hmac = self.cipher.lookup_hash(extracted.document_number, adapter.document_type.value)
+        db.execute(sa.delete(MRZResult).where(MRZResult.organization_id == record.organization_id,
+                                              MRZResult.session_id == record.id, MRZResult.document_id == document.id))
+        mrz_check = next((check for check in checks if check.check_type == "MRZ" and "format" in check.details), None)
+        if mrz_check is not None:
+            consistency = next((check.details.get("field_consistency", {}) for check in checks
+                                if check.check_type == "MRZ_CONSISTENCY"), {})
+            db.add(MRZResult(organization_id=record.organization_id, session_id=record.id, document_id=document.id,
+                             format=mrz_check.details["format"], mrz_valid=mrz_check.details["mrz_valid"],
+                             check_digit_results=mrz_check.details["check_digit_results"],
+                             field_consistency=consistency))
         for check in checks:
             db.add(DocumentCheck(organization_id=record.organization_id, session_id=record.id, document_id=document.id,
                                  check_type=check.check_type, result=check.result,

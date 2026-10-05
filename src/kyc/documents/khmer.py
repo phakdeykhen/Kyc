@@ -82,3 +82,36 @@ def khmer_text(text: str) -> Normalized:
         # A Khmer-script field with no Khmer text is a misread, not a value.
         return Normalized(None, ("EXPECTED_KHMER_SCRIPT",))
     return Normalized(value)
+
+
+LATIN_MONTHS = {name: index for index, name in enumerate(
+    ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"), start=1)}
+KHMER_MONTHS = {name: index for index, name in enumerate(
+    ("មករា", "កុម្ភៈ", "មីនា", "មេសា", "ឧសភា", "មិថុនា", "កក្កដា", "សីហា", "កញ្ញា", "តុលា", "វិច្ឆិកា", "ធ្នូ"), start=1)}
+_TEXT_DATE = re.compile(r"(?<![0-9០-៩])([0-9០-៩]{1,2})\s+(.{2,24}?)\s*([0-9០-៩]{4})(?![0-9០-៩])")
+
+
+def parse_date_any(text: str) -> Normalized:
+    """Numeric dates, or passport-style "15 MAR 1990" / "15 មីនា/MAR 1990"."""
+    numeric = parse_date(text)
+    if numeric.value or "INVALID_DATE" in numeric.flags:
+        return numeric
+    match = _TEXT_DATE.search(clean(text).upper())
+    if not match:
+        return Normalized(None, ("DATE_NOT_FOUND",))
+    middle = match.group(2)
+    months = {LATIN_MONTHS[token[:3]] for token in re.findall(r"[A-Z]{3,9}", middle) if token[:3] in LATIN_MONTHS}
+    months |= {number for name, number in KHMER_MONTHS.items() if name in middle}
+    if len(months) != 1:
+        return Normalized(None, ("MONTH_UNRECOGNIZED" if not months else "MONTH_SOURCES_DISAGREE",))
+    flags = digits_to_ascii(match.group(1) + match.group(3)).flags
+    try:
+        return Normalized(date(int(match.group(3).translate(_DIGIT_MAP)), months.pop(),
+                               int(match.group(1).translate(_DIGIT_MAP))).isoformat(), flags)
+    except ValueError:
+        return Normalized(None, flags + ("INVALID_DATE",))
+
+
+def plain_text(text: str) -> Normalized:
+    value = clean(text).strip(" :;.-")
+    return Normalized(value or None, () if value else ("EMPTY_VALUE",))
