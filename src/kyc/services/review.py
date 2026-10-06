@@ -57,13 +57,17 @@ def _session(db: Session, reviewer: ReviewerContext, session_id: UUID, lock: boo
 
 
 # Queue -----------------------------------------------------------------------------
-def queue(db: Session, reviewer: ReviewerContext, limit: int, offset: int) -> dict:
+def queue(db: Session, reviewer: ReviewerContext, limit: int, offset: int, order: str = "oldest",
+          include_expired: bool = False) -> dict:
     reviewer.require("VIEW_CASE")
-    scope = (KYCSession.organization_id == reviewer.organization_id, KYCSession.status == SessionStatus.MANUAL_REVIEW)
-    total = db.scalar(sa.select(sa.func.count()).select_from(KYCSession).where(*scope)) or 0
-    rows = db.scalars(sa.select(KYCSession).where(*scope).order_by(KYCSession.updated_at, KYCSession.id)
-                      .limit(limit).offset(offset)).all()
     now = datetime.now(timezone.utc)
+    scope = [KYCSession.organization_id == reviewer.organization_id, KYCSession.status == SessionStatus.MANUAL_REVIEW]
+    if not include_expired:
+        scope.append(KYCSession.expires_at > now)
+    total = db.scalar(sa.select(sa.func.count()).select_from(KYCSession).where(*scope)) or 0
+    order_clause = (KYCSession.updated_at.desc(), KYCSession.id.desc()) if order == "newest" else (KYCSession.updated_at.asc(), KYCSession.id.asc())
+    rows = db.scalars(sa.select(KYCSession).where(*scope).order_by(*order_clause)
+                      .limit(limit).offset(offset)).all()
     items = []
     for record in rows:
         assessment = _latest(db, RiskAssessmentRecord, record)

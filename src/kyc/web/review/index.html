@@ -31,6 +31,10 @@
           <h1 id="queue-title">Waiting for review <span id="queue-count" class="count"></span></h1>
           <button type="button" id="refresh" class="secondary small-button">Refresh</button>
         </div>
+        <div class="queue-controls">
+          <input id="search-id" placeholder="Paste session UUID to open..." spellcheck="false">
+          <button type="button" id="open-by-id" class="secondary small-button">Open</button>
+        </div>
         <ol id="queue" class="queue-list"></ol>
         <p id="queue-empty" class="muted" hidden>No cases are waiting. New cases appear here when the risk engine asks for a human check.</p>
       </section>

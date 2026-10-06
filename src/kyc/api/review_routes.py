@@ -29,9 +29,11 @@ def me(review: Review):
 
 @router.get("/queue")
 def review_queue(review: Review, limit: Annotated[int, Query(ge=1, le=100)] = 25,
-                 offset: Annotated[int, Query(ge=0, le=100_000)] = 0):
-    """Cases waiting in MANUAL_REVIEW, longest-waiting first."""
-    return service.queue(review.db, review.reviewer, limit, offset)
+                 offset: Annotated[int, Query(ge=0, le=100_000)] = 0,
+                 order: Literal["oldest", "newest"] = "oldest",
+                 include_expired: bool = False):
+    """Cases waiting in MANUAL_REVIEW."""
+    return service.queue(review.db, review.reviewer, limit, offset, order=order, include_expired=include_expired)
 
 
 @router.get("/{session_id}")

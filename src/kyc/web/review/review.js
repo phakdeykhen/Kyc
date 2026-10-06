@@ -45,7 +45,7 @@ function since(iso) {
 
 // Sign in ---------------------------------------------------------------------------
 async function signIn(event) {
-  event.preventDefault();
+  if (event && event.preventDefault) event.preventDefault();
   state.org = $("org-id").value.trim();
   state.token = $("token").value.trim();
   $("token").value = "";
@@ -79,8 +79,8 @@ function signOut() {
 }
 
 // Queue -----------------------------------------------------------------------------
-async function loadQueue() {
-  const result = await api("/v1/review/queue?limit=100");
+async function loadQueue(preferredCaseId) {
+  const result = await api("/v1/review/queue?limit=100&order=newest");
   if (!result.ok) return signOutOnAuth(result);
   const { items, total } = result.body;
   $("queue-count").textContent = `(${total})`;
@@ -99,6 +99,10 @@ async function loadQueue() {
     button.addEventListener("click", () => openCase(item.session_id));
     return el("li", {}, button);
   }));
+  const targetId = preferredCaseId || (state.current && state.current.session.session_id) || (items.length > 0 ? items[0].session_id : null);
+  if (targetId && (!state.current || state.current.session.session_id !== targetId)) {
+    await openCase(targetId);
+  }
 }
 
 function signOutOnAuth(result) {
@@ -279,9 +283,47 @@ async function submitDecision(event) {
 
 $("sign-in-form").addEventListener("submit", signIn);
 $("sign-out").addEventListener("click", signOut);
-$("refresh").addEventListener("click", loadQueue);
+$("refresh").addEventListener("click", () => loadQueue());
 $("actions").addEventListener("change", chooseAction);
 $("reason").addEventListener("change", updateSubmit);
 $("note").addEventListener("input", updateSubmit);
 $("decision").addEventListener("submit", submitDecision);
 window.addEventListener("pagehide", clearImages);
+
+function getParams() {
+  const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+  const params = new URLSearchParams(hash || window.location.search);
+  return {
+    org: params.get("org") || params.get("organization_id"),
+    token: params.get("token"),
+    caseId: params.get("case") || params.get("session_id"),
+  };
+}
+
+const searchInput = $("search-id");
+const openBtn = $("open-by-id");
+if (openBtn && searchInput) {
+  openBtn.addEventListener("click", () => {
+    const id = searchInput.value.trim();
+    if (id) openCase(id);
+  });
+  searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const id = searchInput.value.trim();
+      if (id) openCase(id);
+    }
+  });
+}
+
+window.addEventListener("DOMContentLoaded", async () => {
+  const params = getParams();
+  if (params.org) $("org-id").value = params.org;
+  if (params.token) $("token").value = params.token;
+  if (params.org && params.token) {
+    await signIn(new Event("submit"));
+    if (params.caseId) {
+      await openCase(params.caseId);
+    }
+  }
+});
