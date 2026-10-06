@@ -174,9 +174,9 @@ def assemble(candidates: list[str], today: date | None = None) -> tuple[str, tup
             syntax_valid = bool(re.fullmatch(r"[A-Z<]+", cleaned) and cleaned.strip("<"))
             if name != "TD1":
                 syntax_valid = syntax_valid and bool(fit[0][2:5].strip("<"))
-            # A reading that kept the full line width beats one padded after losing its tail: misread
-            # trailing filler is recognisable noise, but a truncated line can hide it as a fake initial.
-            return (syntax_valid, "<<" in cleaned, -fit[1], -noise)
+            # A reading with fewer noisy trailing characters beats one filled with misread noise;
+            # check the name separator in the unpadded name rather than against trailing '<' padding.
+            return (syntax_valid, "<<" in cleaned.rstrip("<"), -noise, -fit[1])
 
         chosen_name = max(pools[name_position], key=name_quality)
         # TD2/TD3 checks depend only on line 2; TD1 checks depend on lines 1 and 2.
@@ -476,7 +476,14 @@ def compare(mrz: MRZResult, visual: dict[str, object]) -> dict[str, str]:
         elif viz_value in (None, ""):
             outcome[name] = "MRZ_ONLY"
         else:
-            outcome[name] = "MATCH" if str(mrz_value).replace("<", "") == str(viz_value) else "MISMATCH"
+            mrz_clean = str(mrz_value).replace("<", "")
+            viz_clean = str(viz_value).replace("<", "")
+            match = (mrz_clean == viz_clean)
+            if not match and name == "document_number":
+                # National IDs (e.g. Cambodia) may print 10 digits while TD1 allocates 9 characters
+                # to the document number (positions 6-14) followed by the check digit in position 15.
+                match = viz_clean.startswith(mrz_clean) or mrz_clean.startswith(viz_clean)
+            outcome[name] = "MATCH" if match else "MISMATCH"
     viz_name, mrz_name = _name_tokens(visual.get("full_name")), _name_tokens(mrz.full_name)
     if viz_name and mrz_name:
         same = _names_match(mrz, viz_name, mrz_name)

@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     liveness_challenge_ttl_seconds: int = Field(default=120, ge=30, le=600)
     max_liveness_attempts: int = Field(default=5, ge=1, le=20)
     max_liveness_bytes: int = Field(default=16 * 1024 * 1024, ge=500_000, le=64 * 1024 * 1024)
-    liveness_policy_version: str = Field(default="ACTIVE-GEOMETRY-2026.10.1", min_length=1, max_length=80)
+    liveness_policy_version: str = Field(default="ACTIVE-GEOMETRY-2026.10.2", min_length=1, max_length=80)
     liveness_calibrated: bool = False
     # Phase 11 ePassport chip. Directory of trusted CSCA certificates (PEM/DER), e.g. from the ICAO PKD.
     nfc_csca_trust_store: Path | None = None

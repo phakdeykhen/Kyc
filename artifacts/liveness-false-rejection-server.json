@@ -1,0 +1,8 @@
+{
+  "health_live_status": 200,
+  "health_ready_status": 200,
+  "capture_status": 200,
+  "updated_capture_wording": true,
+  "configured_liveness_policy": "ACTIVE-GEOMETRY-2026.10.2",
+  "configured_liveness_calibrated": false
+}

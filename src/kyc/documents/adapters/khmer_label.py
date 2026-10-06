@@ -23,7 +23,7 @@ from kyc.engines.contracts import CheckEvidence
 from kyc.mrz import parser as mrz_parser
 from kyc.mrz.parser import clean_line as clean_mrz
 
-MRZ_LINE = re.compile(r"^[A-Z0-9<]{25,44}$")
+MRZ_LINE = re.compile(r"^[A-Z0-9<]{20,44}$")
 LATIN_NAME_LINE = re.compile(r"^[A-Z][A-Z' \-]{2,}$")
 _ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
 KINGDOM_CUES = ("ព្រះរាជាណាចក្រកម្ពុជា", "ជាតិ សាសនា ព្រះមហាក្សត្រ")
@@ -306,6 +306,11 @@ class KhmerLabelAdapter:
         for line in front:
             if id(line) in labelled_lines or khmer.DATE_PATTERN.search(line.text):
                 continue
+            cleaned = clean_mrz(line.text)
+            if ("MRZ_PASS" in line.notes or MRZ_LINE.fullmatch(cleaned)
+                    or (self.layout.back_marker and cleaned.startswith(self.layout.back_marker))
+                    or cleaned.count("<") >= 2):
+                continue
             converted = khmer.digits_to_ascii(line.text)
             for match in re.finditer(rule.pattern, converted.value):
                 candidates.append((line.bbox[1], match.group(1), line, converted.flags, line.text))
@@ -453,7 +458,8 @@ class KhmerLabelAdapter:
             existing = next((item for item in fields if item.field == name), None)
             if value is None or (existing is not None and existing.normalized_value):
                 continue
-            trusted = parsed.check_digits.get(digit, {}).get("valid") if digit else parsed.mrz_valid
+            trusted = parsed.check_digits.get(digit, {}).get("valid") if digit else (
+                parsed.mrz_valid or mrz_parser._fields_verified(parsed))
             if not trusted:
                 continue
             name_line = 2 if parsed.format == "TD1" else 0

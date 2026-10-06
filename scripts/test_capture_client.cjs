@@ -78,6 +78,10 @@ const enqueue = (body, status = 200) => queue.push({ body, status });
   assert.equal(JSON.parse(requests.at(-3).options.body).scope, 'DOCUMENT_PROCESSING');
   assert.equal(run('state.mode'), 'processing');
   assert.ok(timers.length, 'Processing schedules a refresh');
+  assert.equal(elements.verdict.textContent, 'DATA PAGE photo accepted', 'Capture acceptance describes the photo');
+  assert.match(elements.next.textContent, /Photo quality passed.*checking your document details.*Identity verification is still in progress/,
+    'Passing photo quality does not claim that identity verification is complete');
+  assert.doesNotMatch(elements.next.textContent, /DOCUMENT_PROCESSING/, 'The capture handoff uses plain language');
   enqueue(session('SELFIE_REQUIRED'));
   await run('refreshSession()');
   assert.equal(run('state.mode'), 'selfie');
@@ -137,6 +141,21 @@ const enqueue = (body, status = 200) => queue.push({ body, status });
   await run('resumeSession()');
   assert.match(elements.verdict.textContent, /Identity verified/);
   assert.match(elements.verdict.className, /ok/);
+  assert.equal(elements.scores.children.length, 0, 'Verified outcomes clear photo quality meters');
+  run('state.sides = ["FRONT", "BACK"]');
+  await run(`showResult(${JSON.stringify({ capture_status: 'ACCEPTED', side: 'BACK', status: 'DOCUMENT_PROCESSING',
+    instructions: [], quality, sides: { FRONT: 'ACCEPTED', BACK: 'ACCEPTED' }, attempts_remaining: 18 })})`);
+  assert.equal(elements.verdict.textContent, 'BACK photo accepted');
+  assert.equal(elements.scores.children.length, 16, 'Accepted document photos display their quality checks');
+  enqueue(session('REJECTED'));
+  enqueue({ status: 'REJECTED', decision: { result: 'FAIL', reason_codes: ['LIVENESS_FAILED'] } });
+  await run('refreshSession()');
+  assert.equal(run('state.mode'), 'done');
+  assert.equal(elements.verdict.textContent, 'We could not verify your identity');
+  assert.equal(elements.scores.children.length, 0, 'Rejected outcomes clear previous photo quality meters');
+  assert.equal(elements.instructions.children.length, 0, 'Final outcomes clear earlier capture instructions');
+  assert.doesNotMatch(elements.next.textContent + elements.verdict.textContent, /LIVENESS_FAILED|FAIL|REJECTED/,
+    'Rejected outcomes keep diagnostic codes out of the person-facing page');
   context.navigator.mediaDevices.getUserMedia = async () => { throw new Error('Camera blocked'); };
   enqueue(session('SELFIE_REQUIRED'));
   await run('resumeSession()');

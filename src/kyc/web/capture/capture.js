@@ -518,7 +518,7 @@ function showResult(body) {
   $("result").hidden = false;
   const accepted = body.capture_status === "ACCEPTED";
   $("verdict").className = `verdict ${accepted ? "ok" : "retry"}`;
-  $("verdict").textContent = accepted ? `${body.side.replace("_", " ")} accepted` : `Please retake the ${body.side.replace("_", " ")}`;
+  $("verdict").textContent = accepted ? `${body.side.replace("_", " ")} photo accepted` : `Please retake the ${body.side.replace("_", " ")}`;
   $("instructions").replaceChildren(...body.instructions.map((code) => {
     const item = document.createElement("li");
     item.textContent = TEXT[code] || "Please take another clear document photo.";
@@ -543,7 +543,7 @@ function showResult(body) {
   renderSides(body.sides);
   $("next").textContent = state.current
     ? `Next: capture the ${state.current.replace("_", " ")}. ${body.attempts_remaining} attempts left.`
-    : `All sides accepted. Session status: ${body.status}. The document engine takes over from here.`;
+    : "Photo quality passed for all sides. We are now checking your document details. Identity verification is still in progress.";
   if (!state.current) {
     stopCamera();
     $("hint").textContent = "Capture complete.";

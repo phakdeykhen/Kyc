@@ -1,0 +1,40 @@
+{
+  "issue": "uncalibrated flat geometry caused automatic rejection",
+  "observed_rejection": "LIVENESS_FAILED",
+  "observed_liveness_reason": "FLAT_FACE_PRESENTATION",
+  "document_quality": "PASS",
+  "document_expiry": "PASS",
+  "face_match": "REVIEW",
+  "existing_session_decision": "preserved",
+  "correction": "Uncalibrated flat geometry requires manual review; cannot automatically verify. Calibrated flat failures and identical-frame replay failures are preserved.",
+  "policy_version": "ACTIVE-GEOMETRY-2026.10.2",
+  "targeted_tests": {
+    "passed": 35,
+    "duration_seconds": 9.42,
+    "transcript": "artifacts/liveness-false-rejection-tests.txt"
+  },
+  "capture_client_smoke": "passed",
+  "full_suite": {
+    "tests": 452,
+    "passed": 452,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "duration_seconds": 216.37,
+    "transcript": "artifacts/liveness-false-rejection-full-tests.txt"
+  },
+  "phone_test_server": {
+    "health_live_status": 200,
+    "health_ready_status": 200,
+    "capture_status": 200,
+    "updated_capture_wording": true,
+    "configured_liveness_policy": "ACTIVE-GEOMETRY-2026.10.2",
+    "configured_liveness_calibrated": false,
+    "restarted": true
+  },
+  "limitations": [
+    "Liveness frames are not stored; original capture cannot be replayed.",
+    "Face/liveness remain uncalibrated and document authenticity is unverified; genuine applicants can require manual review."
+  ],
+  "success": true
+}

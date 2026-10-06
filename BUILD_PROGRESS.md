@@ -2,8 +2,38 @@
 
 Updated: 6 October 2026. The full requirements in `Document.md` control the build.
 Phases 1–18 are implemented. The user authorized Phases 17 and 18 on 6 October 2026.
-Load/performance testing is complete: 445/445 tests passed, with no skips. Work is paused
-at the Phase 18 approval gate; Phase 19 (GCP production deployment) has not started.
+Load/performance testing is complete; subsequent phone-test corrections passed
+with no skips. Work is paused at the Phase 18 approval gate; Phase 19 (GCP production
+deployment) has not started.
+
+## Phone-test Khmer ID extraction & MRZ matching correction (6 October 2026)
+
+Following real card test observations from `var/real-id-debug.json`:
+1. **MRZ candidate extraction.** `MRZ_LINE` regex minimum length changed from 25 to 20, matching the TD1 assembler minimum width and preventing truncated name lines (`KHEN<<PHAKDEY<<<<<<<<<<<`) from being discarded before assembly.
+2. **Name selection.** In `mrz/parser.py`, `name_quality` checks for `<<` within `cleaned.rstrip("<")` (distinguishing the name separator from trailing `<` filler) and prioritizes low noise (`-noise`) over unpadded line length (`-fit[1]`), selecting clean lines over lines with trailing OCR filler noise (`CCCCCCEECEEEEE`).
+3. **Number extraction.** In `KhmerLabelAdapter._number`, lines matching MRZ patterns (`clean_mrz.count("<") >= 2`, `MRZ_PASS`, `back_marker`) are excluded from visual number extraction so that raw MRZ lines (`IDKHMO...`) are not falsely extracted as visual document numbers (`405477038`).
+4. **MRZ field fallback.** In `KhmerLabelAdapter._fill_from_mrz`, `sex` and `full_name` are populated when `_fields_verified(parsed)` is true (document number, birth date, and expiry date check digits pass), even if optional data composite check digit is unverified due to trailing noise.
+5. **Cambodian ID layout & comparison.** `CambodiaNationalIDAdapter` updated to policy `KH-NID-ADAPTER-2026.10.3` supporting 9-10 digit numbers (`\d{9,10}`) and additional label variations. MRZ comparison allows 10-digit visual numbers to match 9-digit TD1 MRZ numbers when prefixed by them.
+
+## Phone-test liveness correction (6 October 2026)
+
+The reported Khmer ID session was rejected solely for `LIVENESS_FAILED`, from an
+uncalibrated `FLAT_FACE_PRESENTATION` finding. The current document photos and expiry
+passed; OCR/MRZ and face comparison remained review findings. The landmark heuristic
+can also flag a live 3D head with expression/estimation displacement.
+
+Policy `ACTIVE-GEOMETRY-2026.10.2` routes uncertain flat geometry to manual review,
+without automatically verifying it. Identical-image replay and calibrated flat-geometry
+failures remain failures. Existing recorded decisions are preserved. Capture wording
+now distinguishes photo quality acceptance from identity verification.
+
+Targeted liveness/risk regressions: **35/35 passed**, including a synthetic live-head
+false-rejection reproduction, manual-review handoff and replay rejection. Capture-client
+smoke passed. The full suite passed **452/452 tests with no skips** in 216.370 seconds,
+including live PostgreSQL and native face inference. The local HTTPS phone-test server
+on port 8443 was restarted; liveness policy `.2`, health/live, health/ready and updated
+capture wording were verified. Refresh the capture page and create a new session;
+[validation summary](artifacts/liveness-false-rejection-validation.json).
 
 ## Phase 18 implementation (6 October 2026)
 
@@ -379,8 +409,9 @@ Implemented active liveness. The server issues a single-use, random head-movemen
 challenge (frontal baseline + three distinct moves, 24 sequences, 256-bit nonce stored
 only as a hash, 120 s TTL). The client returns 4–12 raw frames tagged with step indices.
 Each move is verified with an affine-invariant 3D test on YuNet landmarks: flat faces
-keep the nose's eye/mouth-frame coordinates; real heads move them. Flat-face presentations
-and single-image replays FAIL. Every frame must still be the selfie's person (SFace
+keep the nose's eye/mouth-frame coordinates; real heads move them. Single-image replays
+FAIL; uncertain flat geometry requires REVIEW under the uncalibrated policy following
+the 6 October phone-test correction. Every frame must still be the selfie's person (SFace
 continuity). Incomplete challenges are retryable within an attempt limit. Frames are
 never stored; `liveness_checks` keeps outcomes, metrics, coverage and the nonce hash.
 The policy is uncalibrated, so the best result is REVIEW. The capture page gained the

@@ -159,11 +159,35 @@ class AssessorTests(unittest.TestCase):
         calibrated = self.run_frames(self.live(), ActiveLivenessPolicy(calibrated=True))
         self.assertEqual(calibrated.result, CheckResult.PASS)
 
-    def test_a_printed_or_screen_photo_is_failed_as_flat(self):
+    def test_uncalibrated_flat_geometry_requires_review_and_never_passes(self):
         frames = [(0, real_head("LOOK_STRAIGHT")), (1, flat_photo(35, 0)), (2, flat_photo(0, 30)), (3, flat_photo(-35, 0))]
         outcome = self.run_frames(frames)
+        self.assertEqual((outcome.result, outcome.attack_type, outcome.retryable),
+                         (CheckResult.REVIEW, "POSSIBLE_PRINTED_OR_SCREEN_PHOTO", False))
+        self.assertIn("FLAT_FACE_PRESENTATION", outcome.reason_codes)
+        self.assertIn("UNCALIBRATED_LIVENESS_POLICY", outcome.reason_codes)
+        self.assertLess(outcome.metrics["steps_completed"], outcome.metrics["steps_required"])
+        self.assertLess(outcome.score, 1.0)
+
+    def test_calibrated_flat_geometry_preserves_failure(self):
+        frames = [(0, real_head("LOOK_STRAIGHT")), (1, flat_photo(35, 0)), (2, flat_photo(0, 30)), (3, flat_photo(-35, 0))]
+        outcome = self.run_frames(frames, ActiveLivenessPolicy(calibrated=True))
         self.assertEqual((outcome.result, outcome.attack_type), (CheckResult.FAIL, "PRINTED_OR_SCREEN_PHOTO"))
         self.assertEqual(outcome.reason_codes, ["FLAT_FACE_PRESENTATION"])
+
+    def test_live_landmark_displacement_does_not_cause_uncalibrated_rejection(self):
+        # A 3D live head with modest mouth/nose landmark displacement can trigger
+        # the planar heuristic despite containing no printed or screen photo.
+        baseline = real_head("LOOK_STRAIGHT")
+        displaced = tuple((x, y + (22 if index in (3, 4) else 11 if index == 2 else 0))
+                          for index, (x, y) in enumerate(baseline))
+        small_left = project(HEAD @ rotation(5, 0))
+        small_right = project(HEAD @ rotation(-5, 0))
+        outcome = self.run_frames([(0, baseline), (1, small_left), (2, displaced), (3, small_right)])
+        self.assertGreater(outcome.metrics["flat_face_frames"], 0)
+        self.assertEqual(outcome.result, CheckResult.REVIEW)
+        self.assertIn("UNCALIBRATED_LIVENESS_POLICY", outcome.reason_codes)
+        self.assertFalse(all(step["completed"] for step in outcome.steps))
 
     def test_one_image_replayed_for_every_step_is_failed(self):
         engine, data = self.engine, None
@@ -246,14 +270,31 @@ class LivenessAPITests(BiometricAPICase):
             self.assertFalse(check.evidence_metadata["frames_retained"])
             self.assertEqual(db.scalar(sa.select(sa.func.count()).select_from(SelfieCapture)), 1)  # frames were not stored
 
-    async def test_flat_photo_attack_is_recorded_as_fail_and_handed_to_assessment(self):
+    async def test_uncalibrated_flat_geometry_goes_to_manual_review_without_verifying(self):
         session_id, engine = await self.at_liveness()
         code, issued, _ = await self.challenge(session_id)
         code, body, _ = await self.submit(session_id, issued, self.follow(engine, issued, flat=True))
-        self.assertEqual((body["result"], body["attack_type"], body["status"]), ("FAIL", "PRINTED_OR_SCREEN_PHOTO", "PROCESSING"))
+        self.assertEqual((body["result"], body["attack_type"], body["status"]),
+                         ("REVIEW", "POSSIBLE_PRINTED_OR_SCREEN_PHOTO", "PROCESSING"))
         code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
-        self.assertEqual(result["checks"]["liveness"], "FAIL")
+        self.assertEqual(result["checks"]["liveness"], "REVIEW")
+        self.assertEqual(result["status"], "MANUAL_REVIEW")
+        self.assertEqual(result["decision"]["result"], "REVIEW")
+        self.assertIn("LIVENESS_INCONCLUSIVE", result["decision"]["reason_codes"])
+        self.assertNotIn("LIVENESS_FAILED", result["decision"]["reason_codes"])
         self.assertIn("LIVENESS_FLAT_FACE_PRESENTATION", result["review_flags"])
+
+    async def test_identical_replay_still_rejects_session(self):
+        session_id, engine = await self.at_liveness()
+        code, issued, _ = await self.challenge(session_id)
+        data = engine.frame(real_head("LOOK_STRAIGHT"))
+        frames = [(item["index"], data) for item in issued["steps"]]
+        code, body, _ = await self.submit(session_id, issued, frames)
+        self.assertEqual(body["result"], "FAIL")
+        self.assertIn("STATIC_IMAGE_REPLAY", body["reason_codes"])
+        code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual(result["status"], "REJECTED")
+        self.assertIn("LIVENESS_FAILED", result["decision"]["reason_codes"])
 
     async def test_challenges_are_single_use_bound_to_their_nonce_and_expire(self):
         session_id, engine = await self.at_liveness()
@@ -341,6 +382,6 @@ class NativePhotoAttackTests(unittest.TestCase):
             image.save(buffer, "PNG")
             frames.append((index, image, str(hash(buffer.getvalue()))))
         outcome = assess(frames, steps, engine, None, FaceMatchPolicy())
-        self.assertTrue(outcome.result == CheckResult.FAIL or outcome.retryable, outcome)
+        self.assertIn(outcome.result, (CheckResult.FAIL, CheckResult.REVIEW), outcome)
         self.assertNotIn(CheckResult.PASS, (outcome.result,))
         self.assertFalse(all(step["completed"] for step in outcome.steps[1:]) if outcome.steps else False)
