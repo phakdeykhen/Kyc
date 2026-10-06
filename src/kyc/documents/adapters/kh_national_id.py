@@ -1,8 +1,9 @@
 """Cambodia National ID (Khmer Identity Card) adapter — a layout on the shared Khmer label engine.
 
-Layout assumptions to confirm against official specimens before production: the label
-set below, the unlabelled 9-digit number at the top, Khmer numerals, a single validity
-label holding "issue … expiry", and an "IDKHM" TD1 MRZ on the lower back.
+Confirmed on a real card (6 October 2026 phone test): the portrait side carries the Khmer
+labels, the Latin name and the "IDKHM" TD1 MRZ along its bottom; the back is mostly a
+fingerprint/seal area with no identity text. Still to confirm against official specimens:
+the full label set, the unlabelled 9-digit number at the top, and the validity label.
 """
 
 from kyc.documents.adapters.khmer_label import (  # noqa: F401  (find_label re-exported)
@@ -30,8 +31,12 @@ LAYOUT = CardLayout(
     multiline={"place_of_birth": 1, "address": 2},
     validity_label="validity",
     back_marker="IDKHM",
+    mrz_on_front=True,
+    # A check-digit-valid MRZ already proves number, birth date and sex; an unreadable Khmer name then
+    # goes to a reviewer instead of looping the person through recaptures.
+    mrz_relieves=("full_name_local",),
     mrz_formats=("TD1",),
-    mrz_regions={"BACK": (0.0, 0.45, 1.0, 1.0)},
+    mrz_regions={"FRONT": (0.0, 0.62, 1.0, 1.0)},
     mrz_document_code="ID",
     mrz_issuing_state="KHM",
     portrait_regions={"FRONT": (0.0, 0.15, 0.27, 0.83)},
@@ -40,4 +45,4 @@ LAYOUT = CardLayout(
 
 class CambodiaNationalIDAdapter(KhmerLabelAdapter):
     layout = LAYOUT
-    policy = AdapterPolicy(version="KH-NID-ADAPTER-2026.10.1", typical_validity_years=(9, 11))
+    policy = AdapterPolicy(version="KH-NID-ADAPTER-2026.10.2", typical_validity_years=(9, 11))

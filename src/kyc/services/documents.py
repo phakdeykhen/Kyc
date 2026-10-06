@@ -158,7 +158,8 @@ class DocumentProcessor:
         classifications = {side: adapter.classify(lines[side], side) for side in sides}
         notes: list[str] = []
         if "FRONT" in classifications and "BACK" in classifications and \
-                classifications["FRONT"].document_side == "BACK" and classifications["BACK"].document_side == "FRONT":
+                classifications["FRONT"].document_side != "FRONT" and classifications["BACK"].document_side == "FRONT":
+            # Also covers a nearly blank back (UNKNOWN) uploaded as the front.
             # The person uploaded the sides the wrong way round; use them as they really are.
             lines["FRONT"], lines["BACK"] = lines["BACK"], lines["FRONT"]
             classifications["FRONT"], classifications["BACK"] = classifications["BACK"], classifications["FRONT"]

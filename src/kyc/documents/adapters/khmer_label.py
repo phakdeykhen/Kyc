@@ -93,7 +93,11 @@ class CardLayout:
     important_fields: tuple[str, ...]
     multiline: dict[str, int] = field(default_factory=dict)
     validity_label: str | None = None                       # one label holding "issue … expiry"
-    back_marker: str | None = None                          # MRZ prefix printed on the back
+    back_marker: str | None = None                          # MRZ prefix that identifies the card's MRZ
+    mrz_on_front: bool = False                              # the MRZ shares the portrait side (real KH ID)
+    # Critical fields that a fully check-digit-valid MRZ makes non-blocking: their absence means
+    # REVIEW instead of recapture (e.g. a Khmer name the OCR cannot read when the MRZ identifies the card).
+    mrz_relieves: tuple[str, ...] = ()
     expiry_printed: bool = True                             # False: a missing expiry is NOT_APPLICABLE
     sides: tuple[str, ...] = ("FRONT", "BACK")
     mrz_formats: tuple[str, ...] = ()                       # expected ICAO formats, e.g. ("TD1",)
@@ -175,9 +179,13 @@ class KhmerLabelAdapter:
         if not labels and not has_number:
             front = 0.0  # headings alone (often printed on the back too) do not make a front
         mrz = [clean_mrz(line.text) for line in mrz_candidates(lines)]
+        marked = bool(layout.back_marker) and any(item.startswith(layout.back_marker) for item in mrz)
         back = 0.0
-        if mrz:
-            back = 0.7 if layout.back_marker and any(item.startswith(layout.back_marker) for item in mrz) else 0.35
+        if mrz and layout.mrz_on_front:
+            # The card's own MRZ is printed under the portrait: evidence of the front, never of the back.
+            front += 0.4 if marked else 0.1
+        elif mrz:
+            back = 0.7 if marked else 0.35
         back += min(0.2, 0.1 * headers) if not labels else 0
         if front >= back and front > 0:
             side, confidence = "FRONT", min(1.0, front)
@@ -460,8 +468,12 @@ class KhmerLabelAdapter:
             by_name[name].normalized_value if name in by_name else None)
         checks: list[CheckEvidence] = []
 
-        missing_critical = [name for name in layout.critical_fields if not present(name)]
-        missing_important = [name for name in layout.important_fields if not present(name)]
+        mrz_field = by_name.get("mrz")
+        mrz_verified = bool(mrz_field and "CHECK_DIGITS_VALID" in mrz_field.flags)
+        relieved = set(layout.mrz_relieves) if mrz_verified else set()
+        missing_critical = [name for name in layout.critical_fields if not present(name) and name not in relieved]
+        missing_important = [name for name in layout.important_fields if not present(name)] + \
+            [name for name in layout.critical_fields if not present(name) and name in relieved]
         if missing_critical:
             checks.append(CheckEvidence(CheckResult.FAIL, ("CRITICAL_FIELD_MISSING",), check_type="REQUIRED_FIELDS",
                                         details={"missing": missing_critical + missing_important}))

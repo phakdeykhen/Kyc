@@ -36,7 +36,8 @@ class DecodedCapture:
 
 @dataclass(frozen=True)
 class DocumentQualityPolicy:
-    version: str = "DOC-CAPTURE-HEURISTIC-2026.10.1"
+    # 2026.10.2: an image already cropped to the document (uploads, scanner apps) is accepted.
+    version: str = "DOC-CAPTURE-HEURISTIC-2026.10.2"
     calibrated: bool = False
     analysis_long_side: int = 400
     detail_long_side: int = 1000
@@ -57,6 +58,9 @@ class DocumentQualityPolicy:
     min_shadow: float = 0.35
     min_perspective: float = 0.75
     min_overall: float = 0.50
+    # A whole image whose shape matches the document within this tolerance, and in which the document
+    # fills the frame (or cannot be told apart from it), is treated as already cropped to the document.
+    precrop_aspect_tolerance: float = 0.06
 
 
 @dataclass(frozen=True)
@@ -202,8 +206,22 @@ class HeuristicDocumentQualityEngine:
         document = self._locate(small)
         geometry: dict = {"document_detected": document is not None}
         scores = dict.fromkeys(SCORE_NAMES, 0.0)
+        precropped = self._precropped(height, width, document, expected_aspect)
 
-        if document is None:
+        if precropped:
+            # The image is the document: no background, so no framing checks. Image quality still applies.
+            landscape = width >= height
+            scores.update(perspective_score=1.0, document_coverage=1.0,
+                          resolution_score=round(_ramp(max(height, width), 400, p.detail_long_side), 3))
+            geometry = {"document_detected": True, "precropped": True,
+                        "orientation": "LANDSCAPE" if landscape else "PORTRAIT",
+                        "rotation_hint_degrees": 0 if landscape else 90, "skew_degrees": 0.0,
+                        "corners": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]}
+            if max(height, width) < p.min_document_long_side_px:
+                flag("RESOLUTION_TOO_LOW", "USE_HIGHER_RESOLUTION")
+            inset_y, inset_x = round(height * 0.03), round(width * 0.03)
+            region = pixels[inset_y:height - inset_y, inset_x:width - inset_x]
+        elif document is None:
             flag("DOCUMENT_NOT_DETECTED", "USE_CONTRASTING_BACKGROUND")
             region = pixels
         else:
@@ -272,7 +290,7 @@ class HeuristicDocumentQualityEngine:
 
         if scores["brightness_score"] < p.min_brightness:
             flag("TOO_DARK", "MORE_LIGHT") if mean_luminance < 128 else flag("TOO_BRIGHT", "LESS_LIGHT")
-        elif document is not None and scores["blur_score"] < p.min_blur:
+        elif (document is not None or precropped) and scores["blur_score"] < p.min_blur:
             # Sharpness is only judged under usable exposure; dark frames read as blurry.
             flag("IMAGE_BLURRY", "HOLD_STILL")
         if scores["glare_score"] < p.min_glare:
@@ -280,7 +298,7 @@ class HeuristicDocumentQualityEngine:
         if scores["shadow_score"] < p.min_shadow:
             flag("SHADOW_DETECTED", "AVOID_SHADOW")
 
-        coverage_score = 0.0 if document is None else min(_ramp(scores["document_coverage"], 0.05, 0.35),
+        coverage_score = 1.0 if precropped else 0.0 if document is None else min(_ramp(scores["document_coverage"], 0.05, 0.35),
                                                             1 - _ramp(scores["document_coverage"], 0.85, 1.0))
         components = [scores[name] for name in ("blur_score", "glare_score", "brightness_score", "shadow_score",
                                                  "perspective_score", "resolution_score")] + [coverage_score]
@@ -291,14 +309,40 @@ class HeuristicDocumentQualityEngine:
         return QualityAssessment(accepted=not reasons, scores=scores, reason_codes=tuple(reasons),
                                  instructions=tuple(instructions), geometry=geometry, policy_version=p.version)
 
-    def locate_corners(self, pixels: np.ndarray) -> np.ndarray | None:
-        """Document quadrilateral (TL, TR, BR, BL) in source pixel coordinates, or None."""
+    def locate_corners(self, pixels: np.ndarray, expected_aspect: float | None = None) -> np.ndarray | None:
+        """Document quadrilateral (TL, TR, BR, BL) in source pixel coordinates, or None.
+
+        With expected_aspect, an image already cropped to the document returns its own corners.
+        """
         small = _resize(pixels, self.policy.analysis_long_side).astype(np.float32)
         found = self._locate(small)
+        height, width = pixels.shape[:2]
+        if expected_aspect is not None and self._precropped(height, width, found, expected_aspect):
+            return np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype=np.float32)
         if found is None:
             return None
         factor = max(pixels.shape[:2]) / max(small.shape[:2])
         return found[0] * factor
+
+    def _precropped(self, height: int, width: int, document, expected_aspect: float) -> bool:
+        """The image is the document itself: the frame has the document's shape, and either the
+        region found reaches all four image edges (no background anywhere) or nothing document-shaped
+        stands out because the border is the document. A card that is merely too close still shows
+        background on some side and gets MOVE_BACK; 4:3 and 16:9 camera frames never qualify."""
+        p = self.policy
+        frame_aspect = max(height, width) / max(1, min(height, width))
+        if abs(frame_aspect / expected_aspect - 1) > p.precrop_aspect_tolerance:
+            return False
+        if document is None:
+            return True
+        corners, coverage, sides_touched, _ = document
+        if sides_touched == 4:
+            return True
+        horizontal = (np.linalg.norm(corners[1] - corners[0]) + np.linalg.norm(corners[2] - corners[3])) / 2
+        vertical = (np.linalg.norm(corners[3] - corners[0]) + np.linalg.norm(corners[2] - corners[1])) / 2
+        aspect = max(horizontal, vertical) / max(1e-6, min(horizontal, vertical))
+        framed_card = coverage >= p.min_coverage and abs(aspect / expected_aspect - 1) <= p.aspect_tolerance
+        return not framed_card and not sides_touched
 
     def _locate(self, small: np.ndarray):
         """Largest foreground region that contrasts with the frame border, as a quadrilateral."""
@@ -342,8 +386,9 @@ class HeuristicDocumentQualityEngine:
         quad_area = _shoelace(corners + np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32))
         if quad_area <= 0 or main_area / quad_area < p.min_rectangularity:
             return None
-        touches = xs.min() <= 1 or ys.min() <= 1 or xs.max() >= width - 2 or ys.max() >= height - 2
-        return corners, main_area / (height * width), bool(touches), bool(secondary)
+        # How many image edges the region reaches (0–4); non-zero means the document may be cut off.
+        touches = sum((xs.min() <= 1, ys.min() <= 1, xs.max() >= width - 2, ys.max() >= height - 2))
+        return corners, main_area / (height * width), int(touches), bool(secondary)
 
     @staticmethod
     def _shadow(luminance: np.ndarray) -> float:

@@ -1,7 +1,8 @@
 from io import BytesIO
 import unittest
 
-from PIL import Image
+import numpy as np
+from PIL import Image, ImageFilter
 
 from kyc.documents.requirements import ID1_ASPECT, TD3_ASPECT
 from kyc.engines.capture_quality import SCORE_NAMES, CaptureRejected, DocumentQualityPolicy, HeuristicDocumentQualityEngine, decode_capture
@@ -66,6 +67,27 @@ class QualityGateTests(unittest.TestCase):
         self.assertTrue(result.accepted, result.reason_codes)
         self.assertEqual(result.geometry["orientation"], "PORTRAIT")
         self.assertEqual(result.geometry["rotation_hint_degrees"], 90)
+
+    def test_an_image_already_cropped_to_the_card_is_accepted(self):
+        # Uploads and scanner apps send the card alone, with no background around it.
+        result = assess(images.card(1400))
+        self.assertTrue(result.accepted, result.reason_codes)
+        self.assertTrue(result.geometry["precropped"])
+        self.assertEqual(result.scores["document_coverage"], 1.0)
+        corners = HeuristicDocumentQualityEngine().locate_corners(np.asarray(images.card(1400)), ID1_ASPECT)
+        self.assertEqual(corners.tolist(), [[0, 0], [1399, 0], [1399, 882], [0, 882]])
+        # Image quality still applies to a cropped card.
+        self.assertIn("RESOLUTION_TOO_LOW", assess(images.card(500)).reason_codes)
+        self.assertIn("IMAGE_BLURRY", assess(images.card(1400).filter(ImageFilter.GaussianBlur(6))).reason_codes)
+
+    def test_a_camera_frame_cut_through_the_card_is_not_mistaken_for_a_crop(self):
+        for frame in ((1600, 1200), (1920, 1080)):   # 4:3 and 16:9 phone frames are not card-shaped
+            with self.subTest(frame=frame):
+                close = images.scene(images.card(1900), size=frame)
+                result = assess(close)
+                self.assertFalse(result.accepted)
+                self.assertNotIn("precropped", result.geometry)
+        self.assertNotIn("precropped", assess(images.card(1200, ratio=1.0)).geometry, "A square crop is not an ID card")
 
     def test_policy_is_versioned_and_marked_uncalibrated(self):
         policy = DocumentQualityPolicy()
