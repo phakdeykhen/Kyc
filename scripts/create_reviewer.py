@@ -36,6 +36,8 @@ settings = get_settings()
 if settings.migration_database_url is None:
     raise SystemExit("MIGRATION_DATABASE_URL is required to manage reviewers.")
 organization = args.organization or settings.development_organization_id
+if organization is None:
+    raise SystemExit("Pass --organization.")
 engine = sa.create_engine(settings.migration_database_url.get_secret_value())
 with Session(engine) as db, db.begin():
     set_tenant(db, organization)

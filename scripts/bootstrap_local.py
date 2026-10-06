@@ -21,10 +21,11 @@ if url is None:
 configuration = Config(str(root / "alembic.ini"))
 command.upgrade(configuration, "head")
 engine = sa.create_engine(url.get_secret_value(), pool_pre_ping=True)
-with Session(engine) as db, db.begin():
-    set_tenant(db, settings.development_organization_id)
-    if not db.get(Organization, settings.development_organization_id):
-        db.add(Organization(id=settings.development_organization_id, name="Local development organization"))
+if settings.development_organization_id is not None:
+    with Session(engine) as db, db.begin():
+        set_tenant(db, settings.development_organization_id)
+        if not db.get(Organization, settings.development_organization_id):
+            db.add(Organization(id=settings.development_organization_id, name="Local development organization"))
 with engine.begin() as connection:
     connection.execute(sa.text("GRANT USAGE ON SCHEMA public TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT ON organizations, alembic_version TO kyc_app"))
@@ -56,5 +57,9 @@ with engine.begin() as connection:
     connection.execute(sa.text("GRANT SELECT, INSERT ON manual_reviews TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT, DELETE ON selfie_captures, face_quality_checks, biometric_templates, face_comparisons TO kyc_app"))
     connection.execute(sa.text("GRANT SELECT, INSERT ON consents TO kyc_app"))
+    # Phase 15: the API looks keys up, records last use and revocation, and lets a keys:manage
+    # credential create keys for its own organization. Organizations stay read-only to the API.
+    connection.execute(sa.text("GRANT SELECT, INSERT ON api_keys TO kyc_app"))
+    connection.execute(sa.text("GRANT UPDATE (last_used_at, revoked_at) ON api_keys TO kyc_app"))
 engine.dispose()
-print("Migrations through phase 14 applied and local organization provisioned.")
+print("Migrations through phase 15 applied and local organization provisioned.")

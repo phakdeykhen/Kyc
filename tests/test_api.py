@@ -7,6 +7,7 @@ from pydantic import ValidationError
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
+from kyc import __schema_revision__
 from kyc.core.config import Settings
 from kyc.db.models import AuditLog, Base, KYCSession, Organization
 from kyc.db.session import build_engine
@@ -141,8 +142,8 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
     async def test_health_and_inventory_are_honest(self):
         code, body, _ = await call(self.app, "/health/live")
         self.assertEqual(code, 200)
-        self.assertEqual(body["phase"], 14)
-        self.assertEqual(body["implemented_phases"], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+        self.assertEqual(body["phase"], 15)
+        self.assertEqual(body["implemented_phases"], list(range(1, 16)))
         code, body, _ = await call(self.app, "/health/ready")
         self.assertEqual(code, 503)  # create_all is not a migration deployment.
         code, body, _ = await call(self.app, "/v1/document-types", headers=self.headers)
@@ -173,7 +174,7 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
         code, _, _ = await call(self.app, "/health/ready")
         self.assertEqual(code, 503)
         with self.engine.begin() as connection:
-            connection.execute(sa.text("UPDATE alembic_version SET version_num = '0008_phase14'"))
+            connection.execute(sa.text("UPDATE alembic_version SET version_num = :revision"), {"revision": __schema_revision__})
         code, body, _ = await call(self.app, "/health/ready")
         self.assertEqual(code, 200)
         self.assertEqual(body["status"], "ready")

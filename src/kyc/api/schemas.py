@@ -54,6 +54,13 @@ class SessionResponse(BaseModel):
     version: int
 
 
+class ClientTokenResponse(BaseModel):
+    session_id: UUID
+    client_token: str = Field(description="Shown once. Give it to the device; it works only for this session.")
+    scope: str
+    expires_at: datetime
+
+
 class ResultDocument(BaseModel):
     country: str | None
     type: DocumentType
@@ -128,6 +135,7 @@ class SessionResult(BaseModel):
     status: SessionStatus
     document: ResultDocument | None = None
     identity: ResultIdentity | None = None
+    identity_masked: bool = Field(default=False, description="True when the credential lacks the results:identity scope.")
     mrz: ResultMRZ | None = None
     face_comparison: FaceComparisonSummary | None = None
     checks: dict[str, str] = Field(default_factory=dict)

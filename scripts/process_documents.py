@@ -34,7 +34,10 @@ assessor = SessionAssessor(factory, analyzer, RiskPolicy.load(settings.risk_poli
 reason = processor.unavailable_reason()
 if reason:
     raise SystemExit(f"Document processing unavailable: {reason}")
-organizations = [UUID(value) for value in sys.argv[1:]] or [settings.development_organization_id]
+organizations = [UUID(value) for value in sys.argv[1:]] or [
+    item for item in [settings.development_organization_id] if item is not None]
+if not organizations:
+    raise SystemExit("Pass one or more organization IDs.")
 for organization_id in organizations:
     for session_id in pending_sessions(factory, organization_id):
         outcome = processor.process(organization_id, session_id, uuid4())

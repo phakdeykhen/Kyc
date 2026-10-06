@@ -20,7 +20,10 @@ settings = get_settings()
 store = build_capture_store(settings)
 if store is None:
     raise SystemExit("CAPTURE_ENCRYPTION_KEYS is not configured; nothing to purge.")
-organizations = [UUID(value) for value in sys.argv[1:]] or [settings.development_organization_id]
+organizations = [UUID(value) for value in sys.argv[1:]] or [
+    item for item in [settings.development_organization_id] if item is not None]
+if not organizations:
+    raise SystemExit("Pass one or more organization IDs.")
 engine = build_engine(settings)
 factory = sessionmaker(engine, expire_on_commit=False)
 for organization_id in organizations:

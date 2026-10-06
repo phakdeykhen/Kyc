@@ -62,6 +62,8 @@ class Organization(Record, Base):
     pii_retention_days: Mapped[int] = mapped_column(default=30, server_default="30")
     capture_retention_hours: Mapped[int] = mapped_column(default=24, server_default="24")
     template_retention_hours: Mapped[int] = mapped_column(default=24, server_default="24")
+    # A suspended organization's API keys, client tokens and reviewers stop working (Phase 15).
+    active: Mapped[bool] = mapped_column(sa.Boolean, default=True, server_default=sa.true())
     __table_args__ = (sa.CheckConstraint("pii_retention_days > 0 AND capture_retention_hours > 0 AND template_retention_hours > 0", name="retention_positive"),)
 
 
@@ -76,8 +78,15 @@ class KYCSession(Record, Base):
     expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=now, onupdate=now)
     version: Mapped[int] = mapped_column(default=1, server_default="1")
+    # Phase 15: the credential that created the session, the client's Idempotency-Key with a
+    # fingerprint of the request it was first used with, and the session client token's hash.
+    created_by: Mapped[str | None] = mapped_column(sa.String(128))
+    idempotency_key: Mapped[str | None] = mapped_column(sa.String(128))
+    request_fingerprint: Mapped[str | None] = mapped_column(sa.String(64))
+    client_token_sha256: Mapped[str | None] = mapped_column(sa.String(64))
     __table_args__ = (
         sa.UniqueConstraint("organization_id", "id", name="uq_kyc_sessions_scope_id"),
+        sa.UniqueConstraint("organization_id", "idempotency_key", name="uq_kyc_sessions_idempotency_key"),
         sa.CheckConstraint("expires_at > created_at", name="expiry_after_creation"),
         sa.CheckConstraint("length(country) = 2 AND country = upper(country)", name="country_code"),
         sa.CheckConstraint("version > 0", name="version_positive"),
@@ -345,6 +354,27 @@ class Reviewer(Record, Base):
                       sa.UniqueConstraint("organization_id", "id", name="uq_reviewers_scope_id"),
                       sa.CheckConstraint("role IN ('REVIEWER', 'AUDITOR')", name="reviewer_role"),
                       sa.CheckConstraint("length(token_sha256) = 64", name="token_hash_length"))
+
+
+class ApiKey(Record, Base):
+    """An organization's API credential. Only a SHA-256 of the key is stored; scopes limit what it may do."""
+
+    __tablename__ = "api_keys"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid, sa.ForeignKey("organizations.id", ondelete="RESTRICT"))
+    name: Mapped[str] = mapped_column(sa.String(120))
+    key_prefix: Mapped[str] = mapped_column(sa.String(16))
+    key_sha256: Mapped[str] = mapped_column(sa.String(64))
+    scopes: Mapped[list] = mapped_column(JSON_VALUE, default=list)
+    rate_limit_per_minute: Mapped[int] = mapped_column(sa.Integer, default=600, server_default="600")
+    created_by: Mapped[str] = mapped_column(sa.String(128))
+    expires_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    last_used_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = (sa.UniqueConstraint("key_sha256", name="uq_api_keys_key_sha256"),
+                      sa.UniqueConstraint("organization_id", "id", name="uq_api_keys_scope_id"),
+                      sa.CheckConstraint("length(key_sha256) = 64", name="key_hash_length"),
+                      sa.CheckConstraint("rate_limit_per_minute BETWEEN 1 AND 100000", name="rate_limit_range"),
+                      sa.Index("ix_api_keys_org_created", "organization_id", "created_at"))
 
 
 class Consent(SessionArtifact, Base):

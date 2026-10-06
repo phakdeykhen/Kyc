@@ -89,8 +89,11 @@ def review_session(request: Request,
         set_tenant(db, organization_id)  # RLS: a token can only be found inside its own organization
         row = db.scalar(sa.select(Reviewer).where(Reviewer.organization_id == organization_id,
                                                   Reviewer.token_sha256 == token_hash(token), Reviewer.active.is_(True)))
-        if row is None or not db.get(Organization, organization_id):
+        organization = db.get(Organization, organization_id)
+        if row is None or organization is None:
             raise HTTPException(401, detail="A valid reviewer token is required.")
+        if not organization.active:
+            raise HTTPException(403, detail="This organization is suspended.")
         yield ReviewSession(db, ReviewerContext(organization_id, row.id, row.display_name, row.role, ROLES[row.role]))
 
 

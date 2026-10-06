@@ -14,8 +14,13 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     database_url: SecretStr
     migration_database_url: SecretStr | None = None
-    development_api_key: SecretStr
-    development_organization_id: UUID
+    # Optional local credential with every scope, bound to one organization. Provisioned
+    # API keys (scripts/manage_tenants.py) are the tenant credentials from Phase 15 on.
+    development_api_key: SecretStr | None = None
+    development_organization_id: UUID | None = None
+    # Phase 15 per-credential limits (requests per minute, per API instance).
+    api_rate_limit_per_minute: int = Field(default=600, ge=1, le=100_000)
+    client_token_rate_limit_per_minute: int = Field(default=120, ge=1, le=10_000)
     session_ttl_seconds: int = Field(default=900, ge=60, le=3600)
     db_pool_size: int = Field(default=5, ge=1, le=20)
     db_max_overflow: int = Field(default=5, ge=0, le=20)
@@ -78,8 +83,14 @@ class Settings(BaseSettings):
     def enforce_phase_one_boundary(self):
         if self.environment == "production":
             raise ValueError("Production mode is disabled until tenant credentials and security hardening phases are completed.")
-        if len(self.development_api_key.get_secret_value()) < 32:
-            raise ValueError("DEVELOPMENT_API_KEY must contain at least 32 characters.")
+        if self.development_api_key is not None:
+            key = self.development_api_key.get_secret_value()
+            if len(key) < 32:
+                raise ValueError("DEVELOPMENT_API_KEY must contain at least 32 characters.")
+            if key.startswith(("kyc_", "kst_")):
+                raise ValueError("DEVELOPMENT_API_KEY must not use a provisioned credential prefix.")
+            if self.development_organization_id is None:
+                raise ValueError("DEVELOPMENT_ORGANIZATION_ID is required with DEVELOPMENT_API_KEY.")
         url = self.database_url.get_secret_value()
         if not url.startswith("postgresql+psycopg2://") and not (self.environment == "test" and url.startswith("sqlite")):
             raise ValueError("PostgreSQL with psycopg2 is required; SQLite is permitted only in tests.")

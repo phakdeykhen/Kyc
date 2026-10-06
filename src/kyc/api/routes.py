@@ -1,10 +1,10 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPException, Request, Response, UploadFile, status
 
-from kyc.api.dependencies import Database, Tenant
-from kyc.api.schemas import COUNTRY_CODES, CaptureError, CaptureResponse, DocumentSide, SessionCreate, SessionResponse, SessionResult, SelfieResponse, VerifyResponse
+from kyc.api.dependencies import AnyApiKey, Capture, Database, SessionReader, SessionWriter, StatusReader, TenantContext
+from kyc.api.schemas import COUNTRY_CODES, CaptureError, CaptureResponse, ClientTokenResponse, DocumentSide, SessionCreate, SessionResponse, SessionResult, SelfieResponse, VerifyResponse
 from kyc.documents.adapters import adapter_for
 from kyc.documents.requirements import requirement_for
 from kyc.domain.enums import DocumentType
@@ -14,7 +14,7 @@ from kyc.services.liveness import LivenessLimits, issue_challenge, submit_livene
 from kyc.services.nfc import NFCLimits, issue_nfc_challenge, submit_nfc
 from kyc.services.results import build_result
 from kyc.services.risk import verify_session
-from kyc.services.sessions import create_session, get_session, respond
+from kyc.services.sessions import aware, create_session, get_session, issue_client_token, respond
 
 router = APIRouter(prefix="/v1")
 
@@ -27,22 +27,45 @@ CAPTURE_RESPONSES = {
 }
 
 
-@router.post("/kyc/sessions", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
-def start_session(body: SessionCreate, request: Request, tenant: Tenant, db: Database):
-    record = create_session(db, tenant, body, request.app.state.settings.session_ttl_seconds, request.state.request_id)
+@router.post("/kyc/sessions", response_model=SessionResponse, status_code=status.HTTP_201_CREATED, responses={
+    200: {"model": SessionResponse, "description": "Replay of an earlier request with the same Idempotency-Key."},
+    409: {"description": "Idempotency-Key already used with a different request."},
+})
+def start_session(body: SessionCreate, request: Request, response: Response, tenant: SessionWriter, db: Database,
+                  idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key", min_length=8, max_length=128,
+                                                                pattern=r"^[A-Za-z0-9._:-]+$")] = None):
+    """Create a session. Send an Idempotency-Key so that retrying after a timeout cannot create a duplicate."""
+    record, replayed = create_session(db, tenant, body, request.app.state.settings.session_ttl_seconds,
+                                      request.state.request_id, idempotency_key)
+    if replayed:
+        response.status_code = status.HTTP_200_OK
+        response.headers["Idempotent-Replayed"] = "true"
     return respond(record)
 
 
 @router.get("/kyc/{session_id}", response_model=SessionResponse)
-def read_session(session_id: UUID, request: Request, tenant: Tenant, db: Database):
+def read_session(session_id: UUID, request: Request, tenant: StatusReader, db: Database):
     return respond(get_session(db, tenant, session_id, request.state.request_id))
 
 
-@router.get("/kyc/{session_id}/result", response_model=SessionResult)
-def read_result(session_id: UUID, request: Request, tenant: Tenant, db: Database):
+@router.post("/kyc/{session_id}/client-token", response_model=ClientTokenResponse, status_code=status.HTTP_201_CREATED,
+             responses={409: {"description": "The session is closed."}})
+def client_token(session_id: UUID, request: Request, tenant: SessionWriter, db: Database):
+    """Issue a token for the user's device: it can capture evidence for, and read the status of, this session only.
+
+    Issuing a new token revokes the previous one. Never ship an API key to a browser or mobile app.
+    """
     record = get_session(db, tenant, session_id, request.state.request_id)
-    # Extracted evidence only; the PASS/REVIEW/FAIL decision belongs to the risk engine (Phase 13).
-    return build_result(db, record, request.app.state.field_cipher)
+    token = issue_client_token(db, tenant, record, request.state.request_id)
+    return ClientTokenResponse(session_id=record.id, client_token=token, scope="session:capture",
+                               expires_at=aware(record.expires_at))
+
+
+@router.get("/kyc/{session_id}/result", response_model=SessionResult)
+def read_result(session_id: UUID, request: Request, tenant: SessionReader, db: Database):
+    """Identity fields are masked unless the credential holds the results:identity scope."""
+    record = get_session(db, tenant, session_id, request.state.request_id)
+    return build_result(db, record, request.app.state.field_cipher, reveal_identity="results:identity" in tenant.scopes)
 
 
 def _process_after_commit(state, organization_id: UUID, session_id: UUID, request_id: UUID) -> None:
@@ -61,7 +84,7 @@ def _assess_if_processing(outcome, background: BackgroundTasks, request: Request
     return outcome
 
 
-def _capture(session_id: UUID, side: str, file: UploadFile, request: Request, tenant: Tenant, db: Database,
+def _capture(session_id: UUID, side: str, file: UploadFile, request: Request, tenant: TenantContext, db: Database,
              background: BackgroundTasks):
     state = request.app.state
     if state.capture_store is None:
@@ -79,20 +102,20 @@ def _capture(session_id: UUID, side: str, file: UploadFile, request: Request, te
 
 
 @router.post("/kyc/{session_id}/documents", response_model=CaptureResponse, responses=CAPTURE_RESPONSES)
-def upload_document(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
+def upload_document(session_id: UUID, request: Request, tenant: Capture, db: Database, background: BackgroundTasks,
                     side: Annotated[DocumentSide, Form()], file: Annotated[UploadFile, File()]):
     """Upload one side. Passports use DATA_PAGE; cards use FRONT and BACK."""
     return _capture(session_id, side, file, request, tenant, db, background)
 
 
 @router.post("/kyc/{session_id}/documents/front", response_model=CaptureResponse, responses=CAPTURE_RESPONSES)
-def upload_front(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
+def upload_front(session_id: UUID, request: Request, tenant: Capture, db: Database, background: BackgroundTasks,
                  file: Annotated[UploadFile, File()]):
     return _capture(session_id, "FRONT", file, request, tenant, db, background)
 
 
 @router.post("/kyc/{session_id}/documents/back", response_model=CaptureResponse, responses=CAPTURE_RESPONSES)
-def upload_back(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
+def upload_back(session_id: UUID, request: Request, tenant: Capture, db: Database, background: BackgroundTasks,
                 file: Annotated[UploadFile, File()]):
     return _capture(session_id, "BACK", file, request, tenant, db, background)
 
@@ -104,7 +127,7 @@ def upload_back(session_id: UUID, request: Request, tenant: Tenant, db: Database
     429: {"model": CaptureError, "description": "Selfie attempt limit reached."},
     503: {"description": "Models, encrypted storage, or document portrait unavailable."},
 })
-def upload_selfie(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
+def upload_selfie(session_id: UUID, request: Request, tenant: Capture, db: Database, background: BackgroundTasks,
                   file: Annotated[UploadFile, File()], biometric_consent: Annotated[bool, Form()]):
     """Assess one selfie and compare it only to this session's document portrait."""
     state, settings = request.app.state, request.app.state.settings
@@ -128,7 +151,7 @@ def _liveness_limits(settings) -> LivenessLimits:
     409: {"model": CaptureError, "description": "Session is not waiting for liveness."},
     429: {"model": CaptureError, "description": "Liveness attempt limit reached."},
 })
-def liveness_challenge(session_id: UUID, request: Request, tenant: Tenant, db: Database):
+def liveness_challenge(session_id: UUID, request: Request, tenant: Capture, db: Database):
     """Issue a single-use, randomly ordered head-movement challenge (expires quickly)."""
     state = request.app.state
     return issue_challenge(db, tenant, session_id, _liveness_limits(state.settings), state.liveness_policy,
@@ -141,7 +164,7 @@ def liveness_challenge(session_id: UUID, request: Request, tenant: Tenant, db: D
     422: {"description": "Frames unreadable or not matched to steps."},
     503: {"description": "Face models unavailable."},
 })
-def upload_liveness(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
+def upload_liveness(session_id: UUID, request: Request, tenant: Capture, db: Database, background: BackgroundTasks,
                     challenge_id: Annotated[UUID, Form()], nonce: Annotated[str, Form(max_length=128)],
                     frame_steps: Annotated[str, Form(max_length=200, description="Comma-separated step index per frame")],
                     frames: Annotated[list[UploadFile], File(description="Raw (unmirrored) camera frames")]):
@@ -169,7 +192,7 @@ def _nfc_limits(settings) -> NFCLimits:
     409: {"model": CaptureError, "description": "Session is not waiting for the chip step."},
     429: {"model": CaptureError, "description": "Chip attempt limit reached."},
 })
-def nfc_challenge(session_id: UUID, request: Request, tenant: Tenant, db: Database):
+def nfc_challenge(session_id: UUID, request: Request, tenant: Capture, db: Database):
     """Issue a fresh 8-byte Active Authentication challenge for the chip to sign."""
     return issue_nfc_challenge(db, tenant, session_id, _nfc_limits(request.app.state.settings), request.state.request_id)
 
@@ -188,7 +211,7 @@ def _optional_file(upload: UploadFile | None, limit: int) -> bytes | None:
     413: {"description": "Upload exceeds the size limit."},
     429: {"model": CaptureError, "description": "Chip attempt limit reached."},
 })
-def upload_nfc(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
+def upload_nfc(session_id: UUID, request: Request, tenant: Capture, db: Database, background: BackgroundTasks,
                read_status: Annotated[Literal["READ", "NOT_SUPPORTED", "NOT_AVAILABLE", "FAILED"], Form()] = "READ",
                access_protocol: Annotated[Literal["PACE", "BAC"] | None, Form()] = None,
                challenge_id: Annotated[UUID | None, Form()] = None,
@@ -212,14 +235,14 @@ def upload_nfc(session_id: UUID, request: Request, tenant: Tenant, db: Database,
 @router.post("/kyc/{session_id}/verify", response_model=VerifyResponse, responses={
     409: {"model": CaptureError, "description": "Session not ready, expired, or document not processed."},
 })
-def verify(session_id: UUID, request: Request, tenant: Tenant, db: Database):
+def verify(session_id: UUID, request: Request, tenant: SessionWriter, db: Database):
     """Run the deterministic risk engine for a PROCESSING session, or return the decision already made."""
     record = get_session(db, tenant, session_id, request.state.request_id)
     return verify_session(db, tenant, record, request.app.state.assessor, request.state.request_id)
 
 
 @router.get("/document-types")
-def document_types(tenant: Tenant):
+def document_types(tenant: AnyApiKey):
     return {"document_types": [{"type": item.value,
             "country": "KH" if item.value.startswith("KH_") else None,
             "required_sides": list(requirement_for(item).sides),
@@ -228,7 +251,7 @@ def document_types(tenant: Tenant):
 
 
 @router.get("/countries")
-def countries(tenant: Tenant):
+def countries(tenant: AnyApiKey):
     # Country-specific adapters, plus document types read from their ICAO MRZ whatever the issuing country.
     return {"countries": sorted(COUNTRY_CODES), "verification_adapters_available": ["KH"],
             "any_country_document_types": ["PASSPORT"]}

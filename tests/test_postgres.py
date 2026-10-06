@@ -178,6 +178,18 @@ class PostgreSQLIsolationTests(unittest.TestCase):
                 self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM reviewers")).scalar_one(), 0)
                 connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_a)})
 
+                # Phase 15: API keys are found only inside their own organization's context.
+                key_insert = sa.text("""INSERT INTO api_keys (id, organization_id, name, key_prefix, key_sha256, scopes, created_by)
+                  VALUES (:id, :org, 'Key', 'kyc_test', :sha, '["sessions:read"]', 'test')""")
+                connection.execute(key_insert, {"id": uuid4(), "org": org_a, "sha": "c" * 64})
+                with self.assertRaises(sa.exc.ProgrammingError), connection.begin_nested():
+                    connection.execute(key_insert, {"id": uuid4(), "org": org_b, "sha": "d" * 64})
+                connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_b)})
+                self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM api_keys WHERE key_sha256 = :sha"),
+                                                    {"sha": "c" * 64}).scalar_one(), 0)
+                connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_a)})
+                self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM api_keys")).scalar_one(), 1)
+
                 secondary_session, secondary_document, secondary_template = uuid4(), uuid4(), uuid4()
                 now = datetime.now(timezone.utc)
                 connection.execute(sa.text("""INSERT INTO kyc_sessions
