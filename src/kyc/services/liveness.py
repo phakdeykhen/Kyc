@@ -161,7 +161,8 @@ def submit_liveness(db: Session, tenant: TenantContext, session_id: UUID, challe
                          result=outcome.result, score=outcome.score, attack_type=outcome.attack_type,
                          model_name=MODEL_NAME, model_version=f"{policy.version}; {engine.detector_name} {engine.detector_version}",
                          challenge_hash=item.nonce_hash, evidence_metadata=evidence))
-    if outcome.retryable:
+    retry_allowed = outcome.retryable and remaining > 0
+    if retry_allowed:
         _audit(db, record, tenant, request_id, "LIVENESS_RETRY_REQUIRED", outcome.reason_codes)
     else:
         _audit(db, record, tenant, request_id, "LIVENESS_RECORDED", outcome.reason_codes, result=outcome.result.value,
