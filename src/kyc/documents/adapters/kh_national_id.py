@@ -35,6 +35,7 @@ LAYOUT = CardLayout(
     # A check-digit-valid MRZ already proves number, birth date and sex; an unreadable Khmer name then
     # goes to a reviewer instead of looping the person through recaptures.
     mrz_relieves=("full_name_local",),
+    mrz_name_surname_first=True,
     mrz_formats=("TD1",),
     mrz_regions={"FRONT": (0.0, 0.62, 1.0, 1.0)},
     mrz_document_code="ID",

@@ -149,6 +149,9 @@ class DocumentProcessor:
             if refinement and set(refinement.languages) <= self.ocr.available_languages():
                 read = refine_numeric_words(self.ocr, prepared, read, refinement)
             region = layout.mrz_regions.get(side) if layout else None
+            if layout and getattr(layout, "mrz_on_front", False):
+                # Either upload may be the MRZ side, so both get the MRZ pass (Phase 18 real-card test).
+                region = layout.mrz_regions.get("FRONT")
             if region and hasattr(self.ocr, "read_region"):
                 # Dedicated MRZ pass: ICAO alphabet only, so '<' fillers survive.
                 read = read + read_mrz_lines(self.ocr, prepared, region)
@@ -157,9 +160,11 @@ class DocumentProcessor:
         capture_sides = {side: side for side in sides}
         classifications = {side: adapter.classify(lines[side], side) for side in sides}
         notes: list[str] = []
-        if "FRONT" in classifications and "BACK" in classifications and \
-                classifications["FRONT"].document_side != "FRONT" and classifications["BACK"].document_side == "FRONT":
-            # Also covers a nearly blank back (UNKNOWN) uploaded as the front.
+        front_class, back_class = classifications.get("FRONT"), classifications.get("BACK")
+        if front_class and back_class and back_class.document_side == "FRONT" and (
+                front_class.document_side != "FRONT" or back_class.confidence > front_class.confidence):
+            # The sides were uploaded the wrong way round. Also covers a nearly blank back (UNKNOWN) uploaded
+            # as the front, and two "front"-like images where the uploaded back is clearly the stronger front.
             # The person uploaded the sides the wrong way round; use them as they really are.
             lines["FRONT"], lines["BACK"] = lines["BACK"], lines["FRONT"]
             classifications["FRONT"], classifications["BACK"] = classifications["BACK"], classifications["FRONT"]

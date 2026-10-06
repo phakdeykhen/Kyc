@@ -15,7 +15,7 @@ from tests import images
 from tests.helpers import call
 from tests.test_captures_api import GOOD, GOOD_BACK, PASSPORT, CaptureAPICase
 from tests.test_capture_store import keyring
-from tests.test_kh_national_id import BACK, NSSF_BACK, front_lines, line, nssf_front
+from tests.test_kh_national_id import BACK, CARD_BACK, NSSF_BACK, front_lines, line, nssf_front
 from tests.test_mrz import ICAO_TD3, kh_passport_page, page_line
 from tests.mrz_build import td3
 
@@ -68,7 +68,7 @@ class DocumentProcessingTests(CaptureAPICase):
         return body
 
     async def test_valid_card_is_extracted_and_session_advances_to_selfie(self):
-        self.use_ocr(front_lines(), BACK)
+        self.use_ocr(front_lines() + BACK, CARD_BACK)
         session_id = await self.capture_both()
         self.assertEqual((await self.session(session_id))["status"], "SELFIE_REQUIRED")
         result = await self.result(session_id)
@@ -85,7 +85,7 @@ class DocumentProcessingTests(CaptureAPICase):
         self.assertIsNone(result["decision"])  # extraction never decides
 
     async def test_document_only_level_goes_straight_to_processing(self):
-        self.use_ocr(front_lines(), BACK)
+        self.use_ocr(front_lines() + BACK, CARD_BACK)
         session_id = await self.capture_both(level="DOCUMENT_ONLY")
         # PROCESSING, then the Phase 13 assessment: consistent data alone is not proof the card is genuine.
         self.assertEqual((await self.session(session_id))["status"], "MANUAL_REVIEW")
@@ -93,7 +93,7 @@ class DocumentProcessingTests(CaptureAPICase):
         self.assertEqual(result["decision"]["reason_codes"], ["DOCUMENT_AUTHENTICITY_UNVERIFIED"])
 
     async def test_fields_are_encrypted_bound_and_absent_from_audit_and_checks(self):
-        self.use_ocr(front_lines(), BACK)
+        self.use_ocr(front_lines() + BACK, CARD_BACK)
         session_id = await self.capture_both()
         cipher = self.app.state.field_cipher
         with Session(self.engine) as db:
@@ -120,7 +120,7 @@ class DocumentProcessingTests(CaptureAPICase):
         self.assertIn("DOCUMENT_EXTRACTED", [a.action for a in audits])
 
     async def test_expired_card_is_accepted_as_evidence_and_flagged(self):
-        self.use_ocr(front_lines(validity="០១.០១.២០១០ ដល់ថ្ងៃ ៣១.១២.២០១៩"), BACK)
+        self.use_ocr(front_lines(validity="០១.០១.២០១០ ដល់ថ្ងៃ ៣១.១២.២០១៩") + BACK, CARD_BACK)
         session_id = await self.capture_both()
         result = await self.result(session_id)
         self.assertEqual(result["document"]["expiry_status"], "EXPIRED")
@@ -130,7 +130,7 @@ class DocumentProcessingTests(CaptureAPICase):
 
     async def test_wrong_document_type_requests_recapture_and_clears_captures(self):
         passport = [line("KINGDOM OF CAMBODIA PASSPORT", 0.1)]
-        self.use_ocr(passport, BACK)
+        self.use_ocr(passport, CARD_BACK)
         session_id = await self.capture_both()
         self.assertEqual((await self.session(session_id))["status"], "DOCUMENT_REQUIRED")
         with Session(self.engine) as db:
@@ -144,7 +144,7 @@ class DocumentProcessingTests(CaptureAPICase):
     async def test_recapture_reasons(self):
         cases = [
             ((front_lines(number="១២៣៤"), []), "CRITICAL_FIELD_UNREADABLE"),  # no MRZ to fall back on
-            (([line("hello", 0.1)], BACK), "DOCUMENT_NOT_RECOGNIZED"),
+            (([line("hello", 0.1)], CARD_BACK), "DOCUMENT_NOT_RECOGNIZED"),
             ((front_lines(), front_lines()), "BACK_SIDE_EXPECTED"),
         ]
         for pages, reason in cases:
@@ -158,7 +158,7 @@ class DocumentProcessingTests(CaptureAPICase):
                 self.assertEqual(codes, [[reason]])
 
     async def test_sides_uploaded_the_wrong_way_round_are_handled(self):
-        self.use_ocr(BACK, front_lines())
+        self.use_ocr(CARD_BACK, front_lines() + BACK)
         session_id = await self.capture_both()
         self.assertEqual((await self.session(session_id))["status"], "SELFIE_REQUIRED")
         with Session(self.engine) as db:
@@ -187,7 +187,7 @@ class DocumentProcessingTests(CaptureAPICase):
             self.assertIn("DOCUMENT_PROCESSING_FAILED", db.scalars(sa.select(AuditLog.action)).all())
         factory = self.app.state.session_factory
         self.assertEqual(pending_sessions(factory, self.org), [UUID(session_id)])
-        self.use_ocr(front_lines(), BACK)
+        self.use_ocr(front_lines() + BACK, CARD_BACK)
         outcome = self.app.state.document_processor.process(self.org, UUID(session_id), uuid4())
         self.assertEqual(outcome.status, "ACCEPTED")
         self.assertEqual(pending_sessions(factory, self.org), [])
@@ -221,7 +221,7 @@ class NSSFProcessingTests(DocumentProcessingTests):
         self.assertEqual(document.document_number_hmac, self.app.state.field_cipher.lookup_hash("0012345678", "KH_NSSF"))
 
     async def test_wrong_khmer_card_for_the_claimed_type_is_sent_back(self):
-        for claimed, pages in [("KH_NSSF", (front_lines(), BACK)), ("KH_NATIONAL_ID", (nssf_front(), NSSF_BACK))]:
+        for claimed, pages in [("KH_NSSF", (front_lines() + BACK, CARD_BACK)), ("KH_NATIONAL_ID", (nssf_front(), NSSF_BACK))]:
             with self.subTest(claimed=claimed):
                 self.use_ocr(*pages)
                 session_id = await self.capture_both(claimed)

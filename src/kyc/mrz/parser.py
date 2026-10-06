@@ -100,6 +100,25 @@ def _date_characters(text: str) -> bool:
     return bool(re.fullmatch(r"[0-9<]{6}", text.translate(_TO_DIGIT)))
 
 
+FIELD_CHECKS = ("document_number", "date_of_birth", "expiry_date")
+
+
+def _fields_verified(result: "MRZResult") -> bool:
+    """Document number, birth date and expiry each match their own check digit."""
+    return all(result.check_digits.get(name, {}).get("valid") for name in FIELD_CHECKS)
+
+
+def _td1_tail_repair(line: str) -> str:
+    """TD1 line 2: keep the 18 characters up to the nationality; the optional-data zone after it is
+    filler on most cards, where OCR turns '<' into letters (C, E, K…) or drops the tail. Letters there
+    become '<', a lost tail is refilled, and a composite digit is kept only if one was actually read."""
+    head, tail = line[:18], line[18:]
+    zone = re.sub(r"[A-Z]", "<", tail)
+    composite = zone[-1] if len(zone) >= 12 and zone[-1].isdigit() else "<"
+    body = zone[:-1] if len(zone) >= 12 else zone
+    return head + (body + "<" * 11)[:11] + composite
+
+
 def assemble(candidates: list[str], today: date | None = None) -> tuple[str, tuple[str, ...], list[str]] | None:
     """Pick the best TD1/TD2/TD3 block from candidate lines (in reading order, possibly from several OCR passes).
 
@@ -113,11 +132,25 @@ def assemble(candidates: list[str], today: date | None = None) -> tuple[str, tup
     for name, (count, width) in FORMATS.items():
         name_position = 2 if name == "TD1" else 0
         pools = [[] for _ in range(count)]
-        for line in lines:
+        for raw in lines:
             for position in range(count):
-                fit = _fit(line, width, position == name_position)
-                if fit is None:
-                    continue
+                # The data line (with the check digits) may also carry one stray OCR character; each
+                # single deletion is a candidate that is kept only if every check digit then validates.
+                variants = [(raw, False)]
+                if position == 1 and width - 2 <= len(raw) <= width + 4:
+                    variants += [(raw[:index] + raw[index + 1:], True) for index in range(min(len(raw), width))]
+                if name == "TD1" and position == 1 and 18 <= len(raw) <= width + 6:
+                    variants.append((_td1_tail_repair(raw), True))
+                for line, repaired in variants:
+                    fit = _fit(line, width, position == name_position)
+                    if fit is None:
+                        continue
+                    if repaired:
+                        fit = (fit[0], fit[1], True)
+                    pools[position].append(fit)
+        for position, pool in enumerate(pools):
+            kept = []
+            for fit in dict.fromkeys(pool):
                 fitted = fit[0]
                 if position == 0 and not _header(fitted, name):
                     continue
@@ -128,7 +161,8 @@ def assemble(candidates: list[str], today: date | None = None) -> tuple[str, tup
                         continue
                 if name == "TD1" and position == 2 and not re.fullmatch(r"[A-Z<]+", fitted):
                     continue
-                pools[position].append(fit)
+                kept.append(fit)
+            pools[position] = kept
         if any(not pool for pool in pools):
             continue
 
@@ -140,25 +174,45 @@ def assemble(candidates: list[str], today: date | None = None) -> tuple[str, tup
             syntax_valid = bool(re.fullmatch(r"[A-Z<]+", cleaned) and cleaned.strip("<"))
             if name != "TD1":
                 syntax_valid = syntax_valid and bool(fit[0][2:5].strip("<"))
-            return (syntax_valid, "<<" in cleaned, -noise, -fit[1])
+            # A reading that kept the full line width beats one padded after losing its tail: misread
+            # trailing filler is recognisable noise, but a truncated line can hide it as a fake initial.
+            return (syntax_valid, "<<" in cleaned, -fit[1], -noise)
 
         chosen_name = max(pools[name_position], key=name_quality)
         # TD2/TD3 checks depend only on line 2; TD1 checks depend on lines 1 and 2.
         first_pool = pools[0] if name == "TD1" else [chosen_name]
-        for first in first_pool:
-            for second in pools[1]:
+        # Repaired readings are only tried when no reading as printed validates, so a clean MRZ costs
+        # no extra parses.
+        for allow_repair in (False, True):
+            if allow_repair and best is not None and best[0][0]:
+                break
+            best = _best_block(name, count, first_pool, pools[1], chosen_name, name_quality, today, best, allow_repair)
+    return (best[1], best[2], best[3]) if best else None
+
+
+def _best_block(name, count, first_pool, second_pool, chosen_name, name_quality, today, best, allow_repair):
+    for first in first_pool:
+            for second in second_pool:
                 combo = [first, second] + ([chosen_name] if name == "TD1" else [])
+                if (len(first) > 2 or len(second) > 2) != allow_repair:
+                    continue
                 block = tuple(fit[0] for fit in combo)
                 if len(set(block)) != count:
                     continue
                 result = parse(name, block, today)
+                repaired = any(len(fit) > 2 for fit in combo)
+                if repaired and not (result.data_valid and _fields_verified(result)):
+                    continue  # a repair is only believed when the field check digits then agree
                 valid = sum(item["valid"] for item in result.check_digits.values())
                 adjusted = sum(fit[1] for fit in combo)
                 noise = -name_quality(chosen_name)[2]
-                score = (result.mrz_valid, valid, result.data_valid, -noise, -adjusted, -result.substitutions)
+                score = (result.mrz_valid, valid, result.data_valid, -noise, -repaired, -adjusted, -result.substitutions)
                 if best is None or score > best[0]:
-                    best = (score, name, block, ["MRZ_LINE_LENGTH_ADJUSTED"] if adjusted else [])
-    return (best[1], best[2], best[3]) if best else None
+                    flags = (["MRZ_LINE_LENGTH_ADJUSTED"] if adjusted else []) + (["MRZ_CHAR_CORRECTED"] if repaired else [])
+                    if not result.mrz_valid and _fields_verified(result):
+                        flags.append("MRZ_COMPOSITE_UNVERIFIED")
+                    best = (score, name, block, flags)
+    return best
 
 
 class _Reader:
