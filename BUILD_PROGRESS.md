@@ -1,8 +1,111 @@
 # Build progress — Universal Identity Platform
 
 Updated: 6 October 2026. The full requirements in `Document.md` control the build.
-Phases 1–14 are implemented. Work is paused at the Phase 14 approval gate; Phase 15
-(multi-tenant API and credential provisioning) has not started.
+Phases 1–16 are implemented. The user authorized Phases 15 and 16 together. Work is paused
+at the Phase 16 approval gate; Phase 17 (security/privacy hardening) has not started.
+
+## Phase 16 implementation (6 October 2026)
+
+Implemented signed webhooks and the SDKs:
+- **Transactional outbox.** `apply_event` records each state change. Just before the
+  transaction commits, the changes become `webhook_deliveries` rows (one per subscribed
+  endpoint), so a rolled-back transition sends nothing and a committed one is never lost.
+- **Events.** The spec's six events plus `kyc.recapture.required` and `kyc.expired`.
+  Payloads carry IDs, status, `session_version`, and the decision and review codes, never
+  identity data.
+- **Signing.** `KYC-Signature: t=…,v1=HMAC-SHA256(secret, "t.body")` with a five-minute
+  tolerance. `KYC-Event-ID` is stable across retries for deduplication. Secrets are
+  `whsec_…`, shown once and sealed with the PII keyring. Rotation keeps the old secret
+  signing for 24 h.
+- **Delivery.** API background threads send right after commit, and
+  `scripts/deliver_webhooks.py` sends retries. Claims use `SKIP LOCKED` plus a lease.
+  Backoff runs 30 s → 6 h; a delivery is abandoned after 8 attempts and can be redelivered.
+- **SSRF.** https only. At creation and at every delivery, all resolved addresses must be
+  public; the connection goes to the checked IP; redirects are not followed.
+- **API.** `/v1/webhooks` (CRUD, event types, rotate-secret, test, deliveries, redeliver),
+  scope `webhooks:manage`.
+- **SDKs.** `sdk/python` (stdlib only) and `sdk/typescript` (fetch + Web Crypto) provide
+  server and device clients and webhook verification. `sdk/openapi.json` is the contract
+  for the mobile SDKs, which are specified but not built.
+
+Migration `0010_phase16` adds `webhook_endpoints` and `webhook_deliveries`, both with forced
+RLS. Design: [architecture-phase16.md](docs/architecture-phase16.md).
+
+### Phase 16 validation evidence
+
+- **383 tests: 383 passed, 0 skipped, 0 failures** with live PostgreSQL 18.6 (25 forced-RLS
+  tables) and native face models ([artifacts/phase16-tests.txt](artifacts/phase16-tests.txt)).
+  New tests: 18 in `tests/test_webhooks.py` and 3 in `tests/test_sdk.py`.
+- TypeScript SDK: 4/4 `node --test` and a strict `tsc` 5.9.3 type-check. The test vector
+  signed by the Python server verifies in TypeScript.
+- Live HTTP as `kyc_app` ([artifacts/phase16-live-e2e.json](artifacts/phase16-live-e2e.json)):
+  **21/21 checks passed**. The run covered:
+  - A device token uploaded a rendered specimen passport. Real OCR and the risk engine
+    sent it to manual review, and a reviewer approved it.
+  - The receiver got `document.accepted`, `processing`, `review.required` and `verified`.
+    All of them verified with the SDK, and none contained identity data.
+  - A 500 response was retried. A worker with default settings refused the local
+    (private) receiver at delivery time. Redelivery worked, with the same event ID
+    across attempts.
+  - During rotation, the header carried two signatures and both secrets verified.
+  - The TypeScript SDK ran against the live API and verified a live delivery.
+  - Organization B could not see the webhook rows; secrets were encrypted; `kyc_app`
+    could not hard-delete an endpoint.
+
+### Phase 16 limits
+
+Events may arrive out of order (use `session_version`); background sends are per
+instance, so the worker must run; there is no endpoint auto-disable; secrets use the PII
+keyring until Phase 17 KMS; the SDKs are unpublished; mobile SDKs are not built; Docker
+is configured but not executed (Docker is not installed here).
+
+## Phase 15 implementation (6 October 2026)
+
+Implemented the multi-tenant API:
+- **API keys.** Organizations are provisioned with `scripts/manage_tenants.py`. Each gets
+  scoped, expiring, revocable keys (`kyc_…`), stored only as a SHA-256. A key is looked up
+  inside its own organization's RLS context, so with any other `X-Organization-ID` it
+  simply isn't found.
+- **Scopes** (`sessions:write`, `sessions:read`, `results:identity`, `webhooks:manage`,
+  `keys:manage`) are enforced per route. Results mask identity (first letters, birth
+  year) unless the key holds `results:identity`.
+- **Self-service keys.** `GET/POST /v1/api-keys` and `DELETE /v1/api-keys/{id}`; a key
+  cannot grant more scope or rate limit than its creator holds. `GET /v1/organization`.
+- **Session client tokens** (`kst_…`, `POST /v1/kyc/{id}/client-token`) let a device
+  capture evidence for, and poll the status of, one session without an API key. A new
+  token revokes the old one; it expires with the session.
+- **Idempotency-Key** on session creation: replay → 200 with the same session;
+  different body → 409; unique per organization in the database.
+- **Per-credential rate limits** → 429 with `Retry-After`.
+- **Suspension.** A suspended organization loses API keys, client tokens and reviewers
+  at once (403).
+- The development key is now optional.
+
+Migration `0009_phase15` adds `api_keys` (forced RLS; `kyc_app` may only update
+`last_used_at`/`revoked_at`), `organizations.active` and the session columns.
+Design: [architecture-phase15.md](docs/architecture-phase15.md).
+
+### Phase 15 validation evidence
+
+- **362 tests: 362 passed, 0 skipped, 0 failures** with live PostgreSQL 18 (`api_keys`
+  RLS; 23 forced-RLS tables) and the native face models
+  ([artifacts/phase15-tests.txt](artifacts/phase15-tests.txt)). 18 new tests in
+  `tests/test_tenancy.py`.
+- Live HTTP as `kyc_app`, with two organizations and keys made by the real admin script:
+  **25/25 checks passed** ([artifacts/phase15-live-e2e.json](artifacts/phase15-live-e2e.json)). They covered:
+  - cross-organization 401/404;
+  - scope 403s;
+  - idempotent replay and conflict;
+  - client token limits;
+  - self-service create/escalation/revoke;
+  - suspension and reactivation;
+  - `kyc_app` unable to rewrite key scopes or organizations.
+
+### Phase 15 limits
+
+Rate limits are per process (Memorystore in Phase 19); no IP allow-lists, mTLS or
+request signing (Phase 17); `org list` needs a role that bypasses RLS; organizations
+and retention are changed only by the admin script.
 
 ## Phase 14 implementation (6 October 2026)
 

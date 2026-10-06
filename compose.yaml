@@ -39,6 +39,13 @@ services:
       FACE_MATCH_PASS_THRESHOLD: ${FACE_MATCH_PASS_THRESHOLD:-0.363}
       FACE_MATCH_FAIL_THRESHOLD: ${FACE_MATCH_FAIL_THRESHOLD:-0.20}
       FACE_MATCH_CALIBRATION_REFERENCE: ${FACE_MATCH_CALIBRATION_REFERENCE:-}
+      # Phases 15-16: per-credential rate limits and webhook delivery.
+      API_RATE_LIMIT_PER_MINUTE: ${API_RATE_LIMIT_PER_MINUTE:-600}
+      CLIENT_TOKEN_RATE_LIMIT_PER_MINUTE: ${CLIENT_TOKEN_RATE_LIMIT_PER_MINUTE:-120}
+      WEBHOOK_DELIVERY_MODE: ${WEBHOOK_DELIVERY_MODE:-background}
+      WEBHOOK_TIMEOUT_SECONDS: ${WEBHOOK_TIMEOUT_SECONDS:-10}
+      WEBHOOK_MAX_ATTEMPTS: ${WEBHOOK_MAX_ATTEMPTS:-8}
+      WEBHOOK_SECRET_OVERLAP_HOURS: ${WEBHOOK_SECRET_OVERLAP_HOURS:-24}
     volumes:
       - capture_data:/var/lib/kyc/captures
       - ./var/models:/var/lib/kyc/models:ro
@@ -98,6 +105,27 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+  webhooks:
+    # Sends webhook retries as they come due (and everything in WEBHOOK_DELIVERY_MODE=worker).
+    build: .
+    profiles: [tools]
+    command: ["python", "scripts/deliver_webhooks.py", "--loop", "15"]
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg2://kyc_app:${KYC_APP_PASSWORD}@postgres:5432/kyc
+      # Used only to list organization IDs; deliveries run as kyc_app under each tenant's RLS.
+      MIGRATION_DATABASE_URL: postgresql+psycopg2://kyc_migrator:${POSTGRES_PASSWORD}@postgres:5432/kyc
+      PII_ENCRYPTION_KEYS: ${PII_ENCRYPTION_KEYS}
+      PII_HMAC_KEY: ${PII_HMAC_KEY}
+      WEBHOOK_TIMEOUT_SECONDS: ${WEBHOOK_TIMEOUT_SECONDS:-10}
+      WEBHOOK_MAX_ATTEMPTS: ${WEBHOOK_MAX_ATTEMPTS:-8}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
   redis:
     image: redis:7.4-alpine
     profiles: [future]

@@ -1,0 +1,869 @@
+{
+  "info": {
+    "name": "Universal KYC — Phases 15–16 (tenants, keys, client tokens, webhooks)",
+    "description": "Set base_url, organization_id and api_key (a provisioned kyc_… key with sessions:write, sessions:read, keys:manage and webhooks:manage from scripts/manage_tenants.py), plus webhook_url and a unique idempotency_key. Secrets returned by the API (keys, client tokens, webhook secrets) are shown once; keep them out of shared environments.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "organization_id",
+      "value": ""
+    },
+    {
+      "key": "api_key",
+      "value": ""
+    },
+    {
+      "key": "idempotency_key",
+      "value": "postman-signup-0001"
+    },
+    {
+      "key": "webhook_url",
+      "value": "https://example.com/kyc/events"
+    },
+    {
+      "key": "session_id",
+      "value": ""
+    },
+    {
+      "key": "client_token",
+      "value": ""
+    },
+    {
+      "key": "new_key_id",
+      "value": ""
+    },
+    {
+      "key": "endpoint_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Organization and credential",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/organization",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "organization"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"OK\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Credential scopes listed\", () => pm.expect(pm.response.json().credential.scopes).to.be.an(\"array\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create session (idempotent)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotency_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/kyc/sessions",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "kyc",
+            "sessions"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": \"postman-customer\",\n  \"country\": \"KH\",\n  \"expected_document_type\": \"KH_NATIONAL_ID\",\n  \"verification_level\": \"DOCUMENT_ONLY\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Send twice: the second returns 200 with Idempotent-Replayed: true and the same session_id."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Created or replayed\", () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+              "pm.collectionVariables.set(\"session_id\", pm.response.json().session_id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Replay with a different body → 409",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotency_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/kyc/sessions",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "kyc",
+            "sessions"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": \"someone-else\",\n  \"country\": \"KH\",\n  \"expected_document_type\": \"KH_NATIONAL_ID\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Conflict\", () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Issue session client token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/kyc/{{session_id}}/client-token",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "kyc",
+            "{{session_id}}",
+            "client-token"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Created\", () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set(\"client_token\", pm.response.json().client_token);",
+              "pm.test(\"Capture scope\", () => pm.expect(pm.response.json().scope).to.eql(\"session:capture\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Device: read session status",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{client_token}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/kyc/{{session_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "kyc",
+            "{{session_id}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"OK\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Device: result is refused",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{client_token}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/kyc/{{session_id}}/result",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "kyc",
+            "{{session_id}}",
+            "result"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Forbidden\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Result (masked unless results:identity)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/kyc/{{session_id}}/result",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "kyc",
+            "{{session_id}}",
+            "result"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"OK\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Masking flag\", () => pm.expect(pm.response.json()).to.have.property(\"identity_masked\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create a read-only key",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/api-keys",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "api-keys"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"postman read-only\",\n  \"scopes\": [\n    \"sessions:read\"\n  ],\n  \"expires_in_days\": 7\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Needs keys:manage. The secret in api_key is shown only in this response."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Created\", () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set(\"new_key_id\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List keys",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/api-keys",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "api-keys"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"OK\", () => pm.response.to.have.status(200));",
+              "pm.test(\"No secrets\", () => pm.expect(JSON.stringify(pm.response.json())).to.not.include(\"key_sha256\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Revoke the key",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/api-keys/{{new_key_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "api-keys",
+            "{{new_key_id}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Revoked\", () => pm.expect(pm.response.json().status).to.eql(\"REVOKED\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhook event types",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/webhooks/event-types",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "webhooks",
+            "event-types"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"OK\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create webhook endpoint",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/webhooks",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "webhooks"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"{{webhook_url}}\",\n  \"event_types\": [],\n  \"description\": \"Postman\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Needs webhooks:manage and a public https URL (a local receiver only with WEBHOOK_ALLOW_PRIVATE_TARGETS=true in development)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Created\", () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set(\"endpoint_id\", pm.response.json().id);",
+              "pm.test(\"Secret shown once\", () => pm.expect(pm.response.json().secret).to.match(/^whsec_/));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Private target refused",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/webhooks",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "webhooks"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"https://169.254.169.254/latest\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Refused\", () => pm.response.to.have.status(422));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Send test event",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/webhooks/{{endpoint_id}}/test",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "webhooks",
+            "{{endpoint_id}}",
+            "test"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Queued\", () => pm.response.to.have.status(202));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List deliveries",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/webhooks/{{endpoint_id}}/deliveries?limit=10",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "webhooks",
+            "{{endpoint_id}}",
+            "deliveries"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"OK\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rotate secret",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/webhooks/{{endpoint_id}}/rotate-secret",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "webhooks",
+            "{{endpoint_id}}",
+            "rotate-secret"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"New secret\", () => pm.expect(pm.response.json().secret).to.match(/^whsec_/));",
+              "pm.test(\"Overlap window\", () => pm.expect(pm.response.json().previous_secret_expires_at).to.be.a(\"string\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete endpoint",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/webhooks/{{endpoint_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "webhooks",
+            "{{endpoint_id}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Disabled\", () => pm.expect(pm.response.json().active).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

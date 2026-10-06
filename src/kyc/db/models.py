@@ -377,6 +377,59 @@ class ApiKey(Record, Base):
                       sa.Index("ix_api_keys_org_created", "organization_id", "created_at"))
 
 
+class WebhookEndpoint(Record, Base):
+    """A customer URL that receives signed events. The signing secret is encrypted with the PII keyring."""
+
+    __tablename__ = "webhook_endpoints"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid, sa.ForeignKey("organizations.id", ondelete="RESTRICT"))
+    url: Mapped[str] = mapped_column(sa.String(2048))
+    description: Mapped[str | None] = mapped_column(sa.String(200))
+    event_types: Mapped[list] = mapped_column(JSON_VALUE, default=list)   # empty: every kyc.* event
+    secret_ciphertext: Mapped[bytes] = mapped_column(sa.LargeBinary)
+    key_version: Mapped[str] = mapped_column(sa.String(256))
+    # During a rotation the previous secret keeps signing until it expires.
+    previous_secret_ciphertext: Mapped[bytes | None] = mapped_column(sa.LargeBinary)
+    previous_key_version: Mapped[str | None] = mapped_column(sa.String(256))
+    previous_secret_expires_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    active: Mapped[bool] = mapped_column(sa.Boolean, default=True, server_default=sa.true())
+    created_by: Mapped[str] = mapped_column(sa.String(128))
+    disabled_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    consecutive_failures: Mapped[int] = mapped_column(sa.Integer, default=0, server_default="0")
+    __table_args__ = (sa.UniqueConstraint("organization_id", "id", name="uq_webhook_endpoints_scope_id"),
+                      sa.CheckConstraint("previous_secret_ciphertext IS NULL OR previous_key_version IS NOT NULL",
+                                         name="previous_key_required"),
+                      sa.Index("ix_webhook_endpoints_org_active", "organization_id", "active"))
+
+
+class WebhookDelivery(Record, Base):
+    """Transactional outbox row: one event for one endpoint, retried until delivered or abandoned."""
+
+    __tablename__ = "webhook_deliveries"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    endpoint_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    event_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    event_type: Mapped[str] = mapped_column(sa.String(64))
+    # Like audit logs, a delivery keeps the session reference after the session is purged.
+    session_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
+    status: Mapped[str] = mapped_column(sa.String(16), default="PENDING", server_default="PENDING")
+    attempts: Mapped[int] = mapped_column(sa.Integer, default=0, server_default="0")
+    next_attempt_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    last_attempt_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    last_status_code: Mapped[int | None] = mapped_column(sa.Integer)
+    last_error: Mapped[str | None] = mapped_column(sa.String(40))
+    delivered_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = (
+        sa.ForeignKeyConstraint(["organization_id", "endpoint_id"], ["webhook_endpoints.organization_id", "webhook_endpoints.id"],
+                                ondelete="CASCADE", name="fk_webhook_deliveries_endpoint"),
+        sa.UniqueConstraint("endpoint_id", "event_id", name="uq_webhook_deliveries_endpoint_event"),
+        sa.CheckConstraint("status IN ('PENDING', 'DELIVERED', 'ABANDONED')", name="delivery_status"),
+        sa.CheckConstraint("attempts >= 0", name="attempts_non_negative"),
+        sa.Index("ix_webhook_deliveries_due", "organization_id", "status", "next_attempt_at"),
+        sa.Index("ix_webhook_deliveries_endpoint_created", "organization_id", "endpoint_id", "created_at"),
+    )
+
+
 class Consent(SessionArtifact, Base):
     __tablename__ = "consents"
     user_id: Mapped[str] = mapped_column(sa.String(128))

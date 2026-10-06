@@ -190,6 +190,25 @@ class PostgreSQLIsolationTests(unittest.TestCase):
                 connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_a)})
                 self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM api_keys")).scalar_one(), 1)
 
+                # Phase 16: webhook endpoints and their deliveries are tenant rows too.
+                endpoint_a = uuid4()
+                endpoint_insert = sa.text("""INSERT INTO webhook_endpoints (id, organization_id, url, event_types,
+                  secret_ciphertext, key_version, created_by) VALUES (:id, :org, 'https://1.1.1.1/', '[]', '\\x00', 'v1', 'test')""")
+                connection.execute(endpoint_insert, {"id": endpoint_a, "org": org_a})
+                delivery_insert = sa.text("""INSERT INTO webhook_deliveries (id, organization_id, endpoint_id, event_id, event_type,
+                  payload, next_attempt_at) VALUES (:id, :org, :endpoint, :event, 'kyc.verified', '{}', now())""")
+                connection.execute(delivery_insert, {"id": uuid4(), "org": org_a, "endpoint": endpoint_a, "event": uuid4()})
+                with self.assertRaises(sa.exc.ProgrammingError), connection.begin_nested():
+                    connection.execute(endpoint_insert, {"id": uuid4(), "org": org_b})
+                with self.assertRaises(sa.exc.ProgrammingError), connection.begin_nested():
+                    connection.execute(delivery_insert, {"id": uuid4(), "org": org_b, "endpoint": endpoint_a, "event": uuid4()})
+                connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_b)})
+                for table in ("webhook_endpoints", "webhook_deliveries"):
+                    self.assertEqual(connection.execute(sa.text(f"SELECT count(*) FROM {table}")).scalar_one(), 0)
+                connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_a)})
+                for table in ("webhook_endpoints", "webhook_deliveries"):
+                    self.assertEqual(connection.execute(sa.text(f"SELECT count(*) FROM {table}")).scalar_one(), 1)
+
                 secondary_session, secondary_document, secondary_template = uuid4(), uuid4(), uuid4()
                 now = datetime.now(timezone.utc)
                 connection.execute(sa.text("""INSERT INTO kyc_sessions

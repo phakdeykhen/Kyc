@@ -15,6 +15,7 @@ from kyc import __schema_revision__, __version__
 from kyc.api.review_routes import router as review_router
 from kyc.api.routes import router
 from kyc.api.tenant_routes import router as tenant_router
+from kyc.api.webhook_routes import router as webhook_router
 from kyc.biometrics import FaceMatchPolicy, OpenCVFaceEngine
 from kyc.core.config import Settings, get_settings
 from kyc.db.session import build_engine
@@ -31,6 +32,9 @@ from kyc.services.documents import DocumentProcessor
 from kyc.storage.captures import LocalEncryptedCaptureStore, parse_keyring
 from kyc.storage.biometrics import BiometricCipher
 from kyc.tenancy.ratelimit import RateLimiter
+from kyc.webhooks.delivery import HTTPSender
+from kyc.webhooks.dispatcher import WebhookDispatcher
+from kyc.webhooks.outbox import DISPATCHER_KEY
 
 UPLOAD_PATH = re.compile(r"^/v1/kyc/[^/]+/documents(/front|/back)?$")
 SELFIE_PATH = re.compile(r"^/v1/kyc/[^/]+/selfie$")
@@ -92,6 +96,12 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
         application.state.quality_engine = HeuristicDocumentQualityEngine()
         application.state.field_cipher = build_field_cipher(configuration)
         application.state.biometric_cipher = build_biometric_cipher(configuration)
+        application.state.webhook_dispatcher = WebhookDispatcher(
+            application.state.session_factory, application.state.field_cipher,
+            HTTPSender(configuration.webhook_timeout_seconds, configuration.webhook_allow_private_targets),
+            configuration.webhook_max_attempts, background=configuration.webhook_delivery_mode == "background")
+        # Every session from this factory hands newly committed deliveries to the dispatcher.
+        application.state.session_factory.configure(info={DISPATCHER_KEY: application.state.webhook_dispatcher})
         application.state.face_engine = OpenCVFaceEngine(
             configuration.face_models_dir / "face_detection_yunet_2023mar.onnx",
             configuration.face_models_dir / "face_recognition_sface_2021dec.onnx")
@@ -114,11 +124,12 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
         try:
             yield
         finally:
+            application.state.webhook_dispatcher.close()
             if database_engine is None:
                 engine.dispose()
 
     application = FastAPI(title="Universal Identity Platform", version=__version__, lifespan=lifespan,
-                          description="KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness, ePassport chip verification, cross-checks, fraud signals and a deterministic risk engine, an authorized manual review dashboard, and multi-tenant API keys with scopes (phases 1–15).")
+                          description="KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness, ePassport chip verification, cross-checks, fraud signals and a deterministic risk engine, an authorized manual review dashboard, multi-tenant API keys with scopes, and signed webhooks (phases 1–16).")
     application.state.settings = settings
 
     @application.middleware("http")
@@ -180,7 +191,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
 
     @application.get("/health/live", tags=["health"])
     def live():
-        return {"status": "ok", "phase": 15, "implemented_phases": list(range(1, 16)), "version": __version__}
+        return {"status": "ok", "phase": 16, "implemented_phases": list(range(1, 17)), "version": __version__}
 
     @application.get("/health/ready", tags=["health"])
     def ready():
@@ -196,6 +207,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
     application.include_router(router)
     application.include_router(review_router)
     application.include_router(tenant_router)
+    application.include_router(webhook_router)
     # Development capture client; the server-side gate stays authoritative.
     application.mount("/capture", StaticFiles(directory=CAPTURE_PAGE, html=True), name="capture")
     # Reviewer dashboard: static shell; every case, image and decision goes through the reviewer API.

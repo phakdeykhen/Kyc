@@ -46,6 +46,32 @@ keyrings and retention deadlines. The default comparison policy is uncalibrated 
 always returns `REVIEW`; its cosine score is not an identity probability. Liveness
 and the final risk decision remain later stages.
 
+Phase 15 makes the API multi-tenant. Organizations are provisioned with
+`scripts/manage_tenants.py` and get scoped, expiring, revocable API keys (`kyc_…`). Each
+key is stored only as a hash and found only inside its own organization's row-level
+security context. A suspended organization is locked out completely.
+- Routes enforce scopes. Results mask identity unless the key holds `results:identity`.
+- `Idempotency-Key` makes session creation safe to retry.
+- Per-key rate limits return 429.
+- Session client tokens (`kst_…`) let a phone or browser capture evidence for one
+  session without ever holding an API key.
+
+See [Phase 15](docs/architecture-phase15.md).
+
+Phase 16 adds signed webhooks and SDKs. Every session state change becomes a webhook
+delivery in the same database transaction (a transactional outbox).
+- **Signing.** Each delivery is signed with HMAC-SHA256 over a timestamp and the body,
+  so replays can be refused. Each carries a stable event ID for deduplication.
+- **Retries.** Failed deliveries are retried with backoff by the API and by
+  `scripts/deliver_webhooks.py`.
+- **SSRF.** Targets must resolve only to public addresses. This is checked again at
+  every delivery, and the connection goes to the checked address.
+- **SDKs.** `sdk/python` and `sdk/typescript` provide server clients, device clients and
+  webhook verification. `sdk/openapi.json` is the contract for the mobile SDKs, which
+  are not built yet.
+
+See [Phase 16](docs/architecture-phase16.md) and [sdk/README.md](sdk/README.md).
+
 See the design docs ([Phase 1](docs/architecture-phase1.md), [Phase 2](docs/architecture-phase2.md),
 [Phase 3](docs/architecture-phase3.md), [Phase 4](docs/architecture-phase4.md),
 [Phase 5](docs/architecture-phase5.md), [Phases 8–9](docs/architecture-phase8-9.md))
@@ -173,6 +199,7 @@ selfie processing unavailable (HTTP 503).
 | Variable | Purpose |
 | --- | --- |
 | `ENVIRONMENT` | `development` or `test`; production is deliberately gated in Phase 1 |
+| `DEVELOPMENT_API_KEY`, `DEVELOPMENT_ORGANIZATION_ID` | Optional since Phase 15: a local all-scope key bound to one organization |
 | `DATABASE_URL` | Restricted application connection, `postgresql+psycopg2://...` |
 | `MIGRATION_DATABASE_URL` | Separate owner connection used only for migration/bootstrap |
 | `DEVELOPMENT_API_KEY` | Generated secret, minimum 32 characters |
@@ -200,6 +227,13 @@ selfie processing unavailable (HTTP 503).
 | `FACE_MATCH_PASS_THRESHOLD`, `FACE_MATCH_FAIL_THRESHOLD` | Operator policy settings, defaults 0.363/0.20; inactive for automatic PASS/FAIL while uncalibrated |
 | `FACE_MATCH_CALIBRATION_REFERENCE` | Required evidence reference with a distinct policy version when calibrated mode is enabled; setting it does not validate the model |
 | `TEST_DATABASE_URL` | Optional isolated live test database, name ending `_test` |
+| `API_RATE_LIMIT_PER_MINUTE` | Development-key limit and ceiling for keys created via the API; default 600 (Phase 15) |
+| `CLIENT_TOKEN_RATE_LIMIT_PER_MINUTE` | Per session client token; default 120 (Phase 15) |
+| `WEBHOOK_DELIVERY_MODE` | `background` (API sends after commit; worker sends retries) or `worker` (Phase 16) |
+| `WEBHOOK_TIMEOUT_SECONDS`, `WEBHOOK_MAX_ATTEMPTS` | Per-attempt timeout (10 s) and attempts before `ABANDONED` (8) |
+| `WEBHOOK_SECRET_OVERLAP_HOURS` | Hours the previous secret keeps signing after a rotation; default 24 |
+| `WEBHOOK_DELIVERY_RETENTION_DAYS` | Finished deliveries purged after this; default 30 |
+| `WEBHOOK_ALLOW_PRIVATE_TARGETS` | Development only: allow `http` and private addresses for a local receiver; default false |
 | `REDIS_URL` | Reserved cache setting; integration is not implemented in Phase 1 |
 | `GCP_PROJECT_ID`, `GCS_CAPTURE_BUCKET`, `GCS_BIOMETRIC_BUCKET`, `PUBSUB_TOPIC` | Reserved GCP integration settings |
 
@@ -211,6 +245,7 @@ placeholder `.env.example` public; never publish a populated `.env`.
 ```sh
 PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
 node scripts/test_capture_client.cjs
+(cd sdk/typescript && npm test)              # TypeScript SDK (Node 22.18+)
 PYTHONPATH=src .venv/bin/python -m alembic upgrade 0003_phase3:0004_phase8_9 --sql > artifacts/phase8-9-postgresql.sql
 ```
 
@@ -306,6 +341,68 @@ For an NSSF card, create the session with `"expected_document_type":"KH_NSSF"`. 
 result reports `expiry_status: NOT_APPLICABLE` and `mrz: NOT_APPLICABLE`, because the
 card prints neither.
 
+### Tenants, API keys and client tokens (Phase 15)
+
+Provision an organization and a server key (rerun bootstrap first to apply `0009_phase15`):
+
+```sh
+PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py org create "Acme Bank"
+ORG=<organization_id from the output>
+PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py key create $ORG "Acme backend" \
+  --scope sessions:write --scope sessions:read --scope results:identity --scope webhooks:manage --scope keys:manage
+KEY=<the kyc_… key printed once>
+```
+
+Create a session idempotently (a retry returns 200 with `Idempotent-Replayed: true`),
+then issue a device token:
+
+```sh
+curl -s http://127.0.0.1:8000/v1/kyc/sessions -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG" \
+  -H 'Idempotency-Key: signup-42-attempt' -H 'Content-Type: application/json' \
+  -d '{"user_id":"customer-42","country":"KH","expected_document_type":"KH_NATIONAL_ID"}'
+curl -s -X POST "http://127.0.0.1:8000/v1/kyc/$SESSION/client-token" -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG"
+# On the device: capture and status only, for this one session
+curl -s "http://127.0.0.1:8000/v1/kyc/$SESSION/documents/front" -H "Authorization: Bearer $CLIENT_TOKEN" \
+  -H "X-Organization-ID: $ORG" -F file=@front.jpg
+```
+
+Manage keys with a `keys:manage` key. Keys created this way get at most the creator's
+scopes and rate limit:
+
+```sh
+curl -s http://127.0.0.1:8000/v1/organization -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG"
+curl -s http://127.0.0.1:8000/v1/api-keys -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG" \
+  -H 'Content-Type: application/json' -d '{"name":"read-only reporting","scopes":["sessions:read"],"expires_in_days":90}'
+curl -s -X DELETE "http://127.0.0.1:8000/v1/api-keys/$KEY_ID" -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG"
+```
+
+Expected refusals:
+- a revoked, expired or unknown key, or a key sent with another organization's ID: 401;
+- a suspended organization or a missing scope: 403;
+- a client token on `/result`, `/verify` or another route: 403;
+- a client token on another session: 401;
+- too many requests: 429 with `Retry-After`.
+
+### Webhooks (Phase 16)
+
+With a `webhooks:manage` key (`PII_ENCRYPTION_KEYS` must be configured):
+
+```sh
+curl -s http://127.0.0.1:8000/v1/webhooks -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG" \
+  -H 'Content-Type: application/json' -d '{"url":"https://api.example.com/kyc/events","event_types":["kyc.verified","kyc.rejected","kyc.review.required"]}'
+# → {"id": …, "secret": "whsec_…"}  (the secret is shown once)
+curl -s -X POST "http://127.0.0.1:8000/v1/webhooks/$ENDPOINT/test" -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG"
+curl -s "http://127.0.0.1:8000/v1/webhooks/$ENDPOINT/deliveries?status=ABANDONED" -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG"
+curl -s -X POST "http://127.0.0.1:8000/v1/webhooks/$ENDPOINT/rotate-secret" -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG"
+PYTHONPATH=src .venv/bin/python scripts/deliver_webhooks.py --loop 15   # retries; run alongside the API
+```
+
+Verify deliveries with `kyc_sdk.verify_webhook` or `verifyWebhook` from the TypeScript SDK
+(see [sdk/README.md](sdk/README.md)). A private or non-https URL returns 422. A local
+receiver needs `WEBHOOK_ALLOW_PRIVATE_TARGETS=true` and is for development only. The
+[Phases 15–16 Postman collection](requests/phase15-16.postman.json) covers tenants, keys,
+client tokens and webhooks.
+
 ### Passport data-page workflow
 
 Create a Cambodia passport session, then upload one full data-page photograph with
@@ -392,7 +489,7 @@ to 24 hours. Expired templates also remove their dependent comparisons.
 
 ## Security concerns and next phase
 
-The development credential is not production tenant authentication. Captures are
+The development credential is not production tenant authentication; provisioned API keys (Phase 15) are. Captures are
 encrypted and retention-limited, but local keys live in `.env`. Production needs
 Secret Manager/KMS and CMEK storage (Phases 17/19). Biometric consent is required
 before selfie processing; earlier document capture has no consent gate yet. The quality thresholds are uncalibrated heuristics, and the gate never

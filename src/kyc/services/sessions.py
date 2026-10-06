@@ -13,6 +13,7 @@ from kyc.db.models import AuditLog, KYCSession, Organization
 from kyc.domain.enums import SessionStatus
 from kyc.domain.state_machine import Event, TERMINAL_STATUSES, VerificationEvidence, transition
 from kyc.tenancy.keys import CLIENT_TOKEN_PREFIX, new_secret
+from kyc.webhooks.outbox import record_transition
 
 
 def aware(value: datetime) -> datetime:
@@ -122,4 +123,6 @@ def apply_event(db: Session, record: KYCSession, tenant: TenantContext, event: E
     record.updated_at = datetime.now(timezone.utc)
     record.version += 1
     audit(db, record, tenant, request_id, "SESSION_EXPIRED" if event == Event.EXPIRE else event.value, previous)
+    # Webhook deliveries are written in this same transaction, just before it commits (Phase 16).
+    record_transition(db, record, event, previous)
     db.flush()

@@ -1,0 +1,198 @@
+{
+  "phase": 15,
+  "date": "2026-10-06",
+  "api": "http://127.0.0.1:8015",
+  "database_role": "kyc_app",
+  "organizations": {
+    "A": "37129cef-07ad-4353-aa45-999b7212e0ac",
+    "B": "6591a3b1-50b9-43ec-a707-e41c45d0e80e"
+  },
+  "checks": [
+    {
+      "check": "readiness at schema 0009_phase15",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "org A key creates a session",
+      "expected": 201,
+      "actual": 201,
+      "pass": true
+    },
+    {
+      "check": "idempotent retry returns the same session",
+      "expected": [
+        200,
+        "d1c73af6-d0a9-48a0-ae3b-719bac0a969e",
+        "true"
+      ],
+      "actual": [
+        200,
+        "d1c73af6-d0a9-48a0-ae3b-719bac0a969e",
+        "true"
+      ],
+      "pass": true
+    },
+    {
+      "check": "same Idempotency-Key with a different body",
+      "expected": 409,
+      "actual": 409,
+      "pass": true
+    },
+    {
+      "check": "org A key with org B header",
+      "expected": 401,
+      "actual": 401,
+      "pass": true
+    },
+    {
+      "check": "org B key cannot see org A session",
+      "expected": 404,
+      "actual": 404,
+      "pass": true
+    },
+    {
+      "check": "read-only key cannot create",
+      "expected": 403,
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "check": "read-only key reads result (identity masked flag present)",
+      "expected": [
+        200,
+        true
+      ],
+      "actual": [
+        200,
+        true
+      ],
+      "pass": true
+    },
+    {
+      "check": "key without keys:manage cannot list keys",
+      "expected": 403,
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "check": "client token issued",
+      "expected": [
+        201,
+        "session:capture"
+      ],
+      "actual": [
+        201,
+        "session:capture"
+      ],
+      "pass": true
+    },
+    {
+      "check": "client token reads its session status",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "client token cannot read the result",
+      "expected": 403,
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "check": "client token cannot reach another session",
+      "expected": 401,
+      "actual": 401,
+      "pass": true
+    },
+    {
+      "check": "client token is authorized to upload (unreadable image refused by the gate)",
+      "expected": 422,
+      "actual": 422,
+      "pass": true
+    },
+    {
+      "check": "self-service key created",
+      "expected": [
+        201,
+        "ACTIVE",
+        "kyc_"
+      ],
+      "actual": [
+        201,
+        "ACTIVE",
+        "kyc_"
+      ],
+      "pass": true
+    },
+    {
+      "check": "new key works",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "escalation refused",
+      "expected": 403,
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "check": "self-service key revoked",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "revoked key refused",
+      "expected": 401,
+      "actual": 401,
+      "pass": true
+    },
+    {
+      "check": "kyc_app under org B cannot see org A's key",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "check": "kyc_app cannot rewrite a key's scopes",
+      "expected": "permission denied",
+      "actual": "permission denied",
+      "pass": true
+    },
+    {
+      "check": "kyc_app cannot change an organization",
+      "expected": "permission denied",
+      "actual": "permission denied",
+      "pass": true
+    },
+    {
+      "check": "session records its creating key and only a token hash",
+      "expected": [
+        true,
+        64
+      ],
+      "actual": [
+        true,
+        64
+      ],
+      "pass": true
+    },
+    {
+      "check": "suspended organization refused",
+      "expected": 403,
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "check": "reactivated organization works",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
+    }
+  ],
+  "passed": 25,
+  "failed": []
+}

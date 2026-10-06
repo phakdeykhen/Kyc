@@ -1,0 +1,17 @@
+{
+  "name": "@kyc-platform/sdk",
+  "version": "0.16.0",
+  "description": "Client and webhook verification for the Universal Identity Platform KYC API",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist"],
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test \"test/*.test.ts\""
+  },
+  "devDependencies": { "typescript": "^5.9.0" }
+}

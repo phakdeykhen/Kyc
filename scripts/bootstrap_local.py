@@ -61,5 +61,9 @@ with engine.begin() as connection:
     # credential create keys for its own organization. Organizations stay read-only to the API.
     connection.execute(sa.text("GRANT SELECT, INSERT ON api_keys TO kyc_app"))
     connection.execute(sa.text("GRANT UPDATE (last_used_at, revoked_at) ON api_keys TO kyc_app"))
+    # Phase 16: endpoints are managed through the API (secrets sealed with the PII keyring);
+    # deliveries are written by the outbox, updated by the dispatcher and purged by retention.
+    connection.execute(sa.text("GRANT SELECT, INSERT, UPDATE ON webhook_endpoints TO kyc_app"))
+    connection.execute(sa.text("GRANT SELECT, INSERT, UPDATE, DELETE ON webhook_deliveries TO kyc_app"))
 engine.dispose()
-print("Migrations through phase 15 applied and local organization provisioned.")
+print("Migrations through phase 16 applied and local organization provisioned.")

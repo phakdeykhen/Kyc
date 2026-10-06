@@ -1,0 +1,224 @@
+{
+  "phase": 16,
+  "date": "2026-10-06",
+  "api": "http://127.0.0.1:8015",
+  "database_role": "kyc_app",
+  "organization": "37129cef-07ad-4353-aa45-999b7212e0ac",
+  "session_id": "799cddd0-3514-4fb7-8fb3-628d342c44ca",
+  "endpoint_id": "35b2a00c-575a-4411-8540-face8889e1c8",
+  "deliveries_received": 8,
+  "checks": [
+    {
+      "check": "endpoint created with a one-time whsec_ secret",
+      "expected": [
+        true,
+        "whsec_"
+      ],
+      "actual": [
+        true,
+        "whsec_"
+      ],
+      "pass": true
+    },
+    {
+      "check": "background dispatch tried the test ping at once; receiver's 500 schedules a retry",
+      "expected": "HTTP_500",
+      "actual": "HTTP_500",
+      "pass": true
+    },
+    {
+      "check": "device uploaded the passport page with its client token",
+      "expected": "ACCEPTED",
+      "actual": "ACCEPTED",
+      "pass": true
+    },
+    {
+      "check": "real OCR + risk engine sent the document-only case to manual review",
+      "expected": "MANUAL_REVIEW",
+      "actual": "MANUAL_REVIEW",
+      "pass": true
+    },
+    {
+      "check": "reviewer approval verified the session",
+      "expected": "VERIFIED",
+      "actual": "VERIFIED",
+      "pass": true
+    },
+    {
+      "check": "receiver got every lifecycle event for the session",
+      "expected": [
+        "kyc.document.accepted",
+        "kyc.processing",
+        "kyc.review.required",
+        "kyc.verified"
+      ],
+      "actual": [
+        "kyc.document.accepted",
+        "kyc.processing",
+        "kyc.review.required",
+        "kyc.verified"
+      ],
+      "pass": true
+    },
+    {
+      "check": "every delivery verifies with the SDK and its event ID matches the header",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "check": "no identity data in any webhook body",
+      "expected": false,
+      "actual": false,
+      "pass": true
+    },
+    {
+      "check": "kyc.verified carries the engine decision and the review outcome",
+      "expected": [
+        "REVIEW",
+        {
+          "action": "APPROVE",
+          "reason_code": "DOCUMENT_CONFIRMED_GENUINE"
+        }
+      ],
+      "actual": [
+        "REVIEW",
+        {
+          "action": "APPROVE",
+          "reason_code": "DOCUMENT_CONFIRMED_GENUINE"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "check": "during rotation the header carries two signatures",
+      "expected": 2,
+      "actual": 2,
+      "pass": true
+    },
+    {
+      "check": "old and new secrets both verify during the overlap",
+      "expected": [
+        "dc30beea-fc7a-4cd0-ad61-e151c068c2b0",
+        "dc30beea-fc7a-4cd0-ad61-e151c068c2b0"
+      ],
+      "actual": [
+        "dc30beea-fc7a-4cd0-ad61-e151c068c2b0",
+        "dc30beea-fc7a-4cd0-ad61-e151c068c2b0"
+      ],
+      "pass": true
+    },
+    {
+      "check": "a default worker refuses the private receiver at delivery time (SSRF re-check)",
+      "expected": [
+        "PENDING",
+        2,
+        "TARGET_NOT_ALLOWED"
+      ],
+      "actual": [
+        "PENDING",
+        2,
+        "TARGET_NOT_ALLOWED"
+      ],
+      "pass": true,
+      "worker_output": "Delivery round: 1 attempt(s) {'37129cef-07ad-4353-aa45-999b7212e0ac': 1}"
+    },
+    {
+      "check": "a delivery still waiting for its retry cannot be pulled forward",
+      "expected": 409,
+      "actual": 409,
+      "pass": true
+    },
+    {
+      "check": "on its third attempt a worker allowed to reach the local receiver delivers it",
+      "expected": [
+        "DELIVERED",
+        3,
+        200
+      ],
+      "actual": [
+        "DELIVERED",
+        3,
+        200
+      ],
+      "pass": true,
+      "worker_output": "Delivery round: 1 attempt(s) {'37129cef-07ad-4353-aa45-999b7212e0ac': 1}"
+    },
+    {
+      "check": "a delivered event can be redelivered",
+      "expected": "PENDING",
+      "actual": "PENDING",
+      "pass": true
+    },
+    {
+      "check": "the redelivery went out",
+      "expected": [
+        "DELIVERED",
+        1
+      ],
+      "actual": [
+        "DELIVERED",
+        1
+      ],
+      "pass": true
+    },
+    {
+      "check": "every attempt carried the same event ID",
+      "expected": 1,
+      "actual": 1,
+      "pass": true
+    },
+    {
+      "check": "TypeScript SDK: idempotent create, client token, device status, live signature verification",
+      "expected": true,
+      "actual": true,
+      "pass": true,
+      "typescript": {
+        "steps": [
+          {
+            "idempotent": true
+          },
+          {
+            "device_status": "CREATED"
+          },
+          {
+            "bad_key_status": 401
+          },
+          {
+            "verified_event": "webhook.test",
+            "event_id_matches": true,
+            "old_secret_ok": true,
+            "tamper_rejected": true
+          }
+        ],
+        "ok": true
+      }
+    },
+    {
+      "check": "kyc_app under organization B sees none of A's webhook rows",
+      "expected": [
+        0,
+        0
+      ],
+      "actual": [
+        0,
+        0
+      ],
+      "pass": true
+    },
+    {
+      "check": "the signing secret is stored encrypted",
+      "expected": false,
+      "actual": false,
+      "pass": true
+    },
+    {
+      "check": "kyc_app cannot hard-delete endpoints (history is kept)",
+      "expected": "permission denied",
+      "actual": "permission denied",
+      "pass": true
+    }
+  ],
+  "passed": 21,
+  "failed": []
+}

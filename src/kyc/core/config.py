@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     # Phase 15 per-credential limits (requests per minute, per API instance).
     api_rate_limit_per_minute: int = Field(default=600, ge=1, le=100_000)
     client_token_rate_limit_per_minute: int = Field(default=120, ge=1, le=10_000)
+    # Phase 16 webhooks. "background": the API sends right after commit and the worker sends
+    # retries; "worker": only scripts/deliver_webhooks.py sends. Private targets are for local receivers only.
+    webhook_delivery_mode: Literal["background", "worker"] = "background"
+    webhook_allow_private_targets: bool = False
+    webhook_timeout_seconds: float = Field(default=10.0, ge=1, le=30)
+    webhook_max_attempts: int = Field(default=8, ge=1, le=20)
+    webhook_secret_overlap_hours: int = Field(default=24, ge=0, le=168)
+    webhook_delivery_retention_days: int = Field(default=30, ge=1, le=365)
     session_ttl_seconds: int = Field(default=900, ge=60, le=3600)
     db_pool_size: int = Field(default=5, ge=1, le=20)
     db_max_overflow: int = Field(default=5, ge=0, le=20)
