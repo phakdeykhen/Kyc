@@ -21,7 +21,7 @@ services:
     environment:
       ENVIRONMENT: development
       DATABASE_URL: postgresql+psycopg2://kyc_app:${KYC_APP_PASSWORD}@postgres:5432/kyc
-      DEVELOPMENT_API_KEY: ${DEVELOPMENT_API_KEY}
+      DEVELOPMENT_API_KEY: ${DEVELOPMENT_API_KEY:-}
       DEVELOPMENT_ORGANIZATION_ID: ${DEVELOPMENT_ORGANIZATION_ID}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-900}
       CAPTURE_ENCRYPTION_KEYS: ${CAPTURE_ENCRYPTION_KEYS:?Run scripts/configure_local.py first}
@@ -59,7 +59,7 @@ services:
       ENVIRONMENT: development
       DATABASE_URL: postgresql+psycopg2://kyc_app:${KYC_APP_PASSWORD}@postgres:5432/kyc
       MIGRATION_DATABASE_URL: postgresql+psycopg2://kyc_migrator:${POSTGRES_PASSWORD}@postgres:5432/kyc
-      DEVELOPMENT_API_KEY: ${DEVELOPMENT_API_KEY}
+      DEVELOPMENT_API_KEY: ${DEVELOPMENT_API_KEY:-}
       DEVELOPMENT_ORGANIZATION_ID: ${DEVELOPMENT_ORGANIZATION_ID}
     depends_on:
       postgres:
@@ -71,7 +71,7 @@ services:
     environment:
       ENVIRONMENT: development
       DATABASE_URL: postgresql+psycopg2://kyc_app:${KYC_APP_PASSWORD}@postgres:5432/kyc
-      DEVELOPMENT_API_KEY: ${DEVELOPMENT_API_KEY}
+      DEVELOPMENT_API_KEY: ${DEVELOPMENT_API_KEY:-}
       DEVELOPMENT_ORGANIZATION_ID: ${DEVELOPMENT_ORGANIZATION_ID}
       CAPTURE_ENCRYPTION_KEYS: ${CAPTURE_ENCRYPTION_KEYS}
       CAPTURE_STORAGE_DIR: /var/lib/kyc/captures
@@ -87,7 +87,7 @@ services:
     environment:
       ENVIRONMENT: development
       DATABASE_URL: postgresql+psycopg2://kyc_app:${KYC_APP_PASSWORD}@postgres:5432/kyc
-      DEVELOPMENT_API_KEY: ${DEVELOPMENT_API_KEY}
+      DEVELOPMENT_API_KEY: ${DEVELOPMENT_API_KEY:-}
       DEVELOPMENT_ORGANIZATION_ID: ${DEVELOPMENT_ORGANIZATION_ID}
       CAPTURE_ENCRYPTION_KEYS: ${CAPTURE_ENCRYPTION_KEYS}
       CAPTURE_STORAGE_DIR: /var/lib/kyc/captures

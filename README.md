@@ -133,8 +133,9 @@ The Docker image installs Tesseract with the Khmer models. When running Python
 directly, install them yourself (macOS: `brew install tesseract tesseract-lang`).
 
 Open `http://127.0.0.1:8000/docs`, or `http://127.0.0.1:8000/capture/` for the
-camera client. Use the generated `.env` values for both
-`X-API-Key` and `X-Organization-ID` in authenticated requests. Liveness is at
+camera client. Authenticated requests send `X-API-Key` and `X-Organization-ID`. Use an
+organization API key (see [API keys](#api-keys-phase-15)), or in development the generated
+`.env` values `DEVELOPMENT_API_KEY` and `DEVELOPMENT_ORGANIZATION_ID`. Liveness is at
 `/health/live`; database/migration readiness is at `/health/ready`.
 
 Stop the containers with `docker compose down`. The PostgreSQL and capture volumes
@@ -168,15 +169,54 @@ downloads weights during a request. Run the provisioner again with `--verify-onl
 to check installed files without network access. Missing or corrupt models make
 selfie processing unavailable (HTTP 503).
 
+## API keys (Phase 15)
+
+Each client application gets its own key, issued to one organization. Only the key's
+SHA-256 is stored, and the key is printed once. An operator provisions organizations and
+their first key with the migration role:
+
+```sh
+PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py org-create "Acme Bank" --rate-limit 120
+PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py key-create ORG_ID "Acme admin" \
+  --scope keys:manage --scope sessions:create --scope sessions:read \
+  --scope captures:write --scope sessions:verify --scope results:read
+PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py key-list ORG_ID
+PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py key-rotate ORG_ID KEY_ID --grace-hours 24
+PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py key-revoke ORG_ID KEY_ID
+PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py org-suspend ORG_ID   # org-activate to undo
+```
+
+With Docker: `docker compose run --rm migrate python scripts/manage_tenants.py ...`.
+
+| Scope | Allows |
+| --- | --- |
+| `sessions:create` | `POST /v1/kyc/sessions` |
+| `sessions:read` | `GET /v1/kyc/{session}` (status only) |
+| `captures:write` | documents, selfie, liveness and NFC uploads and challenges |
+| `sessions:verify` | `POST /v1/kyc/{session}/verify` |
+| `results:read` | `GET /v1/kyc/{session}/result` (identity fields) |
+| `keys:manage` | `GET/POST /v1/api-keys`, `POST /v1/api-keys/{id}/rotate`, `DELETE /v1/api-keys/{id}` |
+
+Keys without `--scope` get every scope except `keys:manage`. A key holding `keys:manage`
+can issue keys only with scopes it holds itself. For a mobile or browser capture client,
+issue a key with only `captures:write` and `sessions:read`, so it cannot read identity
+results. `GET /v1/me` shows the calling organization, key and scopes.
+
+Each key may make the organization's `api_rate_limit_per_minute` requests per minute
+(default 120). Responses carry `X-RateLimit-Limit` and `X-RateLimit-Remaining`, and a
+429 carries `Retry-After`. Send `Idempotency-Key` on `POST /v1/kyc/sessions` to retry
+safely: the same key and body return the same session for 24 hours
+(`Idempotent-Replayed: true`). The same key with a different body is refused with 422.
+
 ## Environment variables
 
 | Variable | Purpose |
 | --- | --- |
-| `ENVIRONMENT` | `development` or `test`; production is deliberately gated in Phase 1 |
+| `ENVIRONMENT` | `development` or `test`; production stays gated until Phase 17 |
 | `DATABASE_URL` | Restricted application connection, `postgresql+psycopg2://...` |
 | `MIGRATION_DATABASE_URL` | Separate owner connection used only for migration/bootstrap |
-| `DEVELOPMENT_API_KEY` | Generated secret, minimum 32 characters |
-| `DEVELOPMENT_ORGANIZATION_ID` | UUID bound to the development credential |
+| `DEVELOPMENT_API_KEY` | Optional development fallback key for the development organization, minimum 32 characters; empty or unset disables it. Real clients use organization API keys |
+| `DEVELOPMENT_ORGANIZATION_ID` | UUID of the development organization (bootstrap and the development key) |
 | `POSTGRES_PASSWORD` | Local Compose migration-role password |
 | `KYC_APP_PASSWORD` | Local Compose restricted-role password |
 | `SESSION_TTL_SECONDS` | Session lifetime, 60–3600 seconds; default 900 |
@@ -218,7 +258,7 @@ Fast tests execute the real FastAPI ASGI application and transactional service
 against an isolated SQLite test database. They do not open a web server socket.
 The frozen migration is upgraded, compared with ORM metadata, downgraded, and
 upgraded again. Its PostgreSQL SQL is checked separately for native types and
-all seventeen forced RLS policies. SQLite is refused outside test mode.
+all twenty-four forced RLS policies. SQLite is refused outside test mode.
 
 For a live PostgreSQL RLS check, install the pinned dependencies and set
 `TEST_DATABASE_URL` to a dedicated database with a name ending `_test`. Use a

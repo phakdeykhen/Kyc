@@ -14,7 +14,9 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     database_url: SecretStr
     migration_database_url: SecretStr | None = None
-    development_api_key: SecretStr
+    # Phase 15: clients use per-organization API keys (scripts/manage_tenants.py). This shared key is an
+    # optional development fallback for the development organization; leave it unset to disable it.
+    development_api_key: SecretStr | None = None
     development_organization_id: UUID
     session_ttl_seconds: int = Field(default=900, ge=60, le=3600)
     db_pool_size: int = Field(default=5, ge=1, le=20)
@@ -69,6 +71,12 @@ class Settings(BaseSettings):
     gcs_biometric_bucket: str | None = None
     pubsub_topic: str | None = None
 
+    @field_validator("development_api_key", mode="before")
+    @classmethod
+    def empty_development_key_disables_it(cls, value):
+        # compose passes an unset variable through as an empty string.
+        return None if isinstance(value, str) and not value.strip() else value
+
     @field_validator("face_match_calibration_reference", mode="before")
     @classmethod
     def normalize_calibration_reference(cls, value):
@@ -77,8 +85,8 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def enforce_phase_one_boundary(self):
         if self.environment == "production":
-            raise ValueError("Production mode is disabled until tenant credentials and security hardening phases are completed.")
-        if len(self.development_api_key.get_secret_value()) < 32:
+            raise ValueError("Production mode is disabled until the security hardening phase (17) is completed.")
+        if self.development_api_key is not None and len(self.development_api_key.get_secret_value()) < 32:
             raise ValueError("DEVELOPMENT_API_KEY must contain at least 32 characters.")
         url = self.database_url.get_secret_value()
         if not url.startswith("postgresql+psycopg2://") and not (self.environment == "test" and url.startswith("sqlite")):

@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 
 from kyc import __schema_revision__, __version__
+from kyc.api.key_routes import router as key_router
 from kyc.api.review_routes import router as review_router
 from kyc.api.routes import router
 from kyc.biometrics import FaceMatchPolicy, OpenCVFaceEngine
@@ -29,6 +30,7 @@ from kyc.ocr.tesseract import TesseractOCREngine
 from kyc.services.documents import DocumentProcessor
 from kyc.storage.captures import LocalEncryptedCaptureStore, parse_keyring
 from kyc.storage.biometrics import BiometricCipher
+from kyc.tenancy.ratelimit import RateLimiter
 
 UPLOAD_PATH = re.compile(r"^/v1/kyc/[^/]+/documents(/front|/back)?$")
 SELFIE_PATH = re.compile(r"^/v1/kyc/[^/]+/selfie$")
@@ -85,6 +87,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
         application.state.settings = configuration
         engine = database_engine if database_engine is not None else build_engine(configuration)
         application.state.session_factory = sessionmaker(engine, expire_on_commit=False)
+        application.state.rate_limiter = RateLimiter()
         application.state.capture_store = build_capture_store(configuration)
         application.state.quality_engine = HeuristicDocumentQualityEngine()
         application.state.field_cipher = build_field_cipher(configuration)
@@ -115,7 +118,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
                 engine.dispose()
 
     application = FastAPI(title="Universal Identity Platform", version=__version__, lifespan=lifespan,
-                          description="KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness, ePassport chip verification, cross-checks, fraud signals and a deterministic risk engine and an authorized manual review dashboard (phases 1–14).")
+                          description="KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness, ePassport chip verification, cross-checks, fraud signals and a deterministic risk engine, an authorized manual review dashboard and per-organization API keys with scopes and rate limits (phases 1–15).")
     application.state.settings = settings
 
     @application.middleware("http")
@@ -151,6 +154,10 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
         request.state.request_id = uuid4()
         response = await call_next(request)
         response.headers["X-Request-ID"] = str(request.state.request_id)
+        limit = getattr(request.state, "rate_limit", None)
+        if limit is not None:
+            response.headers["X-RateLimit-Limit"] = str(limit.limit)
+            response.headers["X-RateLimit-Remaining"] = str(limit.remaining)
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         if request.url.path.startswith("/review"):
@@ -177,7 +184,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
 
     @application.get("/health/live", tags=["health"])
     def live():
-        return {"status": "ok", "phase": 14, "implemented_phases": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "version": __version__}
+        return {"status": "ok", "phase": 15, "implemented_phases": list(range(1, 16)), "version": __version__}
 
     @application.get("/health/ready", tags=["health"])
     def ready():
@@ -191,6 +198,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
             return JSONResponse(status_code=503, content={"status": "not_ready"})
 
     application.include_router(router)
+    application.include_router(key_router)
     application.include_router(review_router)
     # Development capture client; the server-side gate stays authoritative.
     application.mount("/capture", StaticFiles(directory=CAPTURE_PAGE, html=True), name="capture")

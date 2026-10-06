@@ -1193,9 +1193,9 @@ Design this as:
 
 ## Implementation progress — 6 October 2026
 
-The original specification above is preserved. Phases 1–14 have been implemented
+The original specification above is preserved. Phases 1–15 have been implemented
 at this workspace root. The user authorized Phases 8 and 9 together, then Phases 10
-and 11, then Phases 12, 13 and 14 in turn; their validation passed. Phase 15 has not started.
+and 11, then Phases 12, 13, 14 and 15 in turn; their validation passed. Phase 16 has not started.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -1213,8 +1213,8 @@ and 11, then Phases 12, 13 and 14 in turn; their validation passed. Phase 15 has
 | 12 | Cross-check + fraud signals | Complete; 318/318 tests; signals not verdicts; forensics models not included |
 | 13 | Risk engine | Complete; 333/333 tests; deterministic, tighten-only policy; uncalibrated biometrics → manual review |
 | 14 | Manual review dashboard | Complete; 344/344 tests; role-based, audited, guarded approvals |
-| 15 | Multi-tenant API + API keys | Waiting for approval |
-| 16 | Webhooks + SDK | Not started |
+| 15 | Multi-tenant API + API keys | Complete; 361 tests (0 failures); scoped, hashed, rotatable keys; RLS-scoped lookup; rate limits; idempotency |
+| 16 | Webhooks + SDK | Waiting for approval |
 | 17 | Security/privacy hardening | Not started |
 | 18 | Load/performance testing | Not started |
 | 19 | GCP production deployment | Not started |

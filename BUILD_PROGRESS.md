@@ -1,8 +1,56 @@
 # Build progress — Universal Identity Platform
 
 Updated: 6 October 2026. The full requirements in `Document.md` control the build.
-Phases 1–14 are implemented. Work is paused at the Phase 14 approval gate; Phase 15
-(multi-tenant API and credential provisioning) has not started.
+Phases 1–15 are implemented. Work is paused at the Phase 15 approval gate; Phase 16
+(webhooks and SDK) has not started.
+
+## Phase 15 implementation (6 October 2026)
+
+Implemented per-organization API keys. Each client application now gets its own key
+instead of the single shared development key:
+- Keys are `kyc_<public prefix>_<secret>`. Only a SHA-256 is stored and the key is shown once.
+- Each key has scopes (`sessions:create`, `sessions:read`, `captures:write`,
+  `sessions:verify`, `results:read`, `keys:manage`), an optional expiry, revocation and
+  rotation with a grace period.
+- Keys are looked up inside the organization's row-level-security context, so a key
+  only works with its own `X-Organization-ID`.
+- Organizations can be suspended. Each key has a per-minute rate limit (with
+  `X-RateLimit-*` and `Retry-After` headers).
+- `POST /v1/kyc/sessions` accepts `Idempotency-Key`.
+- `GET /v1/me` describes the caller. A `keys:manage` key can list, issue, rotate and
+  revoke its organization's keys, but cannot grant scopes it lacks.
+- Operators use `scripts/manage_tenants.py`. Requests are audited as `api_key:<id>`.
+- The development key is now optional and works outside production only.
+
+Migration `0009_phase15` adds `api_keys` and `idempotency_keys` (both forced RLS, 24
+policies in total) and `organizations.active` / `api_rate_limit_per_minute`.
+Design: [architecture-phase15.md](docs/architecture-phase15.md).
+
+### Phase 15 validation evidence
+
+- **361 tests: 353 passed, 8 skipped, 0 failures**, including the live PostgreSQL 16 RLS
+  test, which now covers `api_keys` and `idempotency_keys`
+  ([artifacts/phase15-tests.txt](artifacts/phase15-tests.txt)). The skipped tests need
+  Tesseract Khmer fonts and native face models, which this runner did not have.
+- Live HTTP as restricted `kyc_app`, with keys from `manage_tenants.py`: 23 of 23 steps
+  matched ([artifacts/phase15-live-e2e.json](artifacts/phase15-live-e2e.json), secrets redacted):
+  - idempotent retry and a conflicting body
+  - wrong-organization key and a foreign session
+  - capture-only key limits
+  - rotation grace and revocation
+  - 429 rate limit and suspension
+  - no DELETE grant and no plaintext keys
+- The live run found and fixed a bug: a `FOR UPDATE` lock needed a privilege `kyc_app`
+  lacks, and it was removed.
+
+### Phase 15 limits
+
+- Rate limits are counted per process.
+- Failed authentication is not audited.
+- Organizations are provisioned from the CLI only; there is no operator console, SSO or MFA.
+- Key hashes are not peppered.
+
+These belong to Phases 17–19.
 
 ## Phase 14 implementation (6 October 2026)
 

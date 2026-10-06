@@ -1,0 +1,403 @@
+{
+ "info": {
+  "name": "Universal KYC — Phase 15 API keys",
+  "description": "Set organization_id and api_key to a key issued by scripts/manage_tenants.py with keys:manage (or the development key in development). Rate-limit headers are on every authenticated response.",
+  "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+ },
+ "variable": [
+  {
+   "key": "base_url",
+   "value": "http://127.0.0.1:8000"
+  },
+  {
+   "key": "organization_id",
+   "value": ""
+  },
+  {
+   "key": "api_key",
+   "value": ""
+  },
+  {
+   "key": "session_id",
+   "value": ""
+  },
+  {
+   "key": "issued_key",
+   "value": ""
+  },
+  {
+   "key": "issued_key_id",
+   "value": ""
+  }
+ ],
+ "item": [
+  {
+   "name": "Who am I",
+   "request": {
+    "method": "GET",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/me",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "me"
+     ]
+    }
+   }
+  },
+  {
+   "name": "Create session (idempotent)",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json"
+     },
+     {
+      "key": "Idempotency-Key",
+      "value": "order-{{$timestamp}}"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/sessions",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "sessions"
+     ]
+    },
+    "body": {
+     "mode": "raw",
+     "raw": "{\n \"user_id\": \"customer-42\",\n \"country\": \"KH\",\n \"expected_document_type\": \"KH_NATIONAL_ID\",\n \"verification_level\": \"DOCUMENT_ONLY\"\n}"
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "const b = pm.response.json();",
+       "if (b.session_id) pm.collectionVariables.set('session_id', b.session_id);"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Retry with a fixed Idempotency-Key (run twice: same session_id, Idempotent-Replayed: true)",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json"
+     },
+     {
+      "key": "Idempotency-Key",
+      "value": "postman-retry-1"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/sessions",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "sessions"
+     ]
+    },
+    "body": {
+     "mode": "raw",
+     "raw": "{\n \"user_id\": \"customer-42\",\n \"country\": \"KH\",\n \"expected_document_type\": \"KH_NATIONAL_ID\",\n \"verification_level\": \"DOCUMENT_ONLY\"\n}"
+    }
+   }
+  },
+  {
+   "name": "List API keys (keys:manage)",
+   "request": {
+    "method": "GET",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/api-keys",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "api-keys"
+     ]
+    }
+   }
+  },
+  {
+   "name": "Issue capture-only key",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/api-keys",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "api-keys"
+     ]
+    },
+    "body": {
+     "mode": "raw",
+     "raw": "{\n \"name\": \"Mobile capture\",\n \"scopes\": [\n  \"captures:write\",\n  \"sessions:read\"\n ],\n \"expires_in_days\": 30\n}"
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "const b = pm.response.json();",
+       "if (b.key) { pm.collectionVariables.set('issued_key', b.key); pm.collectionVariables.set('issued_key_id', b.id); }"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Capture key: read status (200)",
+   "request": {
+    "method": "GET",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{issued_key}}"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}"
+     ]
+    }
+   }
+  },
+  {
+   "name": "Capture key: read result (403 results:read)",
+   "request": {
+    "method": "GET",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{issued_key}}"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/kyc/{{session_id}}/result",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "kyc",
+      "{{session_id}}",
+      "result"
+     ]
+    }
+   }
+  },
+  {
+   "name": "Rotate issued key (1 h grace)",
+   "request": {
+    "method": "POST",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/api-keys/{{issued_key_id}}/rotate",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "api-keys",
+      "{{issued_key_id}}",
+      "rotate"
+     ]
+    },
+    "body": {
+     "mode": "raw",
+     "raw": "{\n \"grace_hours\": 1\n}"
+    }
+   },
+   "event": [
+    {
+     "listen": "test",
+     "script": {
+      "type": "text/javascript",
+      "exec": [
+       "const b = pm.response.json();",
+       "if (b.key) { pm.collectionVariables.set('issued_key', b.key); pm.collectionVariables.set('issued_key_id', b.id); }"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "Revoke issued key",
+   "request": {
+    "method": "DELETE",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{api_key}}"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/api-keys/{{issued_key_id}}",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "api-keys",
+      "{{issued_key_id}}"
+     ]
+    }
+   }
+  },
+  {
+   "name": "Revoked key refused (401)",
+   "request": {
+    "method": "GET",
+    "header": [
+     {
+      "key": "X-API-Key",
+      "value": "{{issued_key}}"
+     },
+     {
+      "key": "X-Organization-ID",
+      "value": "{{organization_id}}"
+     },
+     {
+      "key": "Content-Type",
+      "value": "application/json"
+     }
+    ],
+    "url": {
+     "raw": "{{base_url}}/v1/me",
+     "host": [
+      "{{base_url}}"
+     ],
+     "path": [
+      "v1",
+      "me"
+     ]
+    }
+   }
+  }
+ ]
+}

@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
@@ -7,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from kyc.api.dependencies import TenantContext
 from kyc.api.schemas import SessionCreate, SessionResponse
-from kyc.db.models import AuditLog, KYCSession, Organization
+from kyc.db.models import AuditLog, IdempotencyKey, KYCSession, Organization
 from kyc.domain.enums import SessionStatus
 from kyc.domain.state_machine import Event, TERMINAL_STATUSES, VerificationEvidence, transition
 
@@ -34,11 +36,29 @@ def audit(db: Session, record: KYCSession, tenant: TenantContext, request_id: UU
                     reason_codes=[action], event_metadata={"version": record.version}))
 
 
+IDEMPOTENCY_WINDOW = timedelta(hours=24)
+
+
 def create_session(db: Session, tenant: TenantContext, body: SessionCreate,
-                   ttl: int, request_id: UUID) -> KYCSession:
+                   ttl: int, request_id: UUID, idempotency_key: str | None = None) -> tuple[KYCSession, bool]:
+    """Create a session, or with a repeated Idempotency-Key return the one created first (replayed=True)."""
     if not db.scalar(sa.select(Organization.id).where(Organization.id == tenant.organization_id)):
         raise HTTPException(409, detail="Organization has not been provisioned. Run the local bootstrap command.")
     now = datetime.now(timezone.utc)
+    request_hash = hashlib.sha256(json.dumps(body.model_dump(mode="json"), sort_keys=True).encode()).hexdigest()
+    if idempotency_key is not None:
+        previous = db.scalar(sa.select(IdempotencyKey).where(IdempotencyKey.organization_id == tenant.organization_id,
+                                                             IdempotencyKey.idempotency_key == idempotency_key))
+        if previous is not None and aware(previous.created_at) > now - IDEMPOTENCY_WINDOW:
+            if previous.request_sha256 != request_hash:
+                raise HTTPException(422, detail="This Idempotency-Key was already used with a different request body.")
+            record = db.scalar(sa.select(KYCSession).where(KYCSession.id == previous.session_id,
+                                                           KYCSession.organization_id == tenant.organization_id))
+            if record is not None:
+                return record, True
+        if previous is not None:   # outside the window: the key may be reused
+            db.delete(previous)
+            db.flush()
     record = KYCSession(id=uuid4(), organization_id=tenant.organization_id,
                         user_id=body.user_id, country=body.country,
                         expected_document_type=body.expected_document_type,
@@ -46,9 +66,18 @@ def create_session(db: Session, tenant: TenantContext, body: SessionCreate,
                         created_at=now, updated_at=now, expires_at=now + timedelta(seconds=ttl), version=1)
     db.add(record)
     db.flush()
+    if idempotency_key is not None:
+        db.add(IdempotencyKey(organization_id=tenant.organization_id, idempotency_key=idempotency_key,
+                              request_sha256=request_hash, session_id=record.id))
+        try:
+            with db.begin_nested():
+                db.flush()
+        except sa.exc.IntegrityError:
+            # A concurrent request with the same key committed first.
+            raise HTTPException(409, detail="A request with this Idempotency-Key is in progress; retry shortly.") from None
     audit(db, record, tenant, request_id, "SESSION_CREATED")
     db.flush()
-    return record
+    return record, False
 
 
 def get_session(db: Session, tenant: TenantContext, session_id: UUID, request_id: UUID) -> KYCSession:

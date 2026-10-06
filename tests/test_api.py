@@ -26,7 +26,7 @@ def configuration(organization_id, **extra):
                 "face_match_pass_threshold": 0.363, "face_match_fail_threshold": 0.20,
                 "document_processing_mode": "inline", "tesseract_cmd": "tesseract", "ocr_languages": "khm,eng"}
     return Settings(_env_file=None, environment="test", database_url="sqlite://",
-                    development_api_key=TEST_KEY, development_organization_id=organization_id, **(hermetic | extra))
+                    development_organization_id=organization_id, **({"development_api_key": TEST_KEY} | hermetic | extra))
 
 
 class SessionAPITests(unittest.IsolatedAsyncioTestCase):
@@ -141,8 +141,8 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
     async def test_health_and_inventory_are_honest(self):
         code, body, _ = await call(self.app, "/health/live")
         self.assertEqual(code, 200)
-        self.assertEqual(body["phase"], 14)
-        self.assertEqual(body["implemented_phases"], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+        self.assertEqual(body["phase"], 15)
+        self.assertEqual(body["implemented_phases"], list(range(1, 16)))
         code, body, _ = await call(self.app, "/health/ready")
         self.assertEqual(code, 503)  # create_all is not a migration deployment.
         code, body, _ = await call(self.app, "/v1/document-types", headers=self.headers)
@@ -173,7 +173,7 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
         code, _, _ = await call(self.app, "/health/ready")
         self.assertEqual(code, 503)
         with self.engine.begin() as connection:
-            connection.execute(sa.text("UPDATE alembic_version SET version_num = '0008_phase14'"))
+            connection.execute(sa.text("UPDATE alembic_version SET version_num = '0009_phase15'"))
         code, body, _ = await call(self.app, "/health/ready")
         self.assertEqual(code, 200)
         self.assertEqual(body["status"], "ready")
