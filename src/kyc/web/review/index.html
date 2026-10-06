@@ -26,21 +26,42 @@
     </section>
 
     <div class="workspace" id="workspace" hidden>
-      <section class="panel queue" aria-labelledby="queue-title">
-        <div class="queue-head">
-          <h1 id="queue-title">Waiting for review <span id="queue-count" class="count"></span></h1>
-          <button type="button" id="refresh" class="secondary small-button">Refresh</button>
+      <section class="panel queue">
+        <div class="tabs" role="tablist" aria-label="Lists">
+          <button type="button" role="tab" id="tab-queue" aria-selected="true" aria-controls="queue-view">Review queue <span id="queue-count" class="count"></span></button>
+          <button type="button" role="tab" id="tab-all" aria-selected="false" aria-controls="all-view">All sessions <span id="all-count" class="count"></span></button>
         </div>
         <div class="queue-controls">
           <input id="search-id" placeholder="Paste session UUID to open..." spellcheck="false">
           <button type="button" id="open-by-id" class="secondary small-button">Open</button>
         </div>
-        <ol id="queue" class="queue-list"></ol>
-        <p id="queue-empty" class="muted" hidden>No cases are waiting. New cases appear here when the risk engine asks for a human check.</p>
+
+        <div id="queue-view" role="tabpanel" aria-labelledby="tab-queue" class="list-view">
+          <div class="queue-head">
+            <h1 id="queue-title">Waiting for review</h1>
+            <button type="button" id="refresh" class="secondary small-button">Refresh</button>
+          </div>
+          <ol id="queue" class="queue-list"></ol>
+          <p id="queue-empty" class="muted" hidden>No cases are waiting. New cases appear here when the risk engine asks for a human check.</p>
+        </div>
+
+        <div id="all-view" role="tabpanel" aria-labelledby="tab-all" class="list-view" hidden>
+          <form id="all-filters" class="filters">
+            <label>Status <select id="all-status"><option value="">All statuses</option></select></label>
+            <label>User ID <input id="all-user" placeholder="Exact customer user ID" maxlength="128" spellcheck="false"></label>
+            <div class="filter-actions">
+              <button type="submit" class="secondary small-button">Apply</button>
+              <button type="button" id="all-clear" class="secondary small-button">Clear</button>
+            </div>
+          </form>
+          <ol id="all-list" class="queue-list"></ol>
+          <p id="all-empty" class="muted" hidden>No sessions match.</p>
+          <button type="button" id="all-more" class="secondary small-button" hidden>Load more</button>
+        </div>
       </section>
 
       <section class="panel case" id="case" aria-live="polite">
-        <p id="case-empty" class="muted">Select a case from the queue.</p>
+        <p id="case-empty" class="muted">Select a case from the list.</p>
         <div id="case-body" hidden>
           <div class="case-head">
             <div>

@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from kyc.db.models import ApiKey, KYCSession, Organization
 from kyc.db.session import set_tenant, tenant_transaction
+from kyc.domain.state_machine import NO_EXPIRY_STATUSES
 from kyc.tenancy.keys import ALL_SCOPES, API_KEY_PREFIX, CLIENT_SCOPE, CLIENT_TOKEN_PREFIX, MAX_CREDENTIAL_LENGTH, digest
 from kyc.tenancy.network import address_allowed
 
@@ -112,10 +113,10 @@ def _client_token(request: Request, token: str, organization_id: UUID) -> Tenant
         raise refuse(request, 403, "CLIENT_TOKEN_OUT_OF_SCOPE", "A session client token only works on its own session's endpoints.")
     with request.app.state.session_factory() as db, db.begin():
         set_tenant(db, organization_id)
-        row = db.execute(sa.select(KYCSession.client_token_sha256, KYCSession.expires_at).where(
+        row = db.execute(sa.select(KYCSession.client_token_sha256, KYCSession.expires_at, KYCSession.status).where(
             KYCSession.id == session_id, KYCSession.organization_id == organization_id)).first()
         if row is None or row.client_token_sha256 is None or not secrets.compare_digest(row.client_token_sha256, digest(token)) \
-                or _aware(row.expires_at) <= datetime.now(timezone.utc):
+                or (row.status not in NO_EXPIRY_STATUSES and _aware(row.expires_at) <= datetime.now(timezone.utc)):
             raise refuse(request, 401, "CLIENT_TOKEN_INVALID", "Valid credentials are required.")
         _active_organization(request, db, organization_id)
     return TenantContext(organization_id, actor_id=f"session_client:{session_id}", scopes=frozenset({CLIENT_SCOPE}),

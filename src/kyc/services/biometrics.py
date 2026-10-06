@@ -27,7 +27,7 @@ from kyc.documents.requirements import requirement_for
 from kyc.domain.enums import CheckResult, SessionStatus
 from kyc.domain.state_machine import Event, TERMINAL_STATUSES
 from kyc.engines.capture_quality import CaptureRejected, decode_capture
-from kyc.services.sessions import apply_event, aware
+from kyc.services.sessions import apply_event, aware, is_expired
 
 
 @dataclass(frozen=True)
@@ -160,7 +160,7 @@ def submit_selfie(db: Session, tenant: TenantContext, session_id: UUID, data: by
     if record is None:
         raise HTTPException(404, detail="Session not found.")
     now = datetime.now(timezone.utc)
-    if record.status not in TERMINAL_STATUSES and aware(record.expires_at) <= now:
+    if is_expired(record, now):
         apply_event(db, record, tenant, Event.EXPIRE, request_id)
         return _error(409, "SESSION_EXPIRED", "The session has expired. Create a new session.")
     if record.status in TERMINAL_STATUSES:
@@ -258,7 +258,7 @@ def submit_selfie(db: Session, tenant: TenantContext, session_id: UUID, data: by
                       limits.max_attempts - attempts)
 
     now = datetime.now(timezone.utc)
-    if aware(record.expires_at) <= now:
+    if is_expired(record, now):
         apply_event(db, record, tenant, Event.EXPIRE, request_id)
         return _error(409, "SESSION_EXPIRED", "The session has expired. Create a new session.")
     if aware(reference_capture.delete_after) <= now or aware(document.delete_after) <= now:

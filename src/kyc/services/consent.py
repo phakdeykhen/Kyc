@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from kyc.api.dependencies import TenantContext
 from kyc.db.models import AuditLog, Consent, KYCSession
 from kyc.domain.state_machine import TERMINAL_STATUSES
-from kyc.services.sessions import aware
+from kyc.services.sessions import is_expired
 
 DOCUMENT_SCOPE = "DOCUMENT_PROCESSING"
 
@@ -37,7 +37,7 @@ def record_document_consent(db: Session, tenant: TenantContext, record: KYCSessi
     if record.organization_id != tenant.organization_id or tenant.session_id not in (None, record.id):
         raise HTTPException(404, detail="Session not found.")
     now = datetime.now(timezone.utc)
-    if record.status in TERMINAL_STATUSES or record.erased_at is not None or aware(record.expires_at) <= now:
+    if record.status in TERMINAL_STATUSES or record.erased_at is not None or is_expired(record, now):
         raise HTTPException(409, detail="The session is closed; create a new session.")
     existing = active_consent(db, record, DOCUMENT_SCOPE)
     if existing is not None and existing.policy_version == policy_version:

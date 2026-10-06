@@ -22,7 +22,7 @@ from kyc.domain.enums import CheckResult, SessionStatus
 from kyc.domain.state_machine import Event, TERMINAL_STATUSES
 from kyc.engines.capture_quality import CaptureRejected, decode_capture
 from kyc.engines.contracts import DocumentQualityEngine
-from kyc.services.sessions import apply_event, aware
+from kyc.services.sessions import apply_event, is_expired
 from kyc.storage.captures import CaptureStore
 
 CHECK_TYPE = "CAPTURE_QUALITY"
@@ -84,7 +84,7 @@ def submit_capture(db: Session, tenant: TenantContext, session_id: UUID, side: s
     if record is None:
         raise HTTPException(404, detail="Session not found.")
     now = datetime.now(timezone.utc)
-    if record.status not in TERMINAL_STATUSES and aware(record.expires_at) <= now:
+    if is_expired(record, now):
         apply_event(db, record, tenant, Event.EXPIRE, request_id)
         return _error(409, "SESSION_EXPIRED", "The session has expired. Create a new session.")
     if record.status in TERMINAL_STATUSES:

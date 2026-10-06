@@ -11,7 +11,7 @@ from kyc.api.dependencies import TenantContext
 from kyc.api.schemas import SessionCreate, SessionResponse
 from kyc.db.models import AuditLog, KYCSession, Organization
 from kyc.domain.enums import SessionStatus
-from kyc.domain.state_machine import Event, TERMINAL_STATUSES, VerificationEvidence, transition
+from kyc.domain.state_machine import Event, TERMINAL_STATUSES, VerificationEvidence, can_expire, transition
 from kyc.tenancy.keys import CLIENT_TOKEN_PREFIX, new_secret
 from kyc.webhooks.outbox import record_transition
 
@@ -19,6 +19,11 @@ from kyc.webhooks.outbox import record_transition
 def aware(value: datetime) -> datetime:
     # SQLite's test driver drops timezone metadata; PostgreSQL uses TIMESTAMPTZ.
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+def is_expired(record: KYCSession, now: datetime | None = None) -> bool:
+    """Past expires_at in a status that can still expire (never while in manual review)."""
+    return can_expire(record.status) and aware(record.expires_at) <= (now or datetime.now(timezone.utc))
 
 
 def respond(record: KYCSession) -> SessionResponse:
@@ -106,7 +111,7 @@ def get_session(db: Session, tenant: TenantContext, session_id: UUID, request_id
     record = db.scalar(query.with_for_update() if lock else query)
     if record is None:
         raise HTTPException(404, detail="Session not found.")
-    if record.status not in TERMINAL_STATUSES and aware(record.expires_at) <= datetime.now(timezone.utc):
+    if is_expired(record):
         if not lock:
             record = db.scalar(query.with_for_update().execution_options(populate_existing=True))
         if record.status not in TERMINAL_STATUSES:
@@ -122,7 +127,7 @@ def apply_event(db: Session, record: KYCSession, tenant: TenantContext, event: E
     if record.organization_id != tenant.organization_id:
         raise HTTPException(404, detail="Session not found.")
     previous = record.status
-    if event != Event.EXPIRE and aware(record.expires_at) <= datetime.now(timezone.utc):
+    if event != Event.EXPIRE and is_expired(record):
         # The worker transaction owner must commit this EXPIRE event and stop processing.
         event = Event.EXPIRE
     record.status = transition(previous, event, record.verification_level, evidence)

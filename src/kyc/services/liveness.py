@@ -23,12 +23,12 @@ from kyc.biometrics.embeddings import deserialize_embedding
 from kyc.biometrics.types import FaceEngineUnavailable
 from kyc.db.models import AuditLog, BiometricTemplate, KYCSession, LivenessChallenge, LivenessCheck
 from kyc.domain.enums import CheckResult, SessionStatus, VerificationLevel
-from kyc.domain.state_machine import Event, TERMINAL_STATUSES
+from kyc.domain.state_machine import Event
 from kyc.engines.capture_quality import CaptureRejected, decode_capture
 from kyc.liveness import challenge as challenges
 from kyc.liveness.active import COVERAGE, ActiveLivenessPolicy, assess
 from kyc.services.biometrics import _template_context
-from kyc.services.sessions import apply_event, aware
+from kyc.services.sessions import apply_event, aware, is_expired
 
 METHOD = "ACTIVE_LIVENESS"
 MODEL_NAME = "KYC active geometry (YuNet landmarks + SFace continuity)"
@@ -58,7 +58,7 @@ def _session(db: Session, tenant: TenantContext, session_id: UUID, request_id: U
                        KYCSession.organization_id == tenant.organization_id).with_for_update())
     if record is None:
         raise HTTPException(404, detail="Session not found.")
-    if record.status not in TERMINAL_STATUSES and aware(record.expires_at) <= datetime.now(timezone.utc):
+    if is_expired(record):
         apply_event(db, record, tenant, Event.EXPIRE, request_id)
         return record, _error(409, "SESSION_EXPIRED", "The session has expired. Create a new session.")
     if record.verification_level not in LIVENESS_LEVELS:

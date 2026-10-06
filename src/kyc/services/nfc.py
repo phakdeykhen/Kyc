@@ -25,13 +25,13 @@ from kyc.core.crypto import FieldCipher
 from kyc.db.models import (AuditLog, BiometricTemplate, DocumentField, FaceComparison, IdentityDocument, KYCSession,
                            NFCChallenge, NFCResult, Organization)
 from kyc.domain.enums import CheckResult, NFCStatus, SessionStatus, VerificationLevel
-from kyc.domain.state_machine import Event, TERMINAL_STATUSES
+from kyc.domain.state_machine import Event
 from kyc.mrz import parser as mrz_parser
 from kyc.nfc.trust import CSCATrustStore
 from kyc.nfc.verify import verify_chip
 from kyc.services.biometrics import _template_context
 from kyc.services.liveness import _selfie_reference
-from kyc.services.sessions import apply_event, aware
+from kyc.services.sessions import apply_event, aware, is_expired
 
 CLIENT_STATUSES = {"NOT_SUPPORTED": NFCStatus.NFC_NOT_SUPPORTED, "NOT_AVAILABLE": NFCStatus.NFC_NOT_AVAILABLE,
                    "FAILED": NFCStatus.NFC_FAILED}
@@ -58,7 +58,7 @@ def _session(db: Session, tenant: TenantContext, session_id: UUID, request_id: U
                        KYCSession.organization_id == tenant.organization_id).with_for_update())
     if record is None:
         raise HTTPException(404, detail="Session not found.")
-    if record.status not in TERMINAL_STATUSES and aware(record.expires_at) <= datetime.now(timezone.utc):
+    if is_expired(record):
         apply_event(db, record, tenant, Event.EXPIRE, request_id)
         return record, _error(409, "SESSION_EXPIRED", "The session has expired. Create a new session.")
     if record.verification_level != VerificationLevel.DOCUMENT_FACE_LIVENESS_NFC:

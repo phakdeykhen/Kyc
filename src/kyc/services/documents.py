@@ -28,7 +28,7 @@ from kyc.documents.refine import refine_numeric_words
 from kyc.documents.requirements import requirement_for
 from kyc.domain.enums import CheckResult, SessionStatus
 from kyc.domain.identity import OCRLine
-from kyc.domain.state_machine import Event, TERMINAL_STATUSES
+from kyc.domain.state_machine import Event
 from kyc.engines.capture_quality import HeuristicDocumentQualityEngine, decode_capture
 from kyc.engines.contracts import CheckEvidence
 from kyc.mrz.reader import read_mrz_lines
@@ -37,7 +37,7 @@ from kyc.barcode.evaluate import assess as assess_barcodes
 from kyc.barcode.signatures import TrustStore
 from kyc.mrz import parser as mrz_parser
 from kyc.documents.iso3166 import ICAO_NON_STATE, to_alpha2
-from kyc.services.sessions import apply_event, aware
+from kyc.services.sessions import apply_event, is_expired
 from kyc.storage.captures import CaptureStore
 
 log = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ class DocumentProcessor:
         if record is None:
             # Without waiting, a locked row reads as absent: tell the two cases apart.
             return ProcessingOutcome("BUSY" if not wait and db.scalar(sa.select(query.exists())) else "NOT_FOUND")
-        if record.status not in TERMINAL_STATUSES and aware(record.expires_at) <= datetime.now(timezone.utc):
+        if is_expired(record):
             apply_event(db, record, tenant, Event.EXPIRE, request_id)
             return ProcessingOutcome("EXPIRED")
         if record.status != SessionStatus.DOCUMENT_PROCESSING:
