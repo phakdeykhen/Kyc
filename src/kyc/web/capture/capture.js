@@ -564,6 +564,17 @@ function showError(result) {
 }
 
 $("session-form").addEventListener("submit", startSession);
+
+// Development convenience: a link ending in #key=…&org=… pre-fills the form (e.g. from a QR code on
+// the operator's screen). The fragment is never sent to any server, and it is removed from the
+// address bar and this history entry at once.
+(function prefillFromFragment() {
+  if (typeof location === "undefined" || !location.hash || location.hash.length < 2) return;
+  const params = new URLSearchParams(location.hash.slice(1));
+  if (params.get("key")) $("api-key").value = params.get("key");
+  if (params.get("org")) $("org-id").value = params.get("org");
+  if (typeof history !== "undefined" && history.replaceState) history.replaceState(null, "", location.pathname);
+})();
 $("resume-session").addEventListener("click", resumeSession);
 $("refresh-session").addEventListener("click", refreshSession);
 $("biometric-consent").addEventListener("change", updateButtons);
