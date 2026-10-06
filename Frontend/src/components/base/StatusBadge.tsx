@@ -1,4 +1,4 @@
-import type { BadgeMeta } from "@/lib/kycSimulation";
+import type { BadgeMeta } from "@/lib/badges";
 
 interface StatusBadgeProps {
   meta: BadgeMeta;

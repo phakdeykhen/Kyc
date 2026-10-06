@@ -1,6 +1,6 @@
 import StatusBadge from "@/components/base/StatusBadge";
 import type { CaseHistoryEntry } from "@/api/types";
-import { decisionMeta } from "@/lib/kycSimulation";
+import { decisionMeta } from "@/lib/badges";
 import { dateTime, humanize } from "@/pages/review/format";
 
 const ACTION_BADGE = { APPROVE: "PASS", REJECT: "FAIL", REQUEST_RECAPTURE: "REVIEW" } as const;

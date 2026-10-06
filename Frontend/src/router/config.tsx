@@ -11,9 +11,11 @@ import VerificationResult from "../pages/verify/result/page";
 import ReviewQueue from "../pages/review/page";
 import ReviewSession from "../pages/review/session/page";
 import Developers from "../pages/developers/page";
+import SessionDetail from "../pages/sessions/page";
 
 // Routes are grouped by who uses them, because each group holds a different credential:
-//   staff (reviewer token, signed in at /signin)   /console, /review, /developers, /verify/new
+//   staff (reviewer token, signed in at /signin)   /console, /review, /sessions, /developers, /verify/new
+//     (+ an optional API key, connected in the tab, for sessions, keys and webhooks)
 //   applicant (session client token in the link)    /verify/:sessionId, /verify/:sessionId/done
 // API keys never reach a browser in production: your server creates sessions and hands the
 // applicant a /verify/:sessionId link.
@@ -27,6 +29,7 @@ const routes: RouteObject[] = [
       { path: "/console", element: <ConsoleHome /> },
       { path: "/review", element: <ReviewQueue /> },
       { path: "/review/:sessionId", element: <ReviewSession /> },
+      { path: "/sessions/:sessionId", element: <SessionDetail /> },
       { path: "/developers", element: <Developers /> },
       { path: "/verify/new", element: <NewVerification /> },
     ],

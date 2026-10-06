@@ -29,8 +29,17 @@ function authHeaders(credential: Credential): Record<string, string> {
   return headers;
 }
 
+// FastAPI validation errors: [{loc: ["body", "user_id"], msg: "..."}, ...]
+function validationMessage(detail: unknown[]): string {
+  const first = detail[0] as { loc?: unknown[]; msg?: string } | undefined;
+  if (!first?.msg) return "Some values are not valid.";
+  const field = (first.loc ?? []).filter((part) => part !== "body").join(".");
+  return field ? `${field}: ${first.msg.replace(/^Value error, /, "")}` : first.msg;
+}
+
 interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
+  headers?: Record<string, string>;
   query?: Record<string, string | number | undefined | null>;
   json?: unknown;
   form?: FormData;
@@ -44,7 +53,7 @@ async function send(credential: Credential, path: string, options: RequestOption
   }
   const query = params.toString();
   const url = `${API_BASE}${path}${query ? `?${query}` : ""}`;
-  const headers = authHeaders(credential);
+  const headers = { ...authHeaders(credential), ...(options.headers ?? {}) };
   let body: FormData | string | undefined;
   if (options.form) body = options.form;
   else if (options.json !== undefined) {
@@ -67,7 +76,7 @@ async function send(credential: Credential, path: string, options: RequestOption
     }
     const detail = data?.detail;
     const message = typeof detail === "string" ? detail
-      : Array.isArray(detail) ? "Some values are not valid." : `Request failed (${response.status}).`;
+      : Array.isArray(detail) ? validationMessage(detail) : `Request failed (${response.status}).`;
     throw new ApiError(response.status, message, (data?.reason_code as string) ?? null, data);
   }
   return response;

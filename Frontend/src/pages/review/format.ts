@@ -1,17 +1,12 @@
-import { checkMeta, signalSeverityMeta, statusMeta, type BadgeMeta } from "@/lib/kycSimulation";
+import { checkMeta, signalSeverityMeta, statusMeta, type BadgeMeta } from "@/lib/badges";
 import type { CheckValue, SessionStatus } from "@/api/types";
-import type { CheckResult } from "@/types/kyc";
-
-const KNOWN_CHECKS = new Set(["PASS", "REVIEW", "FAIL", "NOT_APPLICABLE"]);
 
 export function checkBadge(value: CheckValue): BadgeMeta {
-  if (KNOWN_CHECKS.has(value)) return checkMeta(value as CheckResult);
-  return { label: value === "UNAVAILABLE" ? "Unavailable" : value, icon: "ri-question-line",
-           className: "bg-background-200 text-foreground-600 border-background-300" };
+  return checkMeta(value);
 }
 
 export function sessionStatusBadge(status: SessionStatus): BadgeMeta {
-  return statusMeta(status) ?? { label: status, icon: "ri-question-line", className: "bg-background-200 text-foreground-600 border-background-300" };
+  return statusMeta(status);
 }
 
 export function severityBadge(severity: "HIGH" | "MEDIUM" | "LOW"): BadgeMeta {

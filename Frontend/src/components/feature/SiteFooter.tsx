@@ -38,10 +38,10 @@ export default function SiteFooter() {
       </div>
       <div className="border-t border-background-50/10">
         <div className="mx-auto flex flex-col items-start justify-between gap-2 px-4 py-5 font-label text-xs text-background-50/60 sm:flex-row sm:items-center md:px-6">
-          <span>© 2026 Verix Identity Cloud. Prototype — verification engines are simulated.</span>
+          <span>© 2026 Verix Identity Cloud. Connected to the KYC API ({import.meta.env.MODE}).</span>
           <span className="inline-flex items-center gap-1.5">
             <i className="ri-shield-check-line text-sm leading-none"></i>
-            Sandbox environment
+            Credentials are kept in this tab's memory only
           </span>
         </div>
       </div>

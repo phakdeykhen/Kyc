@@ -3,7 +3,7 @@ import StatusBadge from "@/components/base/StatusBadge";
 import type { Credential } from "@/api/http";
 import { reviewApi } from "@/api/review";
 import type { ReviewCase } from "@/api/types";
-import { decisionMeta } from "@/lib/kycSimulation";
+import { decisionMeta } from "@/lib/badges";
 import { CHECK_LABELS, checkBadge, dateTime, humanize } from "@/pages/review/format";
 
 const card = "rounded-lg border border-background-200 bg-background-50 p-4 md:p-5";

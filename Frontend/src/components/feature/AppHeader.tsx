@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useStaffAuth } from "@/auth/useStaffAuth";
+import { useApiKey, useStaffAuth } from "@/auth/useStaffAuth";
 
 interface NavItem {
   label: string;
@@ -19,6 +19,7 @@ export default function AppHeader() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { profile, signOut } = useStaffAuth();
+  const { apiKey, organization } = useApiKey();
   const initials = (profile?.display_name ?? "")
     .split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "?";
 
@@ -63,10 +64,13 @@ export default function AppHeader() {
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-200 bg-accent-50 px-3 py-1 font-label text-xs font-medium text-accent-800">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent-500"></span>
-            Sandbox
-          </span>
+          <Link to="/developers"
+                title={apiKey ? `API key connected · ${organization?.credential.scopes.join(", ")}` : "Connect an API key to create sessions and manage keys and webhooks"}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-label text-xs font-medium ${
+                  apiKey ? "border-primary-200 bg-primary-50 text-primary-800" : "border-background-300 bg-background-100 text-foreground-600"}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${apiKey ? "bg-primary-500" : "bg-foreground-300"}`}></span>
+            {apiKey ? organization?.name ?? "API key" : "No API key"}
+          </Link>
           <button
             type="button"
             onClick={() => navigate("/verify/new")}
