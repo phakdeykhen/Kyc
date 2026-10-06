@@ -14,12 +14,13 @@ from collections.abc import Callable
 import json
 from typing import Any
 import urllib.error
+import urllib.parse
 import urllib.request
 from uuid import uuid4
 
 # (method, url, headers, body) -> (status, headers, body)
 Transport = Callable[[str, str, dict[str, str], bytes | None], tuple[int, dict[str, str], bytes]]
-USER_AGENT = "kyc-sdk-python/0.16.0"
+USER_AGENT = "kyc-sdk-python/0.18.0"
 
 
 class KYCAPIError(Exception):
@@ -30,11 +31,18 @@ class KYCAPIError(Exception):
         self.retry_after = None
 
 
+class _NoRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # A custom API-key header can otherwise reach the redirect destination.
+        return None
+
+
 def urllib_transport(timeout: float = 30.0) -> Transport:
+    opener = urllib.request.build_opener(_NoRedirects())
     def send(method, url, headers, body):
         request = urllib.request.Request(url, data=body, method=method, headers=headers)
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            with opener.open(request, timeout=timeout) as response:
                 return response.status, {k.lower(): v for k, v in response.headers.items()}, response.read()
         except urllib.error.HTTPError as error:
             return error.code, {k.lower(): v for k, v in error.headers.items()}, error.read()
@@ -54,6 +62,11 @@ def _multipart(fields: dict[str, str], files: list[tuple[str, str, str, bytes]])
 class _Base:
     def __init__(self, base_url: str, organization_id: str, credential_headers: dict[str, str],
                  transport: Transport | None = None):
+        url = urllib.parse.urlsplit(base_url)
+        if (url.scheme not in ("https", "http") or not url.hostname or url.username is not None
+                or url.password is not None or url.query or url.fragment
+                or (url.scheme == "http" and url.hostname not in ("localhost", "127.0.0.1", "::1"))):
+            raise ValueError("Use an HTTPS API URL without credentials, query or fragment; HTTP is permitted only on loopback.")
         self.base_url = base_url.rstrip("/")
         self._headers = {"X-Organization-ID": str(organization_id), "User-Agent": USER_AGENT, **credential_headers}
         self._transport = transport or urllib_transport()
@@ -70,7 +83,7 @@ class _Base:
         status, response_headers, data = self._transport(method, self.base_url + path,
                                                          {**self._headers, **extra, **(headers or {})}, body)
         parsed = json.loads(data) if data and response_headers.get("content-type", "").startswith("application/json") else data
-        if status >= 400:
+        if not 200 <= status < 300:
             error = KYCAPIError(status, parsed, response_headers.get("x-request-id"))
             error.retry_after = response_headers.get("retry-after")
             raise error
@@ -79,6 +92,11 @@ class _Base:
     # Capture steps, shared by server and device clients.
     def get_session(self, session_id: str) -> dict:
         return self._request("GET", f"/v1/kyc/{session_id}")
+
+    def give_document_consent(self, session_id: str) -> dict:
+        """Record consent to document processing. Call only after the person agreed on their device,
+        and before upload_document (required when the platform enforces consent, as in production)."""
+        return self._request("POST", f"/v1/kyc/{session_id}/consent", {"scope": "DOCUMENT_PROCESSING", "granted": True})
 
     def upload_document(self, session_id: str, side: str, image: bytes, filename: str = "document.jpg",
                         content_type: str = "image/jpeg") -> dict:
@@ -149,6 +167,10 @@ class KYCClient(_Base):
     def verify(self, session_id: str) -> dict:
         return self._request("POST", f"/v1/kyc/{session_id}/verify")
 
+    def erase(self, session_id: str) -> dict:
+        """Erase the session's personal and biometric data (data:erase). Status and decision codes remain."""
+        return self._request("POST", f"/v1/kyc/{session_id}/erase")
+
     def organization(self) -> dict:
         return self._request("GET", "/v1/organization")
 
@@ -163,9 +185,10 @@ class KYCClient(_Base):
         return self._request("GET", "/v1/api-keys")
 
     def create_api_key(self, name: str, scopes: list[str], expires_in_days: int | None = None,
-                       rate_limit_per_minute: int | None = None) -> dict:
+                       rate_limit_per_minute: int | None = None, allowed_cidrs: list[str] | None = None) -> dict:
+        """allowed_cidrs restricts the key to those networks (default: the creating key's own list)."""
         body = {"name": name, "scopes": scopes, "expires_in_days": expires_in_days,
-                "rate_limit_per_minute": rate_limit_per_minute}
+                "rate_limit_per_minute": rate_limit_per_minute, "allowed_cidrs": allowed_cidrs}
         return self._request("POST", "/v1/api-keys", {key: value for key, value in body.items() if value is not None})
 
     def revoke_api_key(self, key_id: str) -> dict:

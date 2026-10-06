@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from kyc.api.dependencies import TenantContext
-from kyc.core.crypto import FieldCipher
+from kyc.webhooks.secrets import WebhookSecretCipher
 from kyc.db.models import WebhookDelivery, WebhookEndpoint
 from kyc.services.tenancy import audit
 from kyc.webhooks.delivery import TargetNotAllowed, resolve
@@ -38,9 +38,9 @@ def delivery_view(row: WebhookDelivery) -> dict:
             "last_error": row.last_error, "delivered_at": _aware(row.delivered_at), "created_at": _aware(row.created_at)}
 
 
-def _require_cipher(cipher: FieldCipher | None) -> FieldCipher:
+def _require_cipher(cipher: WebhookSecretCipher | None) -> WebhookSecretCipher:
     if cipher is None:
-        raise HTTPException(503, detail="Webhook secrets need PII_ENCRYPTION_KEYS to be configured.")
+        raise HTTPException(503, detail="Webhook secrets need WEBHOOK_SECRET_KEYS (or, in development, PII_ENCRYPTION_KEYS).")
     return cipher
 
 
@@ -58,7 +58,7 @@ def _check_events(event_types: list[str]) -> list[str]:
     return sorted(set(event_types))
 
 
-def _seal(cipher: FieldCipher, row: WebhookEndpoint, secret: str) -> tuple[bytes, str]:
+def _seal(cipher: WebhookSecretCipher, row: WebhookEndpoint, secret: str) -> tuple[bytes, str]:
     return cipher.seal(secret, secret_context(row.organization_id, row.id))
 
 
@@ -78,7 +78,7 @@ def list_endpoints(db: Session, organization_id: UUID, include_deleted: bool = F
 
 
 def create_endpoint(db: Session, tenant: TenantContext, url: str, event_types: list[str], description: str | None,
-                    cipher: FieldCipher | None, allow_private: bool, request_id: UUID) -> tuple[WebhookEndpoint, str]:
+                    cipher: WebhookSecretCipher | None, allow_private: bool, request_id: UUID) -> tuple[WebhookEndpoint, str]:
     cipher = _require_cipher(cipher)
     count = db.scalar(sa.select(sa.func.count()).select_from(WebhookEndpoint).where(
         WebhookEndpoint.organization_id == tenant.organization_id, WebhookEndpoint.active.is_(True)))
@@ -128,7 +128,7 @@ def delete_endpoint(db: Session, tenant: TenantContext, endpoint_id: UUID, reque
     return row
 
 
-def rotate_secret(db: Session, tenant: TenantContext, endpoint_id: UUID, cipher: FieldCipher | None, overlap_hours: int,
+def rotate_secret(db: Session, tenant: TenantContext, endpoint_id: UUID, cipher: WebhookSecretCipher | None, overlap_hours: int,
                   request_id: UUID) -> tuple[WebhookEndpoint, str]:
     """New secret now; the old one keeps signing alongside it for `overlap_hours`, so receivers can switch over."""
     cipher = _require_cipher(cipher)

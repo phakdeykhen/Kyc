@@ -1,0 +1,425 @@
+{
+  "runs": [
+    {
+      "tool": "scripts/benchmark_stages.py",
+      "mode": "cpu",
+      "label": "",
+      "date": "2026-10-06T14:36:23+0700",
+      "host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "results": {
+        "capture_decode_and_quality_gate": {
+          "runs": 20,
+          "mean_ms": 172.12,
+          "p50_ms": 158.15,
+          "p95_ms": 261.57,
+          "max_ms": 261.57,
+          "input": "synthetic 1600x1200 JPEG, 376 KiB"
+        },
+        "ocr_full_page_khm_eng": {
+          "runs": 5,
+          "mean_ms": 1860.29,
+          "p50_ms": 1851.49,
+          "p95_ms": 1908.09,
+          "max_ms": 1908.09,
+          "input": "rendered SPECIMEN passport page 1600x1126"
+        },
+        "ocr_full_page_eng": {
+          "runs": 5,
+          "mean_ms": 822.86,
+          "p50_ms": 822.63,
+          "p95_ms": 868.41,
+          "max_ms": 868.41
+        },
+        "mrz_parse_td3": {
+          "runs": 1000,
+          "mean_ms": 0.31,
+          "p50_ms": 0.27,
+          "p95_ms": 0.51,
+          "max_ms": 0.95
+        },
+        "barcode_decode_qr": {
+          "runs": 20,
+          "mean_ms": 16.57,
+          "p50_ms": 12.56,
+          "p95_ms": 68.84,
+          "max_ms": 68.84
+        },
+        "face_detect": {
+          "runs": 20,
+          "mean_ms": 24.44,
+          "p50_ms": 23.48,
+          "p95_ms": 31.25,
+          "max_ms": 31.25
+        },
+        "face_embed": {
+          "runs": 20,
+          "mean_ms": 18.25,
+          "p50_ms": 17.81,
+          "p95_ms": 28.02,
+          "max_ms": 28.02
+        },
+        "pii_field_seal_and_open": {
+          "runs": 2000,
+          "mean_ms": 0.02,
+          "p50_ms": 0.01,
+          "p95_ms": 0.03,
+          "max_ms": 0.39
+        },
+        "template_seal_and_open": {
+          "runs": 2000,
+          "mean_ms": 0.02,
+          "p50_ms": 0.02,
+          "p95_ms": 0.03,
+          "max_ms": 0.33
+        },
+        "capture_store_put_fsync": {
+          "runs": 20,
+          "mean_ms": 2.7,
+          "p50_ms": 2.58,
+          "p95_ms": 3.57,
+          "max_ms": 3.57
+        },
+        "webhook_sign": {
+          "runs": 2000,
+          "mean_ms": 0.01,
+          "p50_ms": 0.01,
+          "p95_ms": 0.01,
+          "max_ms": 0.12
+        }
+      }
+    },
+    {
+      "tool": "scripts/benchmark_stages.py",
+      "mode": "pipeline",
+      "label": "baseline, inline processing, 1 process",
+      "date": "2026-10-06T14:37:23+0700",
+      "host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "results": {
+        "parallel_1": {
+          "documents": 6,
+          "wall_s": 34.2,
+          "documents_per_minute": 10.5,
+          "processing_ms": {
+            "p50": 5374.9,
+            "max": 5530.7,
+            "mean": 5359.3
+          },
+          "upload_ms_p50": 262.8,
+          "final_statuses": [
+            "PROCESSING"
+          ],
+          "capture_statuses": [
+            "ACCEPTED"
+          ]
+        },
+        "parallel_3": {
+          "documents": 6,
+          "wall_s": 16.67,
+          "documents_per_minute": 21.6,
+          "processing_ms": {
+            "p50": 7706.6,
+            "max": 7789.4,
+            "mean": 7709.1
+          },
+          "upload_ms_p50": 532.7,
+          "final_statuses": [
+            "PROCESSING"
+          ],
+          "capture_statuses": [
+            "ACCEPTED"
+          ]
+        }
+      }
+    },
+    {
+      "tool": "scripts/benchmark_stages.py",
+      "mode": "pipeline",
+      "label": "deferred, document worker --parallel 4 (INVALID: ran behind a ~470-document OCR backlog left by the upload test; kept for the record)",
+      "date": "2026-10-06T14:59:42+0700",
+      "host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "results": {
+        "parallel_1": {
+          "documents": 8,
+          "wall_s": 400.7,
+          "documents_per_minute": 1.2,
+          "processing_ms": {
+            "p50": 6586.6,
+            "max": 180048.4,
+            "mean": 49747.7
+          },
+          "upload_ms_p50": 293.0,
+          "final_statuses": [
+            "DOCUMENT_PROCESSING",
+            "MANUAL_REVIEW",
+            "PROCESSING"
+          ],
+          "capture_statuses": [
+            "ACCEPTED"
+          ]
+        },
+        "parallel_4": {
+          "documents": 8,
+          "wall_s": 28.77,
+          "documents_per_minute": 16.7,
+          "processing_ms": {
+            "p50": 12904.3,
+            "max": 15231.6,
+            "mean": 12214.8
+          },
+          "upload_ms_p50": 305.9,
+          "final_statuses": [
+            "PROCESSING"
+          ],
+          "capture_statuses": [
+            "ACCEPTED"
+          ]
+        },
+        "parallel_8": {
+          "documents": 8,
+          "wall_s": 36.86,
+          "documents_per_minute": 13.0,
+          "processing_ms": {
+            "p50": 26815.6,
+            "max": 36137.0,
+            "mean": 25351.0
+          },
+          "upload_ms_p50": 492.6,
+          "final_statuses": [
+            "PROCESSING"
+          ],
+          "capture_statuses": [
+            "ACCEPTED"
+          ]
+        }
+      }
+    },
+    {
+      "tool": "scripts/benchmark_stages.py",
+      "mode": "pipeline",
+      "label": "deferred, empty queue, document worker --parallel 4",
+      "date": "2026-10-06T15:01:37+0700",
+      "host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "results": {
+        "parallel_1": {
+          "documents": 8,
+          "wall_s": 52.95,
+          "documents_per_minute": 9.1,
+          "processing_ms": {
+            "p50": 6246.4,
+            "max": 7001.0,
+            "mean": 6316.6
+          },
+          "upload_ms_p50": 261.3,
+          "final_statuses": [
+            "MANUAL_REVIEW",
+            "PROCESSING"
+          ],
+          "capture_statuses": [
+            "ACCEPTED"
+          ]
+        },
+        "parallel_4": {
+          "documents": 8,
+          "wall_s": 31.59,
+          "documents_per_minute": 15.2,
+          "processing_ms": {
+            "p50": 13045.6,
+            "max": 17919.5,
+            "mean": 14048.5
+          },
+          "upload_ms_p50": 340.4,
+          "final_statuses": [
+            "PROCESSING"
+          ],
+          "capture_statuses": [
+            "ACCEPTED"
+          ]
+        }
+      }
+    },
+    {
+      "tool": "scripts/benchmark_stages.py",
+      "mode": "pipeline",
+      "label": "deferred, empty queue, document worker --parallel 8",
+      "date": "2026-10-06T15:02:26+0700",
+      "host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "results": {
+        "parallel_8": {
+          "documents": 16,
+          "wall_s": 44.57,
+          "documents_per_minute": 21.5,
+          "processing_ms": {
+            "p50": 19443.0,
+            "max": 22115.8,
+            "mean": 18863.0
+          },
+          "upload_ms_p50": 504.2,
+          "final_statuses": [
+            "MANUAL_REVIEW",
+            "PROCESSING"
+          ],
+          "capture_statuses": [
+            "ACCEPTED"
+          ]
+        }
+      }
+    },
+    {
+      "tool": "scripts/benchmark_stages.py",
+      "mode": "pipeline",
+      "label": "deferred, empty queue, worker --parallel 8, OMP_THREAD_LIMIT=1",
+      "date": "2026-10-06T15:05:28+0700",
+      "host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "results": {
+        "parallel_1": {
+          "documents": 16,
+          "wall_s": 107.19,
+          "documents_per_minute": 9.0,
+          "processing_ms": {
+            "p50": 6162.8,
+            "max": 8353.5,
+            "mean": 6367.7
+          },
+          "upload_ms_p50": 266.1,
+          "final_statuses": [
+            "PROCESSING"
+          ],
+          "capture_statuses": [
+            "ACCEPTED"
+          ]
+        },
+        "parallel_8": {
+          "documents": 16,
+          "wall_s": 59.49,
+          "documents_per_minute": 16.1,
+          "processing_ms": {
+            "p50": 23094.9,
+            "max": 45506.7,
+            "mean": 24957.9
+          },
+          "upload_ms_p50": 452.0,
+          "final_statuses": [
+            "PROCESSING"
+          ],
+          "capture_statuses": [
+            "ACCEPTED"
+          ]
+        }
+      }
+    },
+    {
+      "tool": "scripts/benchmark_stages.py",
+      "mode": "pipeline",
+      "label": "deferred, empty queue, 3 worker processes x --parallel 3, OMP_THREAD_LIMIT=1",
+      "date": "2026-10-06T15:07:11+0700",
+      "host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "results": {
+        "parallel_9": {
+          "documents": 18,
+          "wall_s": 88.01,
+          "documents_per_minute": 12.3,
+          "processing_ms": {
+            "p50": 48509.4,
+            "max": 58826.9,
+            "mean": 35527.2
+          },
+          "upload_ms_p50": 538.0,
+          "final_statuses": [
+            "PROCESSING"
+          ],
+          "capture_statuses": [
+            "ACCEPTED"
+          ]
+        }
+      }
+    },
+    {
+      "tool": "scripts/benchmark_stages.py",
+      "mode": "pipeline",
+      "label": "deferred, claiming worker: 1 process x --parallel 8",
+      "date": "2026-10-06T15:09:02+0700",
+      "host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "results": {
+        "parallel_8": {
+          "documents": 16,
+          "wall_s": 40.11,
+          "documents_per_minute": 23.9,
+          "processing_ms": {
+            "p50": 17890.2,
+            "max": 20888.8,
+            "mean": 17387.7
+          },
+          "upload_ms_p50": 413.5,
+          "final_statuses": [
+            "PROCESSING"
+          ],
+          "capture_statuses": [
+            "ACCEPTED"
+          ]
+        }
+      }
+    },
+    {
+      "tool": "scripts/benchmark_stages.py",
+      "mode": "pipeline",
+      "label": "deferred, claiming worker: 3 processes x --parallel 3",
+      "date": "2026-10-06T15:10:02+0700",
+      "host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "results": {
+        "parallel_9": {
+          "documents": 18,
+          "wall_s": 53.13,
+          "documents_per_minute": 20.3,
+          "processing_ms": {
+            "p50": 24499.0,
+            "max": 25469.1,
+            "mean": 24621.7
+          },
+          "upload_ms_p50": 1105.3,
+          "final_statuses": [
+            "PROCESSING"
+          ],
+          "capture_statuses": [
+            "ACCEPTED"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from io import StringIO
+import logging
 from pathlib import Path
 import unittest
 from uuid import uuid4
@@ -107,3 +108,21 @@ class SchemaTests(unittest.TestCase):
         self.assertIn("UUID", sql)
         self.assertIn("WITH CHECK", sql)
         self.assertIn("NULLIF(current_setting('app.organization_id', true), '')::uuid", sql)
+
+    def test_migrations_preserve_existing_security_logging(self):
+        logger = logging.getLogger("kyc.security")
+        previous = logger.disabled
+        logger.disabled = False
+        try:
+            Base.metadata.drop_all(self.engine)
+            config = Config(str(ROOT / "alembic.ini"))
+            config.attributes["database_url"] = "sqlite://"
+            with self.engine.begin() as connection:
+                config.attributes["connection"] = connection
+                with self.assertLogs("kyc.security", logging.WARNING) as events:
+                    command.upgrade(config, "head")
+                    logger.warning("Security logging remains active after migration")
+                self.assertEqual(len(events.records), 1)
+                self.assertFalse(logger.disabled)
+        finally:
+            logger.disabled = previous

@@ -19,6 +19,7 @@ SCOPES = {
     "results:identity": "See unmasked identity fields in results.",
     "webhooks:manage": "Create, change and remove webhook endpoints; read deliveries.",
     "keys:manage": "Create, list and revoke this organization's API keys.",
+    "data:erase": "Erase a session's personal and biometric data (data-subject requests).",
 }
 ALL_SCOPES = frozenset(SCOPES)
 DEFAULT_SCOPES = ("sessions:write", "sessions:read")

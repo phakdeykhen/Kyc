@@ -170,9 +170,11 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None, re
     checks, flags, summary, signals, document = (evidence.checks, evidence.flags, evidence.face_comparison,
                                                  evidence.signals, evidence.document)
     decision, review = latest_decision(db, record), latest_review(db, record)
+    erased_at = record.erased_at.replace(tzinfo=record.erased_at.tzinfo or timezone.utc) if record.erased_at else None
     if document is None or cipher is None:
         return SessionResult(session_id=record.id, status=record.status, checks=checks, fraud_signals=signals,
-                             face_comparison=summary, review_flags=sorted(set(flags)), decision=decision, review=review)
+                             face_comparison=summary, review_flags=sorted(set(flags)), decision=decision, review=review,
+                             erased_at=erased_at)
 
     values: dict[str, str] = {}
     for field in db.scalars(sa.select(DocumentField).where(DocumentField.organization_id == record.organization_id,

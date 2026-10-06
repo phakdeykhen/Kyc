@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
+from kyc.webhooks.secrets import WebhookSecretCipher
 from kyc.db.models import AuditLog, KYCSession, WebhookDelivery, WebhookEndpoint
 from kyc.domain.enums import SessionStatus
 from kyc.domain.state_machine import Event
@@ -42,7 +43,9 @@ class WebhookCase(ReviewCase):
         await super().asyncSetUp()
         self.sender = RecordingSender()
         self.dispatcher = self.app.state.webhook_dispatcher
-        self.dispatcher.cipher, self.dispatcher.sender = self.cipher, self.sender
+        # ReviewCase injects the PII cipher after startup; webhook secrets fall back to it (no WEBHOOK_SECRET_KEYS).
+        self.app.state.webhook_cipher = WebhookSecretCipher(None, self.cipher)
+        self.dispatcher.cipher, self.dispatcher.sender = self.app.state.webhook_cipher, self.sender
 
     async def endpoint(self, url=PUBLIC_URL, event_types=None, headers=None):
         code, body, _ = await call(self.app, "/v1/webhooks", "POST", {"url": url, "event_types": event_types or []},
@@ -104,8 +107,8 @@ class EndpointManagementTests(WebhookCase):
         code, _, _ = await call(self.app, "/v1/webhooks", "POST", {"url": PUBLIC_URL}, self.headers)
         self.assertEqual(code, 409)
 
-    async def test_secrets_need_the_pii_keyring(self):
-        self.app.state.field_cipher = None
+    async def test_secrets_need_a_keyring(self):
+        self.app.state.webhook_cipher = None
         code, _, _ = await call(self.app, "/v1/webhooks", "POST", {"url": PUBLIC_URL}, self.headers)
         self.assertEqual(code, 503)
 

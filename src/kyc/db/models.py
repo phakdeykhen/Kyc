@@ -84,6 +84,8 @@ class KYCSession(Record, Base):
     idempotency_key: Mapped[str | None] = mapped_column(sa.String(128))
     request_fingerprint: Mapped[str | None] = mapped_column(sa.String(64))
     client_token_sha256: Mapped[str | None] = mapped_column(sa.String(64))
+    # Phase 17: set when the session's personal and biometric data was erased on request.
+    erased_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     __table_args__ = (
         sa.UniqueConstraint("organization_id", "id", name="uq_kyc_sessions_scope_id"),
         sa.UniqueConstraint("organization_id", "idempotency_key", name="uq_kyc_sessions_idempotency_key"),
@@ -92,6 +94,7 @@ class KYCSession(Record, Base):
         sa.CheckConstraint("version > 0", name="version_positive"),
         sa.Index("ix_kyc_sessions_org_status_created", "organization_id", "status", "created_at"),
         sa.Index("ix_kyc_sessions_org_expires", "organization_id", "expires_at"),
+        sa.Index("ix_kyc_sessions_org_user", "organization_id", "user_id"),
     )
 
 
@@ -333,11 +336,13 @@ class ManualReview(SessionArtifact, Base):
     reviewer_id: Mapped[str] = mapped_column(sa.String(128))
     action: Mapped[ReviewAction] = mapped_column(enum_type(ReviewAction))
     reason_code: Mapped[str] = mapped_column(sa.String(80))
-    reason_ciphertext: Mapped[bytes] = mapped_column(sa.LargeBinary)   # the reviewer's note, encrypted
-    key_version: Mapped[str] = mapped_column(sa.String(256))
+    reason_ciphertext: Mapped[bytes | None] = mapped_column(sa.LargeBinary)   # cleared on personal-data erasure
+    key_version: Mapped[str | None] = mapped_column(sa.String(256))
     session_version: Mapped[int | None] = mapped_column(sa.Integer)     # the case version the reviewer saw
     risk_assessment_id: Mapped[UUID | None] = mapped_column(sa.Uuid)    # the assessment being resolved
     __table_args__ = artifact_constraints(__tablename__, sa.CheckConstraint("length(reason_code) > 0", name="reason_required"),
+                                          sa.CheckConstraint("(reason_ciphertext IS NULL) = (key_version IS NULL)",
+                                                             name="review_note_key_pair"),
                                           sa.Index("ix_manual_reviews_session_created", "organization_id", "session_id", "created_at"))
 
 
@@ -350,6 +355,8 @@ class Reviewer(Record, Base):
     role: Mapped[str] = mapped_column(sa.String(20))
     token_sha256: Mapped[str] = mapped_column(sa.String(64))
     active: Mapped[bool] = mapped_column(sa.Boolean, default=True, server_default=sa.true())
+    # Phase 17: tokens expire and are rotated by scripts/create_reviewer.py (NULL: issued before Phase 17).
+    expires_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     __table_args__ = (sa.UniqueConstraint("token_sha256", name="uq_reviewers_token_sha256"),
                       sa.UniqueConstraint("organization_id", "id", name="uq_reviewers_scope_id"),
                       sa.CheckConstraint("role IN ('REVIEWER', 'AUDITOR')", name="reviewer_role"),
@@ -370,6 +377,8 @@ class ApiKey(Record, Base):
     expires_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     last_used_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    # Phase 17: CIDR allow-list; empty means any network.
+    allowed_cidrs: Mapped[list] = mapped_column(JSON_VALUE, default=list, server_default="[]")
     __table_args__ = (sa.UniqueConstraint("key_sha256", name="uq_api_keys_key_sha256"),
                       sa.UniqueConstraint("organization_id", "id", name="uq_api_keys_scope_id"),
                       sa.CheckConstraint("length(key_sha256) = 64", name="key_hash_length"),

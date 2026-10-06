@@ -56,6 +56,7 @@ test("clients send the right credentials, paths and bodies", async () => {
   assert.equal(headers["X-API-Key"], "kyc_key");
   assert.equal(headers["X-Organization-ID"], "org-1");
   assert.equal(headers["Idempotency-Key"], "signup-0001");
+  assert.equal(created.init.redirect, "error", "A redirect must not forward the API key");
   assert.deepEqual(JSON.parse(String(created.init.body)), {
     user_id: "u1", country: "KH", expected_document_type: "KH_NATIONAL_ID", verification_level: "DOCUMENT_FACE_LIVENESS",
   });
@@ -70,4 +71,34 @@ test("clients send the right credentials, paths and bodies", async () => {
 
   await assert.rejects(server.getResult("s1"), (error: unknown) =>
     error instanceof KYCAPIError && error.status === 403 && error.requestId === "req-1");
+});
+
+test("privacy endpoints use device consent and server erasure with network limits", async () => {
+  const calls: { url: string; init: RequestInit }[] = [];
+  const fakeFetch = (async (url: string, init: RequestInit) => {
+    calls.push({ url, init });
+    return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  const device = new SessionClient("https://kyc.example", "kst_synthetic", "org-1", { fetch: fakeFetch });
+  const server = new KYCClient("https://kyc.example", "kyc_synthetic", "org-1", { fetch: fakeFetch });
+  await device.giveDocumentConsent("s1");
+  await server.erase("s1");
+  await server.createApiKey({ name: "restricted", scopes: ["sessions:read"], allowedCidrs: ["192.0.2.0/24"] });
+  assert.equal(calls[0].url, "https://kyc.example/v1/kyc/s1/consent");
+  assert.deepEqual(JSON.parse(String(calls[0].init.body)), { scope: "DOCUMENT_PROCESSING", granted: true });
+  assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "Bearer kst_synthetic");
+  assert.equal(calls[1].url, "https://kyc.example/v1/kyc/s1/erase");
+  assert.deepEqual(JSON.parse(String(calls[2].init.body)).allowed_cidrs, ["192.0.2.0/24"]);
+  assert.ok(calls.every(call => call.init.redirect === "error"));
+});
+
+test("API URLs require encrypted remote transport and exclude embedded secrets", () => {
+  for (const url of ["http://api.example", "http://localhost.evil.example", "https://user:pass@api.example",
+    "https://api.example?secret=1", "https://api.example#secret", "file:///tmp/api"]) {
+    assert.throws(() => new KYCClient(url, "synthetic-key", "org"));
+    assert.throws(() => new SessionClient(url, "synthetic-token", "org"));
+  }
+  for (const url of ["https://api.example", "http://localhost:8000", "http://127.0.0.1:8000", "http://[::1]:8000"]) {
+    assert.doesNotThrow(() => new KYCClient(url, "synthetic-key", "org"));
+  }
 });

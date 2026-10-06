@@ -48,7 +48,9 @@ def _latest(db, model, record, *where):
 
 def _session(db: Session, reviewer: ReviewerContext, session_id: UUID, lock: bool = False) -> KYCSession:
     query = sa.select(KYCSession).where(KYCSession.id == session_id, KYCSession.organization_id == reviewer.organization_id)
-    record = db.scalar(query.with_for_update() if lock else query)
+    # Serialize case/image reads with erasure as well as decisions. The entire response
+    # is built inside this transaction, so a note cannot be decrypted after erasure wins.
+    record = db.scalar(query.with_for_update())
     if record is None:
         raise HTTPException(404, detail="Case not found.")
     return record
@@ -85,8 +87,8 @@ def queue(db: Session, reviewer: ReviewerContext, limit: int, offset: int) -> di
 def case(db: Session, reviewer: ReviewerContext, session_id: UUID, field_cipher, request_id: UUID) -> dict:
     reviewer.require("VIEW_CASE")
     record = _session(db, reviewer, session_id)
-    identity = "VIEW_IDENTITY" in reviewer.permissions and field_cipher is not None
-    images_allowed = "VIEW_IMAGES" in reviewer.permissions
+    identity = "VIEW_IDENTITY" in reviewer.permissions and field_cipher is not None and record.erased_at is None
+    images_allowed = "VIEW_IMAGES" in reviewer.permissions and record.erased_at is None
     evidence = collect_evidence(db, record)
     document = evidence.document
     now = datetime.now(timezone.utc)
@@ -133,7 +135,7 @@ def case(db: Session, reviewer: ReviewerContext, session_id: UUID, field_cipher,
     for row in db.scalars(sa.select(ManualReview).where(ManualReview.organization_id == record.organization_id,
                                                         ManualReview.session_id == record.id).order_by(ManualReview.created_at)):
         note = None
-        if identity:
+        if identity and row.reason_ciphertext is not None:
             note = field_cipher.open(row.reason_ciphertext, row.key_version, _note_context(record, row.id))
         history.append({"action": row.action, "reason_code": row.reason_code, "decided_at": aware(row.created_at),
                         "reviewer": names.get(_uuid(row.reviewer_id), "former reviewer"), "note": note})
@@ -152,7 +154,8 @@ def case(db: Session, reviewer: ReviewerContext, session_id: UUID, field_cipher,
                     "created_at": aware(record.created_at), "updated_at": aware(record.updated_at),
                     "expires_at": aware(record.expires_at)},
         "permissions": sorted(reviewer.permissions),
-        "decision_options": {action: list(codes) for action, codes in REASONS.items()} if "DECIDE" in reviewer.permissions else {},
+        "decision_options": {action: list(codes) for action, codes in REASONS.items()}
+                            if "DECIDE" in reviewer.permissions and record.erased_at is None else {},
         "risk": None if assessment is None else {
             "decision": assessment.decision, "reason_codes": assessment.reason_codes, "policy_version": assessment.policy_version,
             "assessed_at": aware(assessment.created_at), "trace": assessment.check_summary.get("trace", []),
@@ -207,6 +210,8 @@ def _note_context(record: KYCSession, review_id: UUID) -> str:
 def image(db: Session, reviewer: ReviewerContext, session_id: UUID, image_id: UUID, store, request_id: UUID) -> Response:
     reviewer.require("VIEW_IMAGES")
     record = _session(db, reviewer, session_id)
+    if record.erased_at is not None:
+        raise HTTPException(404, detail="Image not found.")
     now = datetime.now(timezone.utc)
     found = db.scalar(sa.select(DocumentImage).where(DocumentImage.id == image_id,
                       DocumentImage.organization_id == record.organization_id, DocumentImage.session_id == record.id))
@@ -249,7 +254,7 @@ def decide(db: Session, reviewer: ReviewerContext, session_id: UUID, action: str
     if field_cipher is None:
         return _error(503, "PII_ENCRYPTION_NOT_CONFIGURED", "Review notes cannot be stored securely.")
     record = _session(db, reviewer, session_id, lock=True)
-    if record.status != SessionStatus.MANUAL_REVIEW:
+    if record.erased_at is not None or record.status != SessionStatus.MANUAL_REVIEW:
         return _error(409, "CASE_NOT_IN_REVIEW", f"The case is {record.status.value}.", status=record.status.value)
     if record.version != expected_version:
         return _error(409, "CASE_CHANGED", "The case changed since you opened it. Reload and review again.",
@@ -293,4 +298,3 @@ def decide(db: Session, reviewer: ReviewerContext, session_id: UUID, action: str
     db.flush()
     return {"session_id": record.id, "status": record.status, "version": record.version, "action": action,
             "reason_code": reason_code}
-

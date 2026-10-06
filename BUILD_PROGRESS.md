@@ -1,8 +1,117 @@
 # Build progress — Universal Identity Platform
 
 Updated: 6 October 2026. The full requirements in `Document.md` control the build.
-Phases 1–16 are implemented. The user authorized Phases 15 and 16 together. Work is paused
-at the Phase 16 approval gate; Phase 17 (security/privacy hardening) has not started.
+Phases 1–18 are implemented. The user authorized Phases 17 and 18 on 6 October 2026.
+Load/performance testing is complete: 445/445 tests passed, with no skips. Work is paused
+at the Phase 18 approval gate; Phase 19 (GCP production deployment) has not started.
+
+## Phase 18 implementation (6 October 2026)
+
+The user's request ("continue do 17 … 18") authorized Phases 17 and 18. Phase 17 was finished
+and validated first (440/440); Phase 18 followed. Design and full numbers:
+[architecture-phase18.md](docs/architecture-phase18.md).
+
+- **Load tools.** `scripts/load_test.py` (closed-loop HTTP, stdlib only; health, status poll,
+  result, create, upload and mixed scenarios) and `scripts/benchmark_stages.py` (per-engine CPU
+  cost; live end-to-end document pipeline).
+- **Defect found and fixed: stall above 40 in-flight requests.** Requests holding a pooled DB
+  connection waited for one of Starlette's 40 threads while every thread waited for a
+  connection. At 64 users throughput fell from about 119 to 4–6 rps, with 10 s latency and 503s.
+  Per-process admission control (`kyc/core/admission.py`, `MAX_CONCURRENT_REQUESTS`,
+  `REQUEST_QUEUE_TIMEOUT_SECONDS`) now queues excess requests and sheds them with
+  503 + `Retry-After` only after 5 s. At 64 and 128 users the API keeps serving.
+- **Status polls no longer wait for OCR.** `GET /v1/kyc/{id}` reads without the row lock that
+  document processing holds for its whole ~5–6 s OCR run; the lock is taken only to record expiry.
+- **Scale-out measured.** Four uvicorn workers (`WEB_CONCURRENCY`) roughly doubled to tripled
+  peak throughput (status 119 → 319 rps, mixed 87 → 207 rps), with zero errors at 128 users.
+- **OCR is the capacity limit.** Full-page Khmer+English Tesseract takes 1.85 s; a passport spends
+  5.4–6.2 s in processing. Deferred processing raised upload intake from 1.1/s to 16.7/s. The
+  document worker now runs `--parallel N --loop S`, claims work with `SKIP LOCKED`
+  (`process(wait=False)` → `BUSY`) and refills slots continuously: 16 → 24 documents/min on this
+  machine. Production configuration now uses deferred processing.
+
+### Phase 18 validation evidence
+
+- **445 tests: 445 passed, 0 skipped, 0 failures** with live PostgreSQL and the native face
+  models ([artifacts/phase18-tests.txt](artifacts/phase18-tests.txt)); 5 new tests in
+  `tests/test_performance.py`. TypeScript SDK and capture-client smoke tests re-run.
+- Load and stage results: [baseline](artifacts/phase18-load-baseline.json),
+  [after the fixes](artifacts/phase18-load-tuned.json), [stages and pipeline](artifacts/phase18-stages.json).
+
+### Phase 18 limits
+
+The measurements come from a shared 12-core laptop (load average up to 52) with the client,
+API, database and OCR on one host. They compare configurations; they are not production
+capacity, and Phase 19 must re-measure on the target sizes. There was no soak test. Face,
+liveness, NFC, webhook and review endpoints were not load-tested over HTTP. Document processing
+still holds one transaction for its OCR run. Admission control and rate limits are per process.
+
+## Phase 17 implementation (6 October 2026)
+
+Implemented application security and privacy controls:
+
+- **Production gate.** Requires the restricted `kyc_app` role, encrypted DB transport,
+  independent capture/PII/biometric/webhook/HMAC keys, Host restrictions and document
+  consent. Development credentials and the development capture page are refused.
+- **HTTP and logs.** Security headers, production HSTS, generic errors with request IDs,
+  refusal events that log route templates and credential types, and sanitized exception
+  summaries. Alembic preserves existing security loggers. Bounded multipart uploads remain
+  in memory, including the largest permitted liveness request.
+- **Credentials.** IPv4/IPv6 CIDR allow-lists; child keys cannot widen scopes, networks,
+  rate limits or expiry. Reviewer tokens expire and can be rotated or deactivated.
+- **Consent.** Explicit current-policy document consent precedes production uploads/OCR;
+  stale grants require renewal. Biometric consent remains separate.
+- **Erasure.** A separate `data:erase` scope removes personal/biometric artifacts,
+  identifiers and reviewer notes, revokes device tokens and consents, and preserves
+  coded decisions and audit history. DB commit precedes storage deletion; interrupted
+  cleanup is recoverable through the retention sweep.
+- **Rotation.** Independent webhook keyring, legacy-secret resealing, data-class key
+  inventory and resealing. Capture envelopes are authenticated; orphan namespaces and
+  interrupted file/DB updates are included. Unverified or old-key data blocks retirement.
+- **Database privileges.** Effective PUBLIC/inherited grants, column privileges, grant
+  options, ownership, exact forced-RLS policies and privileged functions are checked.
+  Audit/decision records remain append-only; one tenant-scoped function can erase notes
+  only after session erasure.
+- **SDKs and dependencies.** HTTPS for remote APIs, redirect refusal, consent/erasure
+  methods and network-restricted key creation. Patched runtime dependencies, updated
+  lock, version `0.17.0` and an OpenAPI contract with route-specific credential types.
+
+Migration `0011_phase17` adds CIDRs, reviewer expiration and session erasure markers.
+The already-applied revision is preserved; `0012_phase17_finalize` adds the scoped
+note-erasure function and nullable erased notes. Both are applied locally.
+Design, directory tree, configuration, curl/Postman examples and operating procedures:
+[architecture-phase17.md](docs/architecture-phase17.md).
+
+### Phase 17 validation evidence
+
+Final validation passed:
+
+- **440/440 Python tests, zero failures, errors or skips** in 235.831 seconds, including
+  live isolated PostgreSQL schemas and native face inference
+  ([transcript](artifacts/phase17-tests.txt), [summary](artifacts/phase17-validation.json)).
+- **24/24 live database security checks**, with 25 forced-RLS tenant tables and the real
+  restricted API role ([report](artifacts/phase17-security-check.json)).
+- Migrated isolated PostgreSQL regression verifies tenant-scoped erasure, immutable coded
+  history, default deny, PUBLIC/inherited privilege detection and privilege reset
+  ([targeted transcript](artifacts/phase17-postgres-tests.txt)).
+- **31 pinned runtime packages, no known vulnerabilities** after replacing the five
+  vulnerable packages identified by the initial audit
+  ([final audit](artifacts/phase17-dependencies.json)).
+- **6/6 TypeScript SDK tests**, strict TypeScript 5.9.3 compilation, Python SDK real
+  redirect refusal and capture-client simulation. OpenAPI has 34 paths.
+- Targeted checks cover failed-commit rollback/no deletion, failed-storage cleanup/retry,
+  current-policy consent, actual old capture envelopes/orphans, active security logging
+  after migrations, and a real 26 MiB multipart parse without plaintext disk rollover.
+
+### Phase 17 limits
+
+The local database connection is loopback development traffic; production requires TLS
+or a non-overridden Unix socket. GCP deployment, IAM/CMEK/KMS and managed secret injection
+remain Phase 19 work. Docker configuration is updated but cannot be executed here because
+Docker is not installed. mTLS/request signing and SSO/MFA are not implemented; rate limits
+are per process. Backup and partner-payload deletion require their own lifecycle controls.
+Face/liveness calibration and physical NFC validation remain unverified. Phase 18 requires
+separate authorization under `Document.md` §31.
 
 ## Phase 16 implementation (6 October 2026)
 
@@ -703,18 +812,18 @@ does not claim production readiness or functioning verification engines.
 | 12 | Cross-checks and fraud signals | Complete; 318/318 tests; 7 detectors + cross-check matrix; live PostgreSQL E2E passed; forensics models not included |
 | 13 | Deterministic risk engine | Complete; 333/333 tests; tighten-only policy; live PostgreSQL E2E passed; uncalibrated biometrics → MANUAL_REVIEW |
 | 14 | Authorized manual review dashboard | Complete; 344/344 tests; role-based views, guarded decisions, audited; live + browser E2E passed |
-| 15 | Multi-tenant API and credential provisioning | Waiting for approval |
-| 16 | Signed webhooks and SDKs | Not started |
-| 17 | Security/privacy hardening | Not started |
-| 18 | Load/performance testing | Not started |
+| 15 | Multi-tenant API and credential provisioning | Complete; 362/362 tests; scoped hashed keys, RLS key lookup, client tokens, idempotency, rate limits; live E2E 25/25 |
+| 16 | Signed webhooks and SDKs | Complete; 383/383 tests; outbox webhooks, HMAC signing, retries, SSRF-safe delivery; Python + TypeScript SDKs; live E2E 21/21; mobile SDKs not built |
+| 17 | Security/privacy hardening | Complete; 440/440 tests, 24/24 DB security checks, 31 audited runtime packages with no known vulnerabilities |
+| 18 | Load/performance testing | Complete; 445/445 tests; admission control fixed a >40-request stall; 4 workers ≈ 2–3× peak; OCR tier is the limit (deferred + claiming worker) |
 | 19 | GCP production deployment | Not started |
 | 20 | Additional country/document adapters | Not started |
 
 ## Approval requirement
 
 `Document.md`, section 31, states: **“Stop and wait for approval before next
-phase.”** The user's request authorized Phases 8 and 9 together, then Phases 10–11, then Phases 12, 13 and 14 in turn.
-Phase 15 requires separate approval.
+phase.”** The user's request authorized Phases 8 and 9 together, then Phases 10–11, then Phases 12, 13 and 14 in turn, then Phases 15 and 16 together.
+The user authorized Phases 17 and 18 on 6 October 2026. Phase 19 requires separate approval.
 
 ## Earlier reference work
 

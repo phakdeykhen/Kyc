@@ -1,4 +1,4 @@
-"""Universal identity platform — Phases 1-16."""
+"""Universal identity platform — Phases 1-18."""
 
-__version__ = "0.16.0"
-__schema_revision__ = "0010_phase16"
+__version__ = "0.18.0"
+__schema_revision__ = "0012_phase17_finalize"

@@ -1,0 +1,1 @@
+Capture UI smoke passed: document and biometric consent, resume, recapture, document handoff/polling, cameras, review, liveness challenge/retry/finish, unavailable engine, stopped streams and no probability.

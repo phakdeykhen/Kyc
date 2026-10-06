@@ -58,6 +58,14 @@ security context. A suspended organization is locked out completely.
 
 See [Phase 15](docs/architecture-phase15.md).
 
+Phase 17 adds production configuration checks, HTTP security headers, privacy-safe
+security logging, CIDR-restricted keys, expiring reviewer tokens, current-policy document
+consent, personal-data erasure and encryption-key resealing. Remote SDK transports require
+HTTPS and refuse redirects. Run bootstrap again to apply `0012_phase17_finalize`, then
+`scripts/security_check.py` to verify effective API-role privileges and tenant isolation.
+See [Phase 17](docs/architecture-phase17.md) for setup, curl/Postman checks, rotation and
+the remaining deployment controls.
+
 Phase 16 adds signed webhooks and SDKs. Every session state change becomes a webhook
 delivery in the same database transaction (a transactional outbox).
 - **Signing.** Each delivery is signed with HMAC-SHA256 over a timestamp and the body,
@@ -198,7 +206,7 @@ selfie processing unavailable (HTTP 503).
 
 | Variable | Purpose |
 | --- | --- |
-| `ENVIRONMENT` | `development` or `test`; production is deliberately gated in Phase 1 |
+| `ENVIRONMENT` | `development`, `test` or `production`; production requires the [Phase 17 security configuration](docs/architecture-phase17.md) |
 | `DEVELOPMENT_API_KEY`, `DEVELOPMENT_ORGANIZATION_ID` | Optional since Phase 15: a local all-scope key bound to one organization |
 | `DATABASE_URL` | Restricted application connection, `postgresql+psycopg2://...` |
 | `MIGRATION_DATABASE_URL` | Separate owner connection used only for migration/bootstrap |
@@ -234,6 +242,9 @@ selfie processing unavailable (HTTP 503).
 | `WEBHOOK_SECRET_OVERLAP_HOURS` | Hours the previous secret keeps signing after a rotation; default 24 |
 | `WEBHOOK_DELIVERY_RETENTION_DAYS` | Finished deliveries purged after this; default 30 |
 | `WEBHOOK_ALLOW_PRIVATE_TARGETS` | Development only: allow `http` and private addresses for a local receiver; default false |
+| `WEB_CONCURRENCY` | uvicorn worker processes (about one per vCPU); each has its own pool and admission limit (Phase 18) |
+| `MAX_CONCURRENT_REQUESTS` | `/v1/` requests in flight per process; 0 = pool capacity minus 3 (Phase 18) |
+| `REQUEST_QUEUE_TIMEOUT_SECONDS` | Longest an excess request queues before 503 + `Retry-After`; default 5 |
 | `REDIS_URL` | Reserved cache setting; integration is not implemented in Phase 1 |
 | `GCP_PROJECT_ID`, `GCS_CAPTURE_BUCKET`, `GCS_BIOMETRIC_BUCKET`, `PUBSUB_TOPIC` | Reserved GCP integration settings |
 
@@ -274,6 +285,20 @@ Phase 5 also renders fictional Cambodia and foreign passport data pages and test
 real MRZ OCR. These fixtures require the macOS Khmer Sangam MN, Arial and Courier
 New Bold fonts, plus Pillow RAQM. Docker supplies OCR models but does not supply
 those fixture fonts. Synthetic OCR tests do not establish real-document accuracy.
+
+### Load and performance tests (Phase 18)
+
+Run these against a running API with a provisioned key for a dedicated test organization;
+they create real sessions. See [docs/architecture-phase18.md](docs/architecture-phase18.md).
+
+```sh
+export KYC_LOAD_API_KEY=...       # from scripts/manage_tenants.py key create ... --rate-limit 100000
+python scripts/load_test.py --organization ORG --scenario mixed --concurrency 1,8,32,64 --duration 20
+python scripts/benchmark_stages.py cpu
+python scripts/benchmark_stages.py pipeline --organization ORG --sessions 8 --parallel 1,4
+# OCR tier for DOCUMENT_PROCESSING_MODE=deferred:
+python scripts/process_documents.py ORG --parallel 4 --loop 1
+```
 
 ## Curl checks
 
@@ -487,13 +512,16 @@ Schedule `scripts/purge_captures.py` to remove expired face photos, templates an
 quality evidence. Organization capture/template retention settings both default
 to 24 hours. Expired templates also remove their dependent comparisons.
 
-## Security concerns and next phase
+## Security and deployment limits
 
-The development credential is not production tenant authentication; provisioned API keys (Phase 15) are. Captures are
-encrypted and retention-limited, but local keys live in `.env`. Production needs
-Secret Manager/KMS and CMEK storage (Phases 17/19). Biometric consent is required
-before selfie processing; earlier document capture has no consent gate yet. The quality thresholds are uncalibrated heuristics, and the gate never
-judges authenticity. No biometric templates are returned by the public API. Migration
+Production refuses development credentials; use provisioned API keys. Captures are
+encrypted and retention-limited, with independent keyrings for captures, identity,
+biometrics and webhook secrets. Local keys live in `.env`; production secret injection,
+KMS and CMEK storage are deployment work. Explicit document consent is required in
+production, and biometric consent is required before selfie processing. Erasure clears
+personal artifacts and free-text review notes while preserving coded decisions and audits.
+The quality thresholds remain uncalibrated. No biometric templates are returned by the
+public API. Migration
 credentials must not be given to the API deployment. See
 [Phase 2 security concerns](docs/architecture-phase2.md#4-security-concerns).
 

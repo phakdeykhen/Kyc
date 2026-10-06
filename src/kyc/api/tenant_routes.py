@@ -1,16 +1,17 @@
 """Organization profile and self-service API keys (spec §26). Keys never grant more than their creator holds."""
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from kyc.api.dependencies import AnyApiKey, Database, KeyManager
+from kyc.api.dependencies import AnyApiKey, Database, KeyManager, refuse
 from kyc.db.models import Organization
 from kyc.services import tenancy
 from kyc.tenancy.keys import SCOPES
+from kyc.tenancy.network import networks_within, parse_networks
 
 router = APIRouter(prefix="/v1", tags=["organization"])
 
@@ -21,6 +22,8 @@ class ApiKeyCreate(BaseModel):
     scopes: Annotated[list[str], Field(min_length=1, max_length=len(SCOPES))]
     expires_in_days: int | None = Field(default=None, ge=1, le=730)
     rate_limit_per_minute: int | None = Field(default=None, ge=1, le=100_000)
+    allowed_cidrs: list[str] | None = Field(default=None, max_length=20, description=
+        "Networks the key may be used from (CIDR or address). Omitted: the creator's own allow-list, if any.")
 
 
 class ApiKeyView(BaseModel):
@@ -29,6 +32,7 @@ class ApiKeyView(BaseModel):
     key_prefix: str
     scopes: list[str]
     rate_limit_per_minute: int
+    allowed_cidrs: list[str] = []
     status: str
     created_at: datetime
     created_by: str
@@ -59,16 +63,29 @@ def list_api_keys(tenant: KeyManager, db: Database):
 
 @router.post("/api-keys", response_model=ApiKeyCreated, status_code=status.HTTP_201_CREATED)
 def create_api_key(body: ApiKeyCreate, request: Request, tenant: KeyManager, db: Database):
-    """Create a key with at most the caller's own scopes and rate limit (no privilege escalation)."""
+    """Create a key bounded by the caller's scopes, rate limit, networks and expiry."""
     excess = set(body.scopes) - tenant.scopes
     if excess:
-        raise HTTPException(403, detail=f"A key cannot grant scopes its creator lacks: {sorted(excess)}.")
+        raise refuse(request, 403, "API_KEY_SCOPE_ESCALATION", "A key cannot grant scopes its creator lacks.")
     ceiling = tenant.rate_limit or request.app.state.settings.api_rate_limit_per_minute
     limit = body.rate_limit_per_minute or ceiling
     if limit > ceiling:
-        raise HTTPException(422, detail=f"rate_limit_per_minute cannot exceed your own limit ({ceiling}).")
+        raise refuse(request, 422, "API_KEY_RATE_LIMIT_ESCALATION", f"rate_limit_per_minute cannot exceed your own limit ({ceiling}).")
+    networks = list(tenant.allowed_networks) if body.allowed_cidrs is None else body.allowed_cidrs
+    try:
+        within = networks_within(parse_networks(networks), tenant.allowed_networks)
+    except ValueError as error:
+        raise HTTPException(422, detail=str(error)) from None
+    if not within or (tenant.allowed_networks and not networks):
+        raise refuse(request, 403, "API_KEY_NETWORK_ESCALATION", "A key cannot be usable from networks its creator is not allowed from.")
+    expiry = datetime.now(timezone.utc) + timedelta(days=body.expires_in_days) if body.expires_in_days else None
+    if tenant.expires_at is not None:
+        if expiry is not None and expiry > tenant.expires_at:
+            raise refuse(request, 403, "API_KEY_EXPIRY_ESCALATION", "A key cannot outlive its creator's expiration.")
+        expiry = expiry or tenant.expires_at
     row, token = tenancy.create_key(db, tenant.organization_id, body.name, body.scopes, tenant.actor_id,
-                                    request.state.request_id, body.expires_in_days, limit)
+                                    request.state.request_id, rate_limit_per_minute=limit,
+                                    allowed_cidrs=networks, expires_at=expiry)
     return tenancy.key_view(row) | {"api_key": token}
 
 

@@ -8,7 +8,7 @@
   python scripts/manage_tenants.py org retention ORG [--pii-retention-days N] [--capture-retention-hours N]
                                    [--template-retention-hours N]
   python scripts/manage_tenants.py key create ORG "Backend" [--scope sessions:write --scope sessions:read ...]
-                                   [--expires-in-days N] [--rate-limit N]
+                                   [--expires-in-days N] [--rate-limit N] [--allow-cidr 203.0.113.0/24 ...]
   python scripts/manage_tenants.py key list ORG
   python scripts/manage_tenants.py key revoke ORG KEY_ID
 
@@ -61,6 +61,8 @@ key_create.add_argument("name")
 key_create.add_argument("--scope", action="append", choices=sorted(SCOPES), dest="scopes")
 key_create.add_argument("--expires-in-days", type=int)
 key_create.add_argument("--rate-limit", type=int)
+key_create.add_argument("--allow-cidr", action="append", dest="allowed_cidrs", metavar="CIDR",
+                        help="only accept the key from this network (repeatable); default: any network")
 key.add_parser("list").add_argument("organization", type=UUID)
 key_revoke = key.add_parser("revoke")
 key_revoke.add_argument("organization", type=UUID)
@@ -121,7 +123,8 @@ try:
             if args.command == "create":
                 row, token = tenancy.create_key(db, args.organization, args.name.strip()[:120],
                                                 args.scopes or list(DEFAULT_SCOPES), ADMIN, request_id,
-                                                args.expires_in_days, args.rate_limit or settings.api_rate_limit_per_minute)
+                                                args.expires_in_days, args.rate_limit or settings.api_rate_limit_per_minute,
+                                                args.allowed_cidrs)
                 show(tenancy.key_view(row))
                 print(f"API key (shown once): {token}")
             elif args.command == "list":

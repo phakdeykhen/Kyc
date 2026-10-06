@@ -90,3 +90,23 @@ class PythonSDKTests(WebhookCase):
         old = signing.sign([secret], body, timestamp=1_000)
         with self.assertRaises(WebhookVerificationError):
             verify_webhook(body, old, secret)  # replayed outside the tolerance
+
+    async def test_device_consent_and_server_erasure(self):
+        self.app.state.settings.require_document_consent = True
+        session = self.client.create_session("privacy-sdk-customer", "KH", "KH_PASSPORT",
+                                             verification_level="DOCUMENT_ONLY")
+        token = self.client.issue_client_token(session["session_id"])
+        device = SessionClient(BASE, token["client_token"], str(self.org), transport=self.transport)
+        with self.assertRaises(KYCAPIError) as raised:
+            device.upload_document(session["session_id"], "DATA_PAGE", b"not an image")
+        self.assertEqual(raised.exception.body["reason_code"], "DOCUMENT_CONSENT_REQUIRED")
+        self.assertEqual(device.give_document_consent(session["session_id"])["scope"], "DOCUMENT_PROCESSING")
+        with self.assertRaises(KYCAPIError) as raised:
+            device.upload_document(session["session_id"], "DATA_PAGE", b"not an image")
+        self.assertNotEqual(raised.exception.body.get("reason_code"), "DOCUMENT_CONSENT_REQUIRED")
+        erased = self.client.erase(session["session_id"])
+        self.assertFalse(erased["already_erased"])
+        self.assertTrue(self.client.erase(session["session_id"])["already_erased"])
+        with self.assertRaises(KYCAPIError) as raised:
+            device.get_session(session["session_id"])
+        self.assertEqual(raised.exception.status, 401, "Erasure revokes the device token")

@@ -8,7 +8,9 @@ from kyc.db.models import Base
 
 configuration = context.config
 if configuration.config_file_name:
-    fileConfig(configuration.config_file_name)
+    # Maintenance can run inside a process with security loggers already configured.
+    # Alembic must not silently disable refusal or privacy-cleanup events.
+    fileConfig(configuration.config_file_name, disable_existing_loggers=False)
 url = configuration.attributes.get("database_url")
 if not url:
     settings = get_settings()

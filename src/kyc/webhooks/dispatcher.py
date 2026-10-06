@@ -18,10 +18,10 @@ import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 
 from kyc import __version__
-from kyc.core.crypto import FieldCipher
 from kyc.db.models import WebhookDelivery, WebhookEndpoint
 from kyc.db.session import set_tenant
 from kyc.webhooks.delivery import SendResult
+from kyc.webhooks.secrets import WebhookSecretCipher
 from kyc.webhooks.signing import SIGNATURE_HEADER, sign
 
 log = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ def _aware(value: datetime | None) -> datetime | None:
     return value.replace(tzinfo=timezone.utc) if value is not None and value.tzinfo is None else value
 
 
-def endpoint_secrets(cipher: FieldCipher, endpoint: WebhookEndpoint, now: datetime) -> list[str]:
+def endpoint_secrets(cipher: WebhookSecretCipher, endpoint: WebhookEndpoint, now: datetime) -> list[str]:
     """The current secret, plus the previous one while a rotation's overlap lasts."""
     context = secret_context(endpoint.organization_id, endpoint.id)
     found = [cipher.open(endpoint.secret_ciphertext, endpoint.key_version, context)]
@@ -64,7 +64,7 @@ class Claim:
 
 
 class WebhookDispatcher:
-    def __init__(self, factory: sessionmaker, cipher: FieldCipher | None, sender, max_attempts: int = 8,
+    def __init__(self, factory: sessionmaker, cipher: WebhookSecretCipher | None, sender, max_attempts: int = 8,
                  background: bool = True, batch_size: int = 25):
         self.factory = factory
         self.cipher = cipher

@@ -35,7 +35,7 @@ const SCORE_LABELS = {
   document_coverage: "Coverage", perspective_score: "Alignment", resolution_score: "Resolution", overall_quality: "Overall",
 };
 const state = { apiKey: "", orgId: "", session: null, sides: [], current: null, stream: null, busy: false,
-  mode: "setup", cameraVersion: 0, pollTimer: null, polling: false, stepDelayMs: 1600 };
+  documentConsentRecorded: false, mode: "setup", cameraVersion: 0, pollTimer: null, polling: false, stepDelayMs: 1600 };
 const $ = (id) => document.getElementById(id);
 const CAMERA_PREFIX = { selfie: "selfie-", liveness: "liveness-" };
 const cameraElement = (id) => $(`${CAMERA_PREFIX[state.mode] || ""}${id}`);
@@ -58,8 +58,9 @@ async function api(path, options = {}) {
 }
 
 function updateButtons() {
-  $("shoot").disabled = state.busy || state.mode !== "document" || !state.current || !state.stream;
-  $("file").disabled = state.busy || state.mode !== "document" || !state.current;
+  const mayCaptureDocument = !state.busy && state.mode === "document" && !!state.current && $("document-consent").checked;
+  $("shoot").disabled = !mayCaptureDocument || !state.stream;
+  $("file").disabled = !mayCaptureDocument;
   const maySubmitSelfie = !state.busy && state.mode === "selfie" && $("biometric-consent").checked;
   $("selfie-shoot").disabled = !maySubmitSelfie || !state.stream;
   $("selfie-file").disabled = !maySubmitSelfie;
@@ -105,6 +106,8 @@ function resetSession() {
   stopCamera();
   state.current = null;
   state.session = null;
+  state.documentConsentRecorded = false;
+  $("document-consent").checked = false;
   $("biometric-consent").checked = false;
   $("result").hidden = true;
   setMode("setup");
@@ -362,10 +365,33 @@ function grabFrame() {
   return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
 }
 
+async function recordDocumentConsent() {
+  // Phase 17: consent to document processing is recorded once per session, before the first upload.
+  if (state.documentConsentRecorded) return true;
+  const result = await api(`/v1/kyc/${state.session.session_id}/consent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scope: "DOCUMENT_PROCESSING", granted: true }),
+  });
+  if (!result.ok) {
+    showError(result);
+    return false;
+  }
+  state.documentConsentRecorded = true;
+  return true;
+}
+
 async function submit(blob) {
   if (state.busy || state.mode !== "document" || !state.current || !blob) return;
+  if (!$("document-consent").checked) {
+    return showError({ status: 0, body: { detail: "Consent to document processing is required before uploading." } });
+  }
   state.busy = true;
   updateButtons();
+  if (!(await recordDocumentConsent())) {
+    state.busy = false;
+    return updateButtons();
+  }
   $("hint").textContent = "Checking quality…";
   const form = new FormData();
   form.append("side", state.current);
@@ -541,6 +567,7 @@ $("session-form").addEventListener("submit", startSession);
 $("resume-session").addEventListener("click", resumeSession);
 $("refresh-session").addEventListener("click", refreshSession);
 $("biometric-consent").addEventListener("change", updateButtons);
+$("document-consent").addEventListener("change", updateButtons);
 $("shoot").addEventListener("click", async () => submit(await grabFrame()));
 $("selfie-shoot").addEventListener("click", async () => submitSelfie(await grabFrame()));
 $("liveness-start").addEventListener("click", runLiveness);

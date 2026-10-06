@@ -64,6 +64,11 @@ class BaseClient {
   private readonly fetcher: typeof fetch;
 
   constructor(baseUrl: string, organizationId: string, credentialHeaders: Record<string, string>, options: Options = {}) {
+    const url = new URL(baseUrl);
+    if (!["https:", "http:"].includes(url.protocol) || url.username || url.password || url.search || url.hash ||
+        (url.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) {
+      throw new Error("Use an HTTPS API URL without credentials, query or fragment; HTTP is permitted only on loopback.");
+    }
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.headers = { "X-Organization-ID": organizationId, ...credentialHeaders };
     this.fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
@@ -77,7 +82,7 @@ class BaseClient {
       body = JSON.stringify(init.json ?? {});
       headers["Content-Type"] = "application/json";
     }
-    const response = await this.fetcher(this.baseUrl + path, { method, headers, body });
+    const response = await this.fetcher(this.baseUrl + path, { method, headers, body, redirect: "error" });
     const text = await response.text();
     const parsed = (response.headers.get("content-type") ?? "").startsWith("application/json") && text ? JSON.parse(text) : text;
     if (!response.ok) {
@@ -88,6 +93,11 @@ class BaseClient {
 
   getSession(sessionId: string): Promise<Session> {
     return this.request("GET", `/v1/kyc/${sessionId}`);
+  }
+
+  /** Record consent to document processing; call only after the person agreed, before uploadDocument. */
+  giveDocumentConsent(sessionId: string): Promise<Json> {
+    return this.request("POST", `/v1/kyc/${sessionId}/consent`, { json: { scope: "DOCUMENT_PROCESSING", granted: true } });
   }
 
   uploadDocument(sessionId: string, side: DocumentSide, image: BinaryInput, filename = "document.jpg"): Promise<Json> {
@@ -180,6 +190,11 @@ export class KYCClient extends BaseClient {
     return this.request("POST", `/v1/kyc/${sessionId}/verify`);
   }
 
+  /** Erase the session's personal and biometric data (scope data:erase). Status and decision codes remain. */
+  erase(sessionId: string): Promise<Json> {
+    return this.request("POST", `/v1/kyc/${sessionId}/erase`);
+  }
+
   organization(): Promise<Json> {
     return this.request("GET", "/v1/organization");
   }
@@ -196,9 +211,15 @@ export class KYCClient extends BaseClient {
     return this.request("GET", "/v1/api-keys");
   }
 
-  createApiKey(input: { name: string; scopes: string[]; expiresInDays?: number; rateLimitPerMinute?: number }): Promise<Json> {
+  createApiKey(input: { name: string; scopes: string[]; expiresInDays?: number; rateLimitPerMinute?: number; allowedCidrs?: string[] }): Promise<Json> {
     return this.request("POST", "/v1/api-keys", {
-      json: { name: input.name, scopes: input.scopes, expires_in_days: input.expiresInDays, rate_limit_per_minute: input.rateLimitPerMinute },
+      json: {
+        name: input.name,
+        scopes: input.scopes,
+        expires_in_days: input.expiresInDays,
+        rate_limit_per_minute: input.rateLimitPerMinute,
+        allowed_cidrs: input.allowedCidrs,
+      },
     });
   }
 

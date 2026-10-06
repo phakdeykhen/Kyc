@@ -70,7 +70,7 @@ def event_types(tenant: WebhookManager):
 def create(body: EndpointCreate, request: Request, tenant: WebhookManager, db: Database):
     """Register an https endpoint. Its host must resolve only to public addresses."""
     state = request.app.state
-    row, secret = service.create_endpoint(db, tenant, body.url, body.event_types, body.description, state.field_cipher,
+    row, secret = service.create_endpoint(db, tenant, body.url, body.event_types, body.description, state.webhook_cipher,
                                           state.settings.webhook_allow_private_targets, request.state.request_id)
     return service.endpoint_view(row) | {"secret": secret}
 
@@ -102,7 +102,7 @@ def delete(endpoint_id: UUID, request: Request, tenant: WebhookManager, db: Data
 def rotate_secret(endpoint_id: UUID, request: Request, tenant: WebhookManager, db: Database):
     """The old secret keeps signing alongside the new one for WEBHOOK_SECRET_OVERLAP_HOURS."""
     state = request.app.state
-    row, secret = service.rotate_secret(db, tenant, endpoint_id, state.field_cipher,
+    row, secret = service.rotate_secret(db, tenant, endpoint_id, state.webhook_cipher,
                                         state.settings.webhook_secret_overlap_hours, request.state.request_id)
     return service.endpoint_view(row) | {"secret": secret}
 

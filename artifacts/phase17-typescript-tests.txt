@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: verifies a signature made the way the server makes it
+ok 1 - verifies a signature made the way the server makes it
+  ---
+  duration_ms: 11.759883
+  type: 'test'
+  ...
+# Subtest: rejects tampering, replays, wrong secrets and malformed headers
+ok 2 - rejects tampering, replays, wrong secrets and malformed headers
+  ---
+  duration_ms: 3.195623
+  type: 'test'
+  ...
+# Subtest: matches a vector signed by the Python server implementation
+ok 3 - matches a vector signed by the Python server implementation
+  ---
+  duration_ms: 1.117688
+  type: 'test'
+  ...
+# Subtest: clients send the right credentials, paths and bodies
+ok 4 - clients send the right credentials, paths and bodies
+  ---
+  duration_ms: 37.197498
+  type: 'test'
+  ...
+# Subtest: privacy endpoints use device consent and server erasure with network limits
+ok 5 - privacy endpoints use device consent and server erasure with network limits
+  ---
+  duration_ms: 2.357691
+  type: 'test'
+  ...
+# Subtest: API URLs require encrypted remote transport and exclude embedded secrets
+ok 6 - API URLs require encrypted remote transport and exclude embedded secrets
+  ---
+  duration_ms: 1.03594
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 340.387903

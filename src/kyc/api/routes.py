@@ -2,13 +2,16 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPException, Request, Response, UploadFile, status
+from fastapi.responses import JSONResponse
 
-from kyc.api.dependencies import AnyApiKey, Capture, Database, SessionReader, SessionWriter, StatusReader, TenantContext
-from kyc.api.schemas import COUNTRY_CODES, CaptureError, CaptureResponse, ClientTokenResponse, DocumentSide, SessionCreate, SessionResponse, SessionResult, SelfieResponse, VerifyResponse
+from kyc.api.dependencies import AnyApiKey, Capture, Database, Eraser, SessionReader, SessionWriter, StatusReader, TenantContext
+from kyc.api.schemas import COUNTRY_CODES, CaptureError, CaptureResponse, ClientTokenResponse, ConsentRequest, ConsentResponse, DocumentSide, SessionCreate, SessionResponse, SessionResult, SelfieResponse, VerifyResponse
 from kyc.documents.adapters import adapter_for
 from kyc.documents.requirements import requirement_for
 from kyc.domain.enums import DocumentType
 from kyc.services.captures import CaptureLimits, submit_capture
+from kyc.services.consent import DOCUMENT_SCOPE, active_consent, record_document_consent
+from kyc.services.erasure import delete_objects, erase_session
 from kyc.services.biometrics import SelfieLimits, submit_selfie
 from kyc.services.liveness import LivenessLimits, issue_challenge, submit_liveness
 from kyc.services.nfc import NFCLimits, issue_nfc_challenge, submit_nfc
@@ -21,7 +24,8 @@ router = APIRouter(prefix="/v1")
 CAPTURE_RESPONSES = {
     409: {"model": CaptureError, "description": "Session expired, closed, or not accepting document capture."},
     413: {"description": "Upload exceeds the size limit."},
-    422: {"description": "Unreadable or unsupported image, or a side this document type does not have."},
+    422: {"description": "Unreadable or unsupported image, a side this document type does not have, or "
+                         "DOCUMENT_CONSENT_REQUIRED (POST /consent first)."},
     429: {"model": CaptureError, "description": "Capture attempt limit reached for this session."},
     503: {"description": "Capture storage is not configured."},
 }
@@ -45,7 +49,8 @@ def start_session(body: SessionCreate, request: Request, response: Response, ten
 
 @router.get("/kyc/{session_id}", response_model=SessionResponse)
 def read_session(session_id: UUID, request: Request, tenant: StatusReader, db: Database):
-    return respond(get_session(db, tenant, session_id, request.state.request_id))
+    # One row, so no lock is needed for a consistent answer; devices poll this (Phase 18).
+    return respond(get_session(db, tenant, session_id, request.state.request_id, lock=False))
 
 
 @router.post("/kyc/{session_id}/client-token", response_model=ClientTokenResponse, status_code=status.HTTP_201_CREATED,
@@ -66,6 +71,39 @@ def read_result(session_id: UUID, request: Request, tenant: SessionReader, db: D
     """Identity fields are masked unless the credential holds the results:identity scope."""
     record = get_session(db, tenant, session_id, request.state.request_id)
     return build_result(db, record, request.app.state.field_cipher, reveal_identity="results:identity" in tenant.scopes)
+
+
+@router.post("/kyc/{session_id}/consent", response_model=ConsentResponse, responses={
+    409: {"description": "The session is closed."}})
+def give_consent(session_id: UUID, body: ConsentRequest, request: Request, response: Response, tenant: Capture,
+    db: Database):
+    """Record the person's consent to document processing, from their device, before capture.
+
+    Required before document uploads when the platform runs with REQUIRE_DOCUMENT_CONSENT (always in production).
+    """
+    record = get_session(db, tenant, session_id, request.state.request_id)
+    policy = request.app.state.settings.document_consent_policy_version
+    consent, created = record_document_consent(db, tenant, record, policy, request.state.request_id)
+    response.status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+    return ConsentResponse(session_id=record.id, scope=consent.scope, policy_version=consent.policy_version,
+                           granted_at=aware(consent.created_at))
+
+
+@router.post("/kyc/{session_id}/erase", responses={404: {"description": "Session not found."}})
+def erase(session_id: UUID, request: Request, tenant: Eraser, db: Database, background: BackgroundTasks):
+    """Erase this session's personal and biometric data now (data-subject request). Requires data:erase.
+
+    The status, decision reason codes and audit trail are kept; an unfinished session is closed first.
+    Repeating the call is harmless.
+    """
+    record = get_session(db, tenant, session_id, request.state.request_id)
+    report = erase_session(db, tenant, record, request.state.request_id)
+    # Commit explicitly before registering destructive storage work. This guarantee must
+    # not depend on when a FastAPI version tears down dependencies that yield.
+    db.commit()
+    if report.object_refs and request.app.state.capture_store is not None:
+        background.add_task(delete_objects, request.app.state.capture_store, report)  # after the commit
+    return report.view(record.status.value)
 
 
 def _process_after_commit(state, organization_id: UUID, session_id: UUID, request_id: UUID) -> None:
@@ -90,6 +128,12 @@ def _capture(session_id: UUID, side: str, file: UploadFile, request: Request, te
     if state.capture_store is None:
         raise HTTPException(503, detail="Capture storage is not configured.")
     settings = state.settings
+    if settings.require_document_consent:
+        record = get_session(db, tenant, session_id, request.state.request_id)
+        if active_consent(db, record, DOCUMENT_SCOPE, settings.document_consent_policy_version) is None:
+            return JSONResponse(status_code=422, content={
+                "detail": "Record the person's consent with POST /v1/kyc/{session}/consent before uploading documents.",
+                "reason_code": "DOCUMENT_CONSENT_REQUIRED", "attempts_remaining": None})
     data = file.file.read(settings.max_capture_bytes + 1)
     limits = CaptureLimits(settings.max_capture_bytes, settings.max_capture_pixels, settings.max_capture_attempts)
     outcome = submit_capture(db, tenant, session_id, side, data, state.quality_engine, state.capture_store,

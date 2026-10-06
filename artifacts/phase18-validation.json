@@ -1,0 +1,66 @@
+{
+ "version": "0.18.0",
+ "phase": 18,
+ "date": "2026-10-06",
+ "tests": 445,
+ "passed": 445,
+ "failures": 0,
+ "errors": 0,
+ "skipped": 0,
+ "duration_seconds": 195.348,
+ "test_transcript": "artifacts/phase18-tests.txt",
+ "postgresql": "live isolated kyc_test schemas",
+ "typescript_sdk": {
+  "tests": 6,
+  "passed": 6
+ },
+ "capture_client_smoke": "passed",
+ "openapi_paths": 34,
+ "schema_revision": "0012_phase17_finalize (no Phase 18 migration)",
+ "load_results": {
+  "baseline": "artifacts/phase18-load-baseline.json",
+  "after_fixes": "artifacts/phase18-load-tuned.json",
+  "stages_and_pipeline": "artifacts/phase18-stages.json"
+ },
+ "findings": {
+  "pool_thread_stall_fixed": "single process at 64 users: 4-6 rps, p95 >10 s, 503s before; ~70 rps, no stall after admission control",
+  "worker_scale_out_4": {
+   "status_poll_peak_rps": [
+    119,
+    319
+   ],
+   "result_peak_rps": [
+    53,
+    124
+   ],
+   "create_session_peak_rps": [
+    100,
+    207
+   ],
+   "mixed_peak_rps": [
+    87,
+    207
+   ]
+  },
+  "upload_intake_per_s": {
+   "inline": 1.1,
+   "deferred": 16.7
+  },
+  "ocr_full_page_khm_eng_ms_p50": 1851,
+  "passport_processing_s": "5.4-6.2",
+  "document_worker_docs_per_min": {
+   "before_claiming": 16,
+   "after_claiming": 24
+  }
+ },
+ "environment": "shared 12-core developer laptop, load average up to 52; client, API, PostgreSQL and OCR on one host",
+ "limitations": [
+  "Not production capacity; Phase 19 must re-measure on target sizes.",
+  "No soak test; status polls still write one audit row each.",
+  "Face/liveness/NFC/webhook/review endpoints not load-tested over HTTP.",
+  "Document processing holds one transaction during OCR.",
+  "Admission control and rate limits are per process."
+ ],
+ "phase19_started": false,
+ "success": true
+}

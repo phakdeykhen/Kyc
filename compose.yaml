@@ -24,6 +24,11 @@ services:
       DEVELOPMENT_API_KEY: ${DEVELOPMENT_API_KEY}
       DEVELOPMENT_ORGANIZATION_ID: ${DEVELOPMENT_ORGANIZATION_ID}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-900}
+      # Phase 18: worker processes, per-process admission limit, and OCR moved to the `process` worker.
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      MAX_CONCURRENT_REQUESTS: ${MAX_CONCURRENT_REQUESTS:-0}
+      REQUEST_QUEUE_TIMEOUT_SECONDS: ${REQUEST_QUEUE_TIMEOUT_SECONDS:-5}
+      DOCUMENT_PROCESSING_MODE: ${DOCUMENT_PROCESSING_MODE:-inline}
       CAPTURE_ENCRYPTION_KEYS: ${CAPTURE_ENCRYPTION_KEYS:?Run scripts/configure_local.py first}
       CAPTURE_STORAGE_DIR: /var/lib/kyc/captures
       PII_ENCRYPTION_KEYS: ${PII_ENCRYPTION_KEYS:?Run scripts/configure_local.py first}
@@ -46,6 +51,14 @@ services:
       WEBHOOK_TIMEOUT_SECONDS: ${WEBHOOK_TIMEOUT_SECONDS:-10}
       WEBHOOK_MAX_ATTEMPTS: ${WEBHOOK_MAX_ATTEMPTS:-8}
       WEBHOOK_SECRET_OVERLAP_HOURS: ${WEBHOOK_SECRET_OVERLAP_HOURS:-24}
+      WEBHOOK_SECRET_KEYS: ${WEBHOOK_SECRET_KEYS:?Run scripts/configure_local.py to add a separate webhook key}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,[::1]}
+      REQUIRE_DOCUMENT_CONSENT: ${REQUIRE_DOCUMENT_CONSENT:-false}
+      DOCUMENT_CONSENT_POLICY_VERSION: ${DOCUMENT_CONSENT_POLICY_VERSION:-DOCUMENT-CONSENT-2026.10.1}
+      REVIEWER_TOKEN_MAX_DAYS: ${REVIEWER_TOKEN_MAX_DAYS:-90}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      EXPOSE_API_DOCS: ${EXPOSE_API_DOCS:-true}
+      ENABLE_CAPTURE_CLIENT: ${ENABLE_CAPTURE_CLIENT:-true}
     volumes:
       - capture_data:/var/lib/kyc/captures
       - ./var/models:/var/lib/kyc/models:ro
@@ -90,7 +103,8 @@ services:
   process:
     build: .
     profiles: [tools]
-    command: ["python", "scripts/process_documents.py"]
+    # With DOCUMENT_PROCESSING_MODE=deferred this is the OCR tier (Phase 18): N documents at once.
+    command: ["sh", "-c", "exec python scripts/process_documents.py --parallel ${DOCUMENT_WORKER_PARALLEL:-2} --loop 1"]
     environment:
       ENVIRONMENT: development
       DATABASE_URL: postgresql+psycopg2://kyc_app:${KYC_APP_PASSWORD}@postgres:5432/kyc
@@ -100,6 +114,7 @@ services:
       CAPTURE_STORAGE_DIR: /var/lib/kyc/captures
       PII_ENCRYPTION_KEYS: ${PII_ENCRYPTION_KEYS}
       PII_HMAC_KEY: ${PII_HMAC_KEY}
+      BIOMETRIC_ENCRYPTION_KEYS: ${BIOMETRIC_ENCRYPTION_KEYS}
     volumes:
       - capture_data:/var/lib/kyc/captures
     depends_on:
@@ -118,6 +133,7 @@ services:
       PII_ENCRYPTION_KEYS: ${PII_ENCRYPTION_KEYS}
       PII_HMAC_KEY: ${PII_HMAC_KEY}
       WEBHOOK_TIMEOUT_SECONDS: ${WEBHOOK_TIMEOUT_SECONDS:-10}
+      WEBHOOK_SECRET_KEYS: ${WEBHOOK_SECRET_KEYS:?Run scripts/configure_local.py to add a separate webhook key}
       WEBHOOK_MAX_ATTEMPTS: ${WEBHOOK_MAX_ATTEMPTS:-8}
     depends_on:
       postgres:

@@ -143,6 +143,27 @@ class SessionResult(BaseModel):
     fraud_signals: list[FraudSignalSummary] = Field(default_factory=list, description="Signals from the fraud engine (Phase 12). Evidence, not a verdict.")
     decision: ResultDecision | None = Field(default=None, description="Set only by the deterministic risk engine (Phase 13).")
     review: ResultReview | None = Field(default=None, description="Latest manual review outcome (Phase 14), if any.")
+    erased_at: datetime | None = Field(default=None, description="Set when personal and biometric data was erased (Phase 17).")
+
+
+class ConsentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    scope: Literal["DOCUMENT_PROCESSING"] = "DOCUMENT_PROCESSING"
+    granted: Literal[True] = Field(description="Send only after the person agreed to the notice on their device.")
+
+    @field_validator("granted", mode="before")
+    @classmethod
+    def explicit_boolean(cls, value):
+        if value is not True:
+            raise ValueError("Consent must be the explicit JSON boolean true.")
+        return value
+
+
+class ConsentResponse(BaseModel):
+    session_id: UUID
+    scope: str
+    policy_version: str
+    granted_at: datetime
 
 
 DocumentSide = Literal["FRONT", "BACK", "DATA_PAGE"]

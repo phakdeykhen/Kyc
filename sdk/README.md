@@ -1,4 +1,4 @@
-# KYC platform SDKs (Phase 16)
+# KYC platform SDKs (Phases 16–17)
 
 | Package | Where it runs | Status |
 | --- | --- | --- |
@@ -24,6 +24,10 @@ get_result(session)   (identity only with results:identity)
 - Every decision is made on the server: quality gate, OCR, MRZ, chip verification,
   face match, liveness and risk. The SDKs only capture and transport evidence (spec §28).
 - Use an `Idempotency-Key` when creating sessions so that retries are safe.
+- Remote API URLs require HTTPS. Loopback HTTP is accepted for development. Both clients
+  refuse redirects to protect credentials and captures; custom transports must do the same.
+- Record document consent after the person agrees, before upload. A policy change requires
+  renewed consent. Server keys need the independent `data:erase` scope to erase a session.
 
 ## Python
 
@@ -35,6 +39,7 @@ session = kyc.create_session("customer-42", "KH", "KH_NATIONAL_ID", idempotency_
 token = kyc.issue_client_token(session["session_id"])["client_token"]
 
 device = SessionClient("https://kyc.example.com", token, ORG)       # e.g. a kiosk
+device.give_document_consent(session["session_id"])               # after explicit agreement
 device.upload_document(session["session_id"], "FRONT", front_jpeg)
 device.upload_document(session["session_id"], "BACK", back_jpeg)
 
@@ -53,11 +58,17 @@ const { client_token } = await kyc.issueClientToken(session.session_id);
 
 // In the browser, with the token your backend handed over:
 const device = new SessionClient("https://kyc.example.com", client_token, ORG);
+await device.giveDocumentConsent(session.session_id); // after explicit agreement
 await device.uploadDocument(session.session_id, "FRONT", frontBlob);
 ```
 
 Run the tests with `npm test` (Node 22.18+ runs the TypeScript directly). Type-check
 with `npm run typecheck`.
+
+Python `kyc.erase(session_id)` and TypeScript `kyc.erase(sessionId)` remove personal
+artifacts and revoke device access. Coded decisions and audit history remain; stored
+review notes are removed. See [Phase 17](../docs/architecture-phase17.md) for cleanup
+timing, CIDR-restricted keys and the key-rotation procedure.
 
 ## Receiving webhooks
 

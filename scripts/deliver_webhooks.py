@@ -24,6 +24,7 @@ from kyc.db.session import build_engine  # noqa: E402
 from kyc.main import build_field_cipher  # noqa: E402
 from kyc.webhooks.delivery import HTTPSender  # noqa: E402
 from kyc.webhooks.dispatcher import WebhookDispatcher  # noqa: E402
+from kyc.webhooks.secrets import build_webhook_cipher  # noqa: E402
 
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("organizations", nargs="*", type=UUID)
@@ -32,7 +33,8 @@ args = parser.parse_args()
 
 settings = get_settings()
 engine = build_engine(settings)
-dispatcher = WebhookDispatcher(sessionmaker(engine, expire_on_commit=False), build_field_cipher(settings),
+dispatcher = WebhookDispatcher(sessionmaker(engine, expire_on_commit=False),
+                               build_webhook_cipher(settings, build_field_cipher(settings)),
                                HTTPSender(settings.webhook_timeout_seconds, settings.webhook_allow_private_targets),
                                settings.webhook_max_attempts, background=False)
 

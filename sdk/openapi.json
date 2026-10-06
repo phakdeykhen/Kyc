@@ -4,6 +4,22 @@
       "ApiKeyCreate": {
         "additionalProperties": false,
         "properties": {
+          "allowed_cidrs": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Networks the key may be used from (CIDR or address). Omitted: the creator's own allow-list, if any.",
+            "title": "Allowed Cidrs"
+          },
           "expires_in_days": {
             "anyOf": [
               {
@@ -40,7 +56,7 @@
             "items": {
               "type": "string"
             },
-            "maxItems": 5,
+            "maxItems": 6,
             "minItems": 1,
             "title": "Scopes",
             "type": "array"
@@ -55,6 +71,14 @@
       },
       "ApiKeyCreated": {
         "properties": {
+          "allowed_cidrs": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Cidrs",
+            "type": "array"
+          },
           "api_key": {
             "description": "Shown once. Store it in your server's secret manager.",
             "title": "Api Key",
@@ -153,6 +177,14 @@
       },
       "ApiKeyView": {
         "properties": {
+          "allowed_cidrs": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Cidrs",
+            "type": "array"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -246,7 +278,7 @@
       "Body_upload_back_v1_kyc__session_id__documents_back_post": {
         "properties": {
           "file": {
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File",
             "type": "string"
           }
@@ -260,7 +292,7 @@
       "Body_upload_document_v1_kyc__session_id__documents_post": {
         "properties": {
           "file": {
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File",
             "type": "string"
           },
@@ -284,7 +316,7 @@
       "Body_upload_front_v1_kyc__session_id__documents_front_post": {
         "properties": {
           "file": {
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File",
             "type": "string"
           }
@@ -311,7 +343,7 @@
           "frames": {
             "description": "Raw (unmirrored) camera frames",
             "items": {
-              "format": "binary",
+              "contentMediaType": "application/octet-stream",
               "type": "string"
             },
             "title": "Frames",
@@ -377,7 +409,7 @@
           "dg1": {
             "anyOf": [
               {
-                "format": "binary",
+                "contentMediaType": "application/octet-stream",
                 "type": "string"
               },
               {
@@ -390,7 +422,7 @@
           "dg15": {
             "anyOf": [
               {
-                "format": "binary",
+                "contentMediaType": "application/octet-stream",
                 "type": "string"
               },
               {
@@ -403,7 +435,7 @@
           "dg2": {
             "anyOf": [
               {
-                "format": "binary",
+                "contentMediaType": "application/octet-stream",
                 "type": "string"
               },
               {
@@ -427,7 +459,7 @@
           "sod": {
             "anyOf": [
               {
-                "format": "binary",
+                "contentMediaType": "application/octet-stream",
                 "type": "string"
               },
               {
@@ -448,7 +480,7 @@
             "type": "boolean"
           },
           "file": {
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File",
             "type": "string"
           }
@@ -733,6 +765,58 @@
           "expires_at"
         ],
         "title": "ClientTokenResponse",
+        "type": "object"
+      },
+      "ConsentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "granted": {
+            "const": true,
+            "description": "Send only after the person agreed to the notice on their device.",
+            "title": "Granted",
+            "type": "boolean"
+          },
+          "scope": {
+            "const": "DOCUMENT_PROCESSING",
+            "default": "DOCUMENT_PROCESSING",
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "granted"
+        ],
+        "title": "ConsentRequest",
+        "type": "object"
+      },
+      "ConsentResponse": {
+        "properties": {
+          "granted_at": {
+            "format": "date-time",
+            "title": "Granted At",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "scope",
+          "policy_version",
+          "granted_at"
+        ],
+        "title": "ConsentResponse",
         "type": "object"
       },
       "DeliveryView": {
@@ -1707,6 +1791,19 @@
               }
             ]
           },
+          "erased_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when personal and biometric data was erased (Phase 17).",
+            "title": "Erased At"
+          },
           "face_comparison": {
             "anyOf": [
               {
@@ -1805,6 +1902,13 @@
       },
       "ValidationError": {
         "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
           "loc": {
             "items": {
               "anyOf": [
@@ -1882,6 +1986,11 @@
         "name": "X-Organization-ID",
         "type": "apiKey"
       },
+      "ReviewerToken": {
+        "description": "Expiring reviewer token (rvw_\u2026), separate from client credentials.",
+        "scheme": "bearer",
+        "type": "http"
+      },
       "SessionClientToken": {
         "description": "Session client token (kst_\u2026) for capture and status of one session.",
         "scheme": "bearer",
@@ -1890,9 +1999,9 @@
     }
   },
   "info": {
-    "description": "KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness, ePassport chip verification, cross-checks, fraud signals and a deterministic risk engine, an authorized manual review dashboard, multi-tenant API keys with scopes, and signed webhooks (phases 1\u201316).",
+    "description": "KYC sessions, document extraction (Cambodian and international documents) MRZ and barcode validation, face quality, private 1:1 comparison, active liveness, ePassport chip verification, cross-checks, fraud signals and a deterministic risk engine, an authorized manual review dashboard, multi-tenant API keys with scopes, signed webhooks, security/privacy controls, and load-tested admission control (phases 1\u201318).",
     "title": "Universal Identity Platform",
-    "version": "0.16.0"
+    "version": "0.18.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1909,6 +2018,7 @@
             "description": "Successful Response"
           }
         },
+        "security": [],
         "summary": "Live",
         "tags": [
           "health"
@@ -1928,6 +2038,7 @@
             "description": "Successful Response"
           }
         },
+        "security": [],
         "summary": "Ready",
         "tags": [
           "health"
@@ -2019,7 +2130,7 @@
         ]
       },
       "post": {
-        "description": "Create a key with at most the caller's own scopes and rate limit (no privilege escalation).",
+        "description": "Create a key bounded by the caller's scopes, rate limit, networks and expiry.",
         "operationId": "create_api_key_v1_api_keys_post",
         "parameters": [
           {
@@ -2559,6 +2670,16 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "ApiKey": [],
+            "Organization": []
+          },
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
         "summary": "Read Session"
       }
     },
@@ -2652,6 +2773,118 @@
           }
         },
         "summary": "Client Token"
+      }
+    },
+    "/v1/kyc/{session_id}/consent": {
+      "post": {
+        "description": "Record the person's consent to document processing, from their device, before capture.\n\nRequired before document uploads when the platform runs with REQUIRE_DOCUMENT_CONSENT (always in production).",
+        "operationId": "give_consent_v1_kyc__session_id__consent_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "The session is closed."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "ApiKey": [],
+            "Organization": []
+          },
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
+        "summary": "Give Consent"
       }
     },
     "/v1/kyc/{session_id}/documents": {
@@ -2753,7 +2986,7 @@
             "description": "Upload exceeds the size limit."
           },
           "422": {
-            "description": "Unreadable or unsupported image, or a side this document type does not have."
+            "description": "Unreadable or unsupported image, a side this document type does not have, or DOCUMENT_CONSENT_REQUIRED (POST /consent first)."
           },
           "429": {
             "content": {
@@ -2769,6 +3002,16 @@
             "description": "Capture storage is not configured."
           }
         },
+        "security": [
+          {
+            "ApiKey": [],
+            "Organization": []
+          },
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
         "summary": "Upload Document"
       }
     },
@@ -2870,7 +3113,7 @@
             "description": "Upload exceeds the size limit."
           },
           "422": {
-            "description": "Unreadable or unsupported image, or a side this document type does not have."
+            "description": "Unreadable or unsupported image, a side this document type does not have, or DOCUMENT_CONSENT_REQUIRED (POST /consent first)."
           },
           "429": {
             "content": {
@@ -2886,6 +3129,16 @@
             "description": "Capture storage is not configured."
           }
         },
+        "security": [
+          {
+            "ApiKey": [],
+            "Organization": []
+          },
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
         "summary": "Upload Back"
       }
     },
@@ -2987,7 +3240,7 @@
             "description": "Upload exceeds the size limit."
           },
           "422": {
-            "description": "Unreadable or unsupported image, or a side this document type does not have."
+            "description": "Unreadable or unsupported image, a side this document type does not have, or DOCUMENT_CONSENT_REQUIRED (POST /consent first)."
           },
           "429": {
             "content": {
@@ -3003,7 +3256,107 @@
             "description": "Capture storage is not configured."
           }
         },
+        "security": [
+          {
+            "ApiKey": [],
+            "Organization": []
+          },
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
         "summary": "Upload Front"
+      }
+    },
+    "/v1/kyc/{session_id}/erase": {
+      "post": {
+        "description": "Erase this session's personal and biometric data now (data-subject request). Requires data:erase.\n\nThe status, decision reason codes and audit trail are kept; an unfinished session is closed first.\nRepeating the call is harmless.",
+        "operationId": "erase_v1_kyc__session_id__erase_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Session not found."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Erase"
       }
     },
     "/v1/kyc/{session_id}/liveness": {
@@ -3109,6 +3462,16 @@
             "description": "Face models unavailable."
           }
         },
+        "security": [
+          {
+            "ApiKey": [],
+            "Organization": []
+          },
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
         "summary": "Upload Liveness"
       }
     },
@@ -3216,6 +3579,16 @@
             "description": "Liveness attempt limit reached."
           }
         },
+        "security": [
+          {
+            "ApiKey": [],
+            "Organization": []
+          },
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
         "summary": "Liveness Challenge"
       }
     },
@@ -3335,6 +3708,16 @@
             "description": "Chip attempt limit reached."
           }
         },
+        "security": [
+          {
+            "ApiKey": [],
+            "Organization": []
+          },
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
         "summary": "Upload Nfc"
       }
     },
@@ -3442,6 +3825,16 @@
             "description": "Chip attempt limit reached."
           }
         },
+        "security": [
+          {
+            "ApiKey": [],
+            "Organization": []
+          },
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
         "summary": "Nfc Challenge"
       }
     },
@@ -3649,6 +4042,16 @@
             "description": "Models, encrypted storage, or document portrait unavailable."
           }
         },
+        "security": [
+          {
+            "ApiKey": [],
+            "Organization": []
+          },
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
         "summary": "Upload Selfie"
       }
     },
@@ -3888,6 +4291,12 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "Organization": [],
+            "ReviewerToken": []
+          }
+        ],
         "summary": "Me",
         "tags": [
           "review"
@@ -3976,6 +4385,12 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "Organization": [],
+            "ReviewerToken": []
+          }
+        ],
         "summary": "Review Queue",
         "tags": [
           "review"
@@ -4050,6 +4465,12 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "Organization": [],
+            "ReviewerToken": []
+          }
+        ],
         "summary": "Review Case",
         "tags": [
           "review"
@@ -4134,6 +4555,12 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "Organization": [],
+            "ReviewerToken": []
+          }
+        ],
         "summary": "Review Decision",
         "tags": [
           "review"
@@ -4218,6 +4645,12 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "Organization": [],
+            "ReviewerToken": []
+          }
+        ],
         "summary": "Review Image",
         "tags": [
           "review"
@@ -5185,10 +5618,6 @@
     {
       "ApiKey": [],
       "Organization": []
-    },
-    {
-      "Organization": [],
-      "SessionClientToken": []
     }
   ]
 }

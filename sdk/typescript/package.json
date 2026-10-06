@@ -1,6 +1,6 @@
 {
   "name": "@kyc-platform/sdk",
-  "version": "0.16.0",
+  "version": "0.18.0",
   "description": "Client and webhook verification for the Universal Identity Platform KYC API",
   "type": "module",
   "main": "dist/index.js",
