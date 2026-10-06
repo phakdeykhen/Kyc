@@ -13,7 +13,7 @@ from kyc.services.captures import CaptureLimits, submit_capture
 from kyc.services.consent import DOCUMENT_SCOPE, active_consent, record_document_consent
 from kyc.services.erasure import delete_objects, erase_session
 from kyc.services.biometrics import SelfieLimits, submit_selfie
-from kyc.services.liveness import LivenessLimits, issue_challenge, submit_liveness
+from kyc.services.liveness import LivenessLimits, guide_step, issue_challenge, submit_liveness
 from kyc.services.nfc import NFCLimits, issue_nfc_challenge, submit_nfc
 from kyc.services.results import build_result
 from kyc.services.risk import verify_session
@@ -200,6 +200,32 @@ def liveness_challenge(session_id: UUID, request: Request, tenant: Capture, db: 
     state = request.app.state
     return issue_challenge(db, tenant, session_id, _liveness_limits(state.settings), state.liveness_policy,
                            request.state.request_id)
+
+
+@router.post("/kyc/{session_id}/liveness/guide", responses={
+    409: {"model": CaptureError, "description": "Challenge unknown, used or expired, or session not waiting for liveness."},
+    413: {"description": "Upload exceeds the size limit."},
+    422: {"description": "Unreadable frame, unknown step, or a baseline frame without exactly one face."},
+    503: {"description": "Face models unavailable."},
+})
+def guide_liveness(session_id: UUID, request: Request, tenant: Capture, db: Database,
+                   challenge_id: Annotated[UUID, Form()], nonce: Annotated[str, Form(max_length=128)],
+                   step: Annotated[int, Form(ge=0, le=20)],
+                   frame: Annotated[UploadFile, File(description="Current raw (unmirrored) camera frame")],
+                   baseline: Annotated[UploadFile | None, File(description="The frame accepted for step 0")] = None):
+    """Live feedback while the person follows one step: is the face visible, and is the movement done?
+
+    Advisory only. It does not use up the challenge or record evidence, and frames are not stored;
+    POST /liveness judges the submitted frames again with the same geometry.
+    """
+    state = request.app.state
+    limits = _liveness_limits(state.settings)
+    data = frame.file.read(limits.max_frame_bytes + 1)
+    reference = baseline.file.read(limits.max_frame_bytes + 1) if baseline is not None else None
+    if len(data) > limits.max_frame_bytes or (reference is not None and len(reference) > limits.max_frame_bytes):
+        raise HTTPException(413, detail="Frame is too large.")
+    return guide_step(db, tenant, session_id, challenge_id, nonce, step, data, reference or None, state.face_engine,
+                      state.liveness_policy, limits, request.state.request_id)
 
 
 @router.post("/kyc/{session_id}/liveness", responses={

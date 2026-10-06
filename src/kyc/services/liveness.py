@@ -26,7 +26,8 @@ from kyc.domain.enums import CheckResult, SessionStatus, VerificationLevel
 from kyc.domain.state_machine import Event
 from kyc.engines.capture_quality import CaptureRejected, decode_capture
 from kyc.liveness import challenge as challenges
-from kyc.liveness.active import COVERAGE, ActiveLivenessPolicy, assess
+from kyc.liveness.active import COVERAGE, ActiveLivenessPolicy, assess, guide
+from kyc.liveness.geometry import pose
 from kyc.services.biometrics import _template_context
 from kyc.services.sessions import apply_event, aware, is_expired
 
@@ -100,6 +101,68 @@ def issue_challenge(db: Session, tenant: TenantContext, session_id: UUID, limits
             "expires_at": item.expires_at, "frames": {"min": policy.min_frames, "max": policy.max_frames,
                                                       "per_step": "1-3 frames, tagged with the step index"},
             "attempts_remaining": limits.max_attempts - attempts - 1}
+
+
+def _open_challenge(db, record, challenge_id: UUID, nonce: str, now: datetime,
+                    remaining: int | None) -> tuple[LivenessChallenge | None, JSONResponse | None]:
+    """The session's challenge, if the nonce matches and it is still usable; read-only."""
+    item = db.scalar(sa.select(LivenessChallenge).where(
+        LivenessChallenge.id == challenge_id, LivenessChallenge.organization_id == record.organization_id,
+        LivenessChallenge.session_id == record.id))
+    if item is None or not hmac.compare_digest(item.nonce_hash, challenges.nonce_hash(nonce or "")):
+        return None, _error(409, "CHALLENGE_INVALID", "Unknown challenge or nonce. Request a new challenge.", remaining)
+    if item.used_at is not None:
+        return None, _error(409, "CHALLENGE_ALREADY_USED", "This challenge was already used. Request a new one.", remaining)
+    if aware(item.expires_at) <= now:
+        return None, _error(409, "CHALLENGE_EXPIRED", "The challenge expired. Request a new one.", remaining)
+    return item, None
+
+
+def _single_face(engine, data: bytes, limits: LivenessLimits):
+    """(face status, pose or None). Face status: OK, NO_FACE, MULTIPLE_FACES or UNCLEAR."""
+    capture = decode_capture(data, max_bytes=limits.max_frame_bytes, max_pixels=limits.max_frame_pixels)
+    faces = engine.detect(Image.fromarray(capture.pixels))
+    if len(faces) != 1:
+        return ("MULTIPLE_FACES" if faces else "NO_FACE"), None
+    try:
+        return "OK", pose(faces[0].landmarks)
+    except ValueError:
+        return "UNCLEAR", None
+
+
+def guide_step(db: Session, tenant: TenantContext, session_id: UUID, challenge_id: UUID, nonce: str, step_index: int,
+               frame: bytes, baseline: bytes | None, engine, policy: ActiveLivenessPolicy, limits: LivenessLimits,
+               request_id: UUID) -> dict | JSONResponse:
+    """Live feedback for one step of an open challenge, from one frame (and the person's baseline frame).
+
+    Advisory only: it neither uses the challenge nor records evidence, and frames are not kept.
+    The submitted frames are judged again by `submit_liveness`.
+    """
+    record, problem = _session(db, tenant, session_id, request_id)
+    if problem:
+        return problem
+    item, problem = _open_challenge(db, record, challenge_id, nonce, datetime.now(timezone.utc), None)
+    if problem:
+        return problem
+    if not 0 <= step_index < len(item.steps):
+        return _error(422, "FRAME_STEP_INVALID", "The step index is not part of this challenge.")
+    reason = engine.unavailable_reason() if engine is not None else "FACE_MODELS_UNAVAILABLE"
+    if reason:
+        return _error(503, reason, "Liveness checking is unavailable. Retry later.")
+    step = item.steps[step_index]
+    try:
+        face, sample = _single_face(engine, frame, limits)
+        if face != "OK" or baseline is None:
+            return {"step": step, "face": face, "state": None, "progress": 0.0}
+        base_face, base_sample = _single_face(engine, baseline, limits)
+    except CaptureRejected as rejected:
+        return _error(422, rejected.reason_code, str(rejected))
+    except FaceEngineUnavailable:
+        return _error(503, "FACE_MODELS_UNAVAILABLE", "Liveness checking is unavailable. Retry later.")
+    if base_face != "OK":
+        return _error(422, "BASELINE_UNUSABLE", "The baseline frame must show exactly one clear face.")
+    advice = guide(base_sample, sample, step, policy)
+    return {"step": step, "face": face, "state": advice.state, "progress": advice.progress}
 
 
 def _selfie_reference(db, record, cipher):

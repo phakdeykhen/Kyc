@@ -62,15 +62,37 @@
 
     <section class="panel" id="liveness" aria-labelledby="liveness-title" hidden>
       <h1 id="liveness-title">4. Show that you are present</h1>
-      <p class="muted">You will be asked to move your head in a few directions, in a random order. Follow each instruction on screen. Photos from this step are checked and then discarded.</p>
+      <div class="tips" id="liveness-tips">
+        <p class="muted">You'll be asked to move your head in a few directions, one at a time. Each step moves on as soon as you've done it. Photos from this step are checked and then discarded.</p>
+        <ul>
+          <li>Look at your camera and hold the phone at eye level.</li>
+          <li>Use light that isn't too dim or too bright.</li>
+          <li>Keep your eyes, nose and mouth visible: no sunglasses, mask or hat.</li>
+          <li>Make sure nobody else, and no photo of a face, is in view.</li>
+          <li>Move your head, not the phone.</li>
+        </ul>
+      </div>
+      <ol class="step-dots" id="liveness-dots" aria-label="Progress" hidden></ol>
       <div class="stage selfie-stage">
         <video id="liveness-video" playsinline muted></video>
         <div class="frame face-frame" id="liveness-frame" aria-hidden="true"><span></span></div>
+        <div class="cue" id="liveness-cue" aria-hidden="true" hidden></div>
+        <div class="step-meter" id="liveness-meter" aria-hidden="true" hidden><i id="liveness-meter-fill"></i></div>
         <p class="hint" id="liveness-hint" role="status">Starting camera…</p>
       </div>
       <p class="liveness-step" id="liveness-step" aria-live="assertive"></p>
+      <p class="liveness-coach muted" id="liveness-coach" aria-live="polite"></p>
+      <div class="help-card" id="liveness-help" role="alertdialog" aria-labelledby="liveness-help-title" hidden>
+        <h2 id="liveness-help-title">Having trouble?</h2>
+        <ul id="liveness-help-tips"></ul>
+        <div class="actions">
+          <button type="button" class="primary" id="liveness-retry-step">Try this step again</button>
+          <button type="button" class="secondary" id="liveness-restart">Start over</button>
+        </div>
+      </div>
       <div class="actions">
-        <button type="button" class="primary" id="liveness-start" disabled>Start</button>
+        <button type="button" class="primary" id="liveness-start" disabled>I'm ready</button>
+        <button type="button" class="secondary" id="liveness-cancel" hidden>Cancel</button>
       </div>
     </section>
 
