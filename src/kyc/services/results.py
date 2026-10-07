@@ -11,6 +11,7 @@ from kyc.core.crypto import FieldCipher
 from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceComparison, FaceQualityCheck, FraudSignal, IdentityDocument, KYCSession, LivenessCheck, ManualReview, MRZResult, NFCResult, RiskAssessmentRecord
 from kyc.domain.enums import CheckResult
 from kyc.services.captures import side_progress
+from kyc.services.verdict import check_results, final_result, latest_assessment
 
 # NFC_VERIFIED means signed by a trusted issuer and unaltered; it is still evidence, not a decision.
 NFC_CHECK = {"NFC_VERIFIED": "PASS", "NFC_READ": "REVIEW", "NFC_FAILED": "FAIL", "NFC_NOT_AVAILABLE": "REVIEW",
@@ -170,11 +171,17 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None, re
     checks, flags, summary, signals, document = (evidence.checks, evidence.flags, evidence.face_comparison,
                                                  evidence.signals, evidence.document)
     decision, review = latest_decision(db, record), latest_review(db, record)
+    outcome = final_result(db, record)
+    common = dict(final_result=outcome["final_result"], outcome=outcome["decision"], retry_allowed=outcome["retry_allowed"],
+                  end_user_message=outcome["end_user_message"], end_user_message_code=outcome["end_user_message_code"],
+                  check_results=check_results(checks, record.verification_level, latest_assessment(db, record)))
+    if summary is not None:
+        summary = summary.model_copy(update={"score": None})  # raw similarity stays internal (reviewers only)
     erased_at = record.erased_at.replace(tzinfo=record.erased_at.tzinfo or timezone.utc) if record.erased_at else None
     if document is None or cipher is None:
         return SessionResult(session_id=record.id, status=record.status, checks=checks, fraud_signals=signals,
                              face_comparison=summary, review_flags=sorted(set(flags)), decision=decision, review=review,
-                             erased_at=erased_at)
+                             erased_at=erased_at, **common)
 
     values: dict[str, str] = {}
     for field in db.scalars(sa.select(DocumentField).where(DocumentField.organization_id == record.organization_id,
@@ -190,7 +197,7 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None, re
                                              MRZResult.document_id == document.id))
     return SessionResult(
         session_id=record.id, status=record.status, checks=checks, review_flags=sorted(set(flags)), face_comparison=summary,
-        fraud_signals=signals, decision=decision, review=review,
+        fraud_signals=signals, decision=decision, review=review, **common,
         document=ResultDocument(country=document.issuing_country, type=document.document_type,
                                 document_number_masked=mask(values.get("document_number")), expiry_status=expiry_status),
         identity=ResultIdentity(full_name=values.get("full_name"), full_name_local=values.get("full_name_local"),

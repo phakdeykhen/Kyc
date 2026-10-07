@@ -24,6 +24,7 @@ from kyc.domain.enums import ReviewAction, SessionStatus, VerificationLevel as L
 from kyc.domain.state_machine import Event, VerificationEvidence
 from kyc.review.access import REASONS, ReviewerContext
 from kyc.services.biometrics import clear_identity_evidence
+from kyc.services.verdict import check_results, final_result, review_summary, timeline
 from kyc.services.results import collect_evidence, mask
 from kyc.services.sessions import apply_event, aware, is_expired
 
@@ -176,7 +177,12 @@ def case(db: Session, reviewer: ReviewerContext, session_id: UUID, field_cipher,
     order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
     signals.sort(key=lambda item: (order[item["severity"]], item["signal"]))
     _audit(db, reviewer, record, request_id, "REVIEW_CASE_VIEWED", identity_shown=identity, images_listed=len(images))
+    results = check_results(evidence.checks, record.verification_level, assessment)
     return {
+        "final_result": final_result(db, record),
+        "check_results": results,
+        "review_summary": review_summary(assessment, results),
+        "timeline": timeline(db, record),
         "session": {"session_id": record.id, "status": record.status, "version": record.version,
                     "verification_level": record.verification_level, "country": record.country,
                     "expected_document_type": record.expected_document_type, "user_id": record.user_id,

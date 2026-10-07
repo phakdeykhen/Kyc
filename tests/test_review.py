@@ -153,6 +153,19 @@ class ReviewQueueAndCaseTests(ReviewCase):
             actions = list(db.scalars(sa.select(AuditLog.action).where(AuditLog.actor_id == f"reviewer:{self.reviewer_id}")))
         self.assertEqual(actions, ["REVIEW_CASE_VIEWED", "REVIEW_IMAGE_VIEWED"])
 
+    async def test_case_explains_the_decision_from_recorded_evidence(self):
+        session_id = await self.in_review()
+        code, case, _ = await self.get(f"/v1/review/{session_id}", self.reviewer)
+        self.assertEqual(code, 200, case)
+        self.assertEqual(case["final_result"]["final_result"], "MANUAL_REVIEW")
+        self.assertEqual(case["review_summary"][0], "Document authenticity is unverified")
+        self.assertIn("Document authenticity needs review", case["review_summary"])
+        statuses = {item["check_name"]: item["status"] for item in case["check_results"]}
+        self.assertEqual(statuses["DOCUMENT_AUTHENTICITY"], "REVIEW")
+        events = [item["event"] for item in case["timeline"]]
+        self.assertEqual(events[-1], "RISK_ASSESSED")
+        self.assertTrue(all(item["since_previous_ms"] is None or item["since_previous_ms"] >= 0 for item in case["timeline"]))
+
     async def test_auditor_sees_evidence_but_no_identity_photos_or_decisions(self):
         session_id = await self.in_review()
         code, case, _ = await self.get(f"/v1/review/{session_id}", self.auditor)

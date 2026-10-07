@@ -97,6 +97,9 @@ class Settings(BaseSettings):
     document_consent_policy_version: str = Field(default="DOCUMENT-CONSENT-2026.10.1", min_length=1, max_length=80)
     reviewer_token_max_days: int = Field(default=90, ge=1, le=365)
     log_format: Literal["text", "json"] | None = None  # default: json in production
+    # GET /metrics (Prometheus text). Requires "Authorization: Bearer <token>" when set; in
+    # production the endpoint stays off (404) until a token is configured.
+    metrics_token: SecretStr | None = None
     # Deployment interfaces reserved for later approved phases.
     redis_url: SecretStr | None = None
     gcp_project_id: str | None = None

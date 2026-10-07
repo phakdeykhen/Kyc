@@ -275,6 +275,53 @@
         "title": "ApiKeyView",
         "type": "object"
       },
+      "Body_guide_liveness_v1_kyc__session_id__liveness_guide_post": {
+        "properties": {
+          "baseline": {
+            "anyOf": [
+              {
+                "contentMediaType": "application/octet-stream",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The frame accepted for step 0",
+            "title": "Baseline"
+          },
+          "challenge_id": {
+            "format": "uuid",
+            "title": "Challenge Id",
+            "type": "string"
+          },
+          "frame": {
+            "contentMediaType": "application/octet-stream",
+            "description": "Current raw (unmirrored) camera frame",
+            "title": "Frame",
+            "type": "string"
+          },
+          "nonce": {
+            "maxLength": 128,
+            "title": "Nonce",
+            "type": "string"
+          },
+          "step": {
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Step",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "challenge_id",
+          "nonce",
+          "step",
+          "frame"
+        ],
+        "title": "Body_guide_liveness_v1_kyc__session_id__liveness_guide_post",
+        "type": "object"
+      },
       "Body_upload_back_v1_kyc__session_id__documents_back_post": {
         "properties": {
           "file": {
@@ -735,6 +782,45 @@
         ],
         "title": "CheckResult",
         "type": "string"
+      },
+      "CheckResultItem": {
+        "properties": {
+          "check_name": {
+            "title": "Check Name",
+            "type": "string"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reason Codes",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "REVIEW",
+              "NOT_SUPPORTED",
+              "NOT_APPLICABLE",
+              "NOT_RUN",
+              "ERROR"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check_name",
+          "group",
+          "status"
+        ],
+        "title": "CheckResultItem",
+        "type": "object"
       },
       "ClientTokenResponse": {
         "properties": {
@@ -1222,15 +1308,21 @@
             "$ref": "#/components/schemas/CheckResult"
           },
           "score": {
-            "description": "Cosine similarity; not an identity probability.",
-            "maximum": 1.0,
-            "minimum": -1.0,
-            "title": "Score",
-            "type": "number"
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": -1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Withheld from client results: a raw similarity is not an identity probability.",
+            "title": "Score"
           }
         },
         "required": [
-          "score",
           "metric",
           "result",
           "policy_version",
@@ -1578,6 +1670,46 @@
         "title": "RiskDecision",
         "type": "string"
       },
+      "SelfieComparisonReceipt": {
+        "description": "Confirms a comparison was recorded; the score and result are never sent to the capturing device.",
+        "properties": {
+          "calibrated": {
+            "title": "Calibrated",
+            "type": "boolean"
+          },
+          "metric": {
+            "const": "COSINE_SIMILARITY",
+            "title": "Metric",
+            "type": "string"
+          },
+          "model_name": {
+            "title": "Model Name",
+            "type": "string"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "recorded": {
+            "title": "Recorded",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "recorded",
+          "metric",
+          "policy_version",
+          "model_name",
+          "model_version",
+          "calibrated"
+        ],
+        "title": "SelfieComparisonReceipt",
+        "type": "object"
+      },
       "SelfieResponse": {
         "properties": {
           "attempts_remaining": {
@@ -1595,7 +1727,7 @@
           "comparison": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/FaceComparisonSummary"
+                "$ref": "#/components/schemas/SelfieComparisonReceipt"
               },
               {
                 "type": "null"
@@ -1763,6 +1895,14 @@
       },
       "SessionResult": {
         "properties": {
+          "check_results": {
+            "description": "Every check with PASS / FAIL / REVIEW / NOT_SUPPORTED / NOT_APPLICABLE / NOT_RUN / ERROR. NOT_RUN is never PASS.",
+            "items": {
+              "$ref": "#/components/schemas/CheckResultItem"
+            },
+            "title": "Check Results",
+            "type": "array"
+          },
           "checks": {
             "additionalProperties": {
               "type": "string"
@@ -1791,6 +1931,29 @@
               }
             ]
           },
+          "end_user_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plain message safe to show the person; never accuses them of fraud.",
+            "title": "End User Message"
+          },
+          "end_user_message_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End User Message Code"
+          },
           "erased_at": {
             "anyOf": [
               {
@@ -1813,6 +1976,20 @@
                 "type": "null"
               }
             ]
+          },
+          "final_result": {
+            "default": "IN_PROGRESS",
+            "description": "TECHNICAL_ERROR is a system failure, never an identity decision; the session stays retryable.",
+            "enum": [
+              "VERIFIED",
+              "MANUAL_REVIEW",
+              "REJECTED",
+              "EXPIRED",
+              "TECHNICAL_ERROR",
+              "IN_PROGRESS"
+            ],
+            "title": "Final Result",
+            "type": "string"
           },
           "fraud_signals": {
             "description": "Signals from the fraud engine (Phase 12). Evidence, not a verdict.",
@@ -1847,6 +2024,28 @@
                 "type": "null"
               }
             ]
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "PASS",
+                  "REVIEW",
+                  "FAIL"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Identity decision; None while undecided, expired or after a technical error.",
+            "title": "Outcome"
+          },
+          "retry_allowed": {
+            "default": false,
+            "title": "Retry Allowed",
+            "type": "boolean"
           },
           "review": {
             "anyOf": [
@@ -2005,6 +2204,27 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/health/dependencies": {
+      "get": {
+        "description": "Every dependency with UP / DOWN / NOT_CONFIGURED / NOT_IMPLEMENTED; no versions, paths or secrets.",
+        "operationId": "dependencies_health_dependencies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [],
+        "summary": "Dependencies",
+        "tags": [
+          "health"
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "operationId": "live_health_live_get",
@@ -3592,6 +3812,112 @@
         "summary": "Liveness Challenge"
       }
     },
+    "/v1/kyc/{session_id}/liveness/guide": {
+      "post": {
+        "description": "Live feedback while the person follows one step: is the face visible, and is the movement done?\n\nAdvisory only. It does not use up the challenge or record evidence, and frames are not stored;\nPOST /liveness judges the submitted frames again with the same geometry.",
+        "operationId": "guide_liveness_v1_kyc__session_id__liveness_guide_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_guide_liveness_v1_kyc__session_id__liveness_guide_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureError"
+                }
+              }
+            },
+            "description": "Challenge unknown, used or expired, or session not waiting for liveness."
+          },
+          "413": {
+            "description": "Upload exceeds the size limit."
+          },
+          "422": {
+            "description": "Unreadable frame, unknown step, or a baseline frame without exactly one face."
+          },
+          "503": {
+            "description": "Face models unavailable."
+          }
+        },
+        "summary": "Guide Liveness"
+      }
+    },
     "/v1/kyc/{session_id}/nfc": {
       "post": {
         "description": "Verify chip data server-side (Passive + Active Authentication). Raw chip data is not stored.",
@@ -4305,7 +4631,7 @@
     },
     "/v1/review/queue": {
       "get": {
-        "description": "Cases waiting in MANUAL_REVIEW, longest-waiting first.",
+        "description": "Cases waiting in MANUAL_REVIEW.",
         "operationId": "review_queue_v1_review_queue_get",
         "parameters": [
           {
@@ -4330,6 +4656,20 @@
               "minimum": 0,
               "title": "Offset",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "oldest",
+              "enum": [
+                "oldest",
+                "newest"
+              ],
+              "title": "Order",
+              "type": "string"
             }
           },
           {
@@ -4392,6 +4732,134 @@
           }
         ],
         "summary": "Review Queue",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/v1/review/sessions": {
+      "get": {
+        "description": "Every session of the organization, newest change first, by status and the client's user ID.",
+        "operationId": "all_sessions_v1_review_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SessionStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "user_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "Organization": [],
+            "ReviewerToken": []
+          }
+        ],
+        "summary": "All Sessions",
         "tags": [
           "review"
         ]

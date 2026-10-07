@@ -151,10 +151,11 @@ class BiometricAPITests(BiometricAPICase):
         self.assertEqual(code, 200, body)
         self.assertEqual((body["capture_status"], body["status"], body["next_step"]),
                          ("ACCEPTED", "LIVENESS_REQUIRED", "CAPTURE_LIVENESS"))
-        self.assertEqual(body["comparison"]["result"], "REVIEW")
-        self.assertEqual(body["comparison"]["metric"], "COSINE_SIMILARITY")
-        self.assertAlmostEqual(body["comparison"]["score"], 1)
-        self.assertIn("UNCALIBRATED_FACE_POLICY", body["reason_codes"])
+        # The device only learns that a comparison was recorded, never its score or result.
+        self.assertEqual((body["comparison"]["recorded"], body["comparison"]["metric"]), (True, "COSINE_SIMILARITY"))
+        self.assertNotIn("score", body["comparison"])
+        self.assertNotIn("result", body["comparison"])
+        self.assertNotIn("UNCALIBRATED_FACE_POLICY", body["reason_codes"])
         self.assertEqual(headers["cache-control"], "no-store")
         self.assertEqual(self.count(LivenessCheck), 0)
         self.assertNotIn("vector", json.dumps(body))
@@ -208,7 +209,8 @@ class BiometricAPITests(BiometricAPICase):
         session_id = self.ready(level="DOCUMENT_FACE")
         code, body, _ = await self.upload(session_id)
         self.assertEqual(code, 200, body)
-        self.assertEqual(body["comparison"]["result"], "FAIL")
+        self.assertNotIn("result", body["comparison"])
+        self.assertNotIn("FACE_MATCH_BELOW_THRESHOLD", body["reason_codes"])
         self.assertEqual(body["status"], "PROCESSING")
         self.assertEqual(self.count(FaceComparison), 1)
 

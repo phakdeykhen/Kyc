@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 from uuid import uuid4
 
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
@@ -165,6 +165,64 @@ class RiskAPITests(BiometricAPICase):
             self.assertEqual(row.check_summary["trace"], [])
             audit = db.scalar(sa.select(AuditLog).where(AuditLog.action == "RISK_ASSESSED"))
             self.assertEqual((audit.from_status, audit.to_status), ("PROCESSING", "VERIFIED"))
+
+    async def test_result_views_report_every_check_and_never_show_not_run_as_pass(self):
+        session_id = self.processing(level="DOCUMENT_FACE_LIVENESS", signed_barcode=False)
+        await self.verify(session_id)
+        code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual(code, 200, result)
+        self.assertEqual((result["final_result"], result["outcome"], result["end_user_message_code"]),
+                         ("MANUAL_REVIEW", "REVIEW", "REVIEW"))
+        self.assertEqual(result["end_user_message"], "Your verification has been submitted for additional review.")
+        statuses = {item["check_name"]: item["status"] for item in result["check_results"]}
+        self.assertEqual(statuses["DOCUMENT_QUALITY"], "PASS")
+        self.assertEqual((statuses["FACE_MATCH"], statuses["LIVENESS"]), ("NOT_RUN", "NOT_RUN"))  # never PASS
+        self.assertEqual((statuses["NFC"], statuses["NFC_ACTIVE_AUTHENTICATION"]), ("NOT_APPLICABLE", "NOT_APPLICABLE"))
+        self.assertEqual(statuses["DOCUMENT_AUTHENTICITY"], "REVIEW")
+        self.assertEqual(statuses["FORENSICS_FONT_INCONSISTENCY"], "NOT_SUPPORTED")
+        self.assertTrue(set(statuses.values()) <= {"PASS", "FAIL", "REVIEW", "NOT_SUPPORTED", "NOT_APPLICABLE", "NOT_RUN", "ERROR"})
+
+    async def test_a_crashed_assessment_is_a_technical_error_not_a_rejection(self):
+        session_id = self.processing()
+        with patch("kyc.services.risk.evaluate", side_effect=RuntimeError("engine crashed")):
+            self.assertEqual(self.app.state.assessor.assess(self.org, session_id, uuid4()), "ERROR")
+        code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual((result["status"], result["final_result"], result["outcome"], result["retry_allowed"]),
+                         ("PROCESSING", "TECHNICAL_ERROR", None, True))
+        self.assertEqual(result["end_user_message_code"], "TECHNICAL")
+        code, body, _ = await self.verify(session_id)  # the retry still decides on the evidence
+        self.assertEqual((code, body["status"]), (200, "VERIFIED"))
+        code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual((result["final_result"], result["outcome"]), ("VERIFIED", "PASS"))
+
+    async def test_metrics_count_committed_decisions_without_identity_data(self):
+        from kyc.core.metrics import REGISTRY
+        before_review, before_tech = REGISTRY.value("kyc_review_total"), REGISTRY.value("kyc_technical_error_total", stage="risk")
+        session_id = self.processing(signed_barcode=False)
+        with patch("kyc.services.risk.evaluate", side_effect=RuntimeError("engine crashed")):
+            self.app.state.assessor.assess(self.org, session_id, uuid4())
+        self.assertEqual(REGISTRY.value("kyc_technical_error_total", stage="risk"), before_tech + 1)
+        self.assertEqual(REGISTRY.value("kyc_review_total"), before_review)  # the rolled-back attempt is not counted
+        await self.verify(session_id)
+        self.assertEqual(REGISTRY.value("kyc_review_total"), before_review + 1)
+        code, text, _ = await call(self.app, "/metrics")
+        self.assertEqual(code, 200)
+        text = text.decode()
+        self.assertIn('kyc_reason_codes_total{decision="REVIEW",reason="DOCUMENT_AUTHENTICITY_UNVERIFIED"}', text)
+        self.assertIn('kyc_http_request_seconds_bucket{route="/v1/kyc/{session_id}/verify",le="+Inf"}', text)
+        self.assertNotIn(str(session_id), text)
+        self.app.state.settings.metrics_token = SecretStr("m" * 32)
+        try:
+            self.assertEqual((await call(self.app, "/metrics"))[0], 401)
+            code, _, _ = await call(self.app, "/metrics", headers={"Authorization": "Bearer " + "m" * 32})
+            self.assertEqual(code, 200)
+        finally:
+            self.app.state.settings.metrics_token = None
+        self.app.state.settings.environment = "production"
+        try:
+            self.assertEqual((await call(self.app, "/metrics"))[0], 404)  # off in production until a token is set
+        finally:
+            self.app.state.settings.environment = "test"
 
     async def test_verify_is_idempotent_and_never_reassesses(self):
         session_id = self.processing(signed_barcode=False)
