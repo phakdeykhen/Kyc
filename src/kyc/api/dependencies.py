@@ -145,7 +145,9 @@ def authenticate_tenant(
     else:
         tenant = _development_key(request, state.settings, api_key, organization_id)
     bucket = str(tenant.session_id or tenant.credential_id or "development")
-    wait = state.rate_limiter.hit(bucket, tenant.rate_limit or state.settings.api_rate_limit_per_minute)
+    limit = tenant.rate_limit or state.settings.api_rate_limit_per_minute
+    wait = state.rate_limiter.hit(bucket, limit)
+    request.state.rate_limit = (limit, state.rate_limiter.remaining(bucket, limit))
     if wait is not None:
         raise refuse(request, 429, "RATE_LIMITED", "Rate limit exceeded for this credential.",
                      {"Retry-After": str(math.ceil(wait))})

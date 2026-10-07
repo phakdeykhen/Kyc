@@ -98,7 +98,8 @@ Each credential has a fixed one-minute window:
 - Client tokens use `CLIENT_TOKEN_RATE_LIMIT_PER_MINUTE` (default 120).
 - The development key uses `API_RATE_LIMIT_PER_MINUTE`.
 
-Over the limit returns `429` with `Retry-After`. The counter is held in each process (see Limits).
+Over the limit returns `429` with `Retry-After`. Every authenticated response carries
+`X-RateLimit-Limit` and `X-RateLimit-Remaining`. The counter is held in each process (see Limits).
 
 ### Audit
 

@@ -31,3 +31,10 @@ class RateLimiter:
                 self._windows = {name: value for name, value in self._windows.items() if now - value[0] < self.window}
             self._windows[key] = (start, count + 1)
             return None
+
+    def remaining(self, key: str, limit: int) -> int:
+        """Requests left in the key's current window (for X-RateLimit-Remaining)."""
+        now = self.clock()
+        with self._lock:
+            start, count = self._windows.get(key, (now, 0))
+            return limit if now - start >= self.window else max(limit - count, 0)

@@ -72,6 +72,9 @@ log = logging.getLogger("kyc.api")
 def apply_security_headers(response, request: Request):
     path = request.url.path
     response.headers["X-Request-ID"] = str(request.state.request_id)
+    rate_limit = getattr(request.state, "rate_limit", None)
+    if rate_limit is not None:
+        response.headers["X-RateLimit-Limit"], response.headers["X-RateLimit-Remaining"] = map(str, rate_limit)
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"

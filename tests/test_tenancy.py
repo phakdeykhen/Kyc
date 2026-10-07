@@ -230,11 +230,14 @@ class RateLimitTests(TenantCase):
     async def test_each_credential_has_its_own_window(self):
         limited, _ = self.make_key(rate_limit_per_minute=2)
         other, _ = self.make_key(rate_limit_per_minute=2)
-        for _ in range(2):
-            self.assertEqual((await self.request("/v1/document-types", limited))[0], 200)
+        for remaining in ("1", "0"):
+            code, _, headers = await self.request("/v1/document-types", limited)
+            self.assertEqual(code, 200)
+            self.assertEqual((headers["x-ratelimit-limit"], headers["x-ratelimit-remaining"]), ("2", remaining))
         code, body, headers = await self.request("/v1/document-types", limited)
         self.assertEqual(code, 429, body)
         self.assertGreaterEqual(int(headers["retry-after"]), 1)
+        self.assertEqual(headers["x-ratelimit-remaining"], "0")
         self.assertEqual((await self.request("/v1/document-types", other))[0], 200)
 
     def test_window_resets(self):
@@ -242,7 +245,9 @@ class RateLimitTests(TenantCase):
         limiter = RateLimiter(window_seconds=60, clock=lambda: now[0])
         self.assertIsNone(limiter.hit("k", 1))
         self.assertAlmostEqual(limiter.hit("k", 1), 60)
+        self.assertEqual(limiter.remaining("k", 1), 0)
         now[0] = 60.0
+        self.assertEqual(limiter.remaining("k", 1), 1)
         self.assertIsNone(limiter.hit("k", 1))
 
 
