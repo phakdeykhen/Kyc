@@ -57,7 +57,6 @@ interface Run {
   challenge: LivenessChallenge;
   baseline: Blob | null;
   stopped: StopReason | null;
-  help: { resolve: () => void; reject: (stop: LivenessStop) => void } | null;
   abort: AbortController;
 }
 
@@ -99,33 +98,23 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
     setCoach({ text: kind === "move" ? "Move slowly." : "Keep your face inside the oval.", progress: 0, good: false });
   }, []);
 
-  const askForHelp = useCallback((run: Run, index: number, kind: Kind) => {
+  // Tips appear beside the camera while the check keeps running, so the step completes as soon as it is done.
+  const showTips = useCallback((run: Run, index: number, kind: Kind) => {
     const stepName = run.challenge.steps[index].step;
     setHelp(kind === "move"
       ? [STEP_TEXT[stepName]?.more ?? "Move your head clearly.", "Move slowly and keep your whole face inside the oval.",
-         "Keep the phone still at eye level and move only your head.", "Make sure your face is evenly lit."]
-      : ["Hold the phone at eye level, about an arm's length away.", "Keep your whole face inside the oval.",
+         "Keep the camera still at eye level and move only your head.", "Make sure your face is evenly lit."]
+      : ["Hold the camera at eye level, about an arm's length away.", "Keep your whole face inside the oval.",
          "Find even light and remove anything covering your face."]);
-    setCoach({ text: "Paused.", progress: null, good: false });
-    return new Promise<void>((resolve, reject) => { run.help = { resolve, reject }; });
   }, []);
-
-  const closeHelp = (action: "retry" | StopReason) => {
-    const run = runRef.current;
-    setHelp(null);
-    if (!run?.help) return;
-    const pending = run.help;
-    run.help = null;
-    if (action === "retry") pending.resolve();
-    else pending.reject(new LivenessStop(action));
-  };
 
   // Repeats until HOLD_FRAMES consecutive frames satisfy the step; returns those frames.
   const followStep = useCallback(async (run: Run, index: number, kind: Kind): Promise<Blob[]> => {
     const text = STEP_TEXT[run.challenge.steps[index].step] ?? { say: "", cue: "" };
     showStep(run, index, kind);
     let held: Blob[] = [];
-    let started = Date.now();
+    const started = Date.now();
+    let tipsShown = false;
     for (;;) {
       if (run.stopped) throw new LivenessStop(run.stopped);
       const tick = Date.now();
@@ -158,19 +147,20 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
       }
       if (satisfied && blob) {
         held.push(blob);
-        if (held.length >= HOLD_FRAMES) return held;
+        if (held.length >= HOLD_FRAMES) {
+          setHelp(null);
+          return held;
+        }
       } else {
         held = [];
-        if (Date.now() - started > HELP_AFTER_MS) {
-          await askForHelp(run, index, kind);  // resolves on "Try this step again"; rejects on start over / cancel
-          showStep(run, index, kind);
-          started = Date.now();
-          continue;
+        if (!tipsShown && Date.now() - started > HELP_AFTER_MS) {
+          showTips(run, index, kind);
+          tipsShown = true;
         }
       }
       await wait(GUIDE_INTERVAL_MS - (Date.now() - tick));
     }
-  }, [askForHelp, credential, grab, sessionId, showStep]);
+  }, [credential, grab, sessionId, showStep, showTips]);
 
   const finish = () => {
     runRef.current = null;
@@ -211,7 +201,7 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
                    detail: failure.status === 429 ? "Ask the service that sent you for a new link." : failure.message, instructions: [] });
       return;
     }
-    const current: Run = { challenge, baseline: null, stopped: null, help: null, abort: new AbortController() };
+    const current: Run = { challenge, baseline: null, stopped: null, abort: new AbortController() };
     runRef.current = current;
     const stepNames = challenge.steps.map((item) => STEP_TEXT[item.step]?.say ?? item.instruction);
     const frames: Blob[] = [];
@@ -261,7 +251,8 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
     const current = runRef.current;
     if (!current) return;
     current.stopped = reason;
-    closeHelp(reason);
+    current.abort.abort();
+    setHelp(null);
   };
 
   const overlay = running && step ? (
@@ -314,9 +305,8 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
           <ul className="mt-2 list-disc space-y-1 pl-5 font-label text-sm text-accent-900">
             {help.map((tip) => <li key={tip}>{tip}</li>)}
           </ul>
+          <p className="mt-2 font-label text-xs text-accent-800">We're still checking, so keep trying.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={() => closeHelp("retry")}
-                    className="rounded-md bg-primary-500 px-4 py-2 font-label text-sm font-medium text-background-50 hover:bg-primary-600">Try this step again</button>
             <button type="button" onClick={() => stopRun("RESTART")}
                     className="rounded-md border border-background-300 bg-background-50 px-4 py-2 font-label text-sm text-foreground-800 hover:bg-background-100">Start over</button>
           </div>

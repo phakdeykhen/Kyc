@@ -17,8 +17,10 @@ from kyc.domain.enums import CheckResult
 from kyc.liveness.challenge import BASELINE
 from kyc.liveness.geometry import PoseSample, pose
 
-# Expected sign of the pose change for each movement (frames are unmirrored).
-DIRECTIONS = {"TURN_LEFT": ("a", 1), "TURN_RIGHT": ("a", -1), "LOOK_UP": ("b", 1), "LOOK_DOWN": ("b", -1)}
+# Expected sign of the pose change for each movement (frames are unmirrored). The nose tip stands in
+# front of the eye/mouth plane: looking up lifts it toward the eye line (b falls), looking down lowers
+# it toward the mouth (b rises).
+DIRECTIONS = {"TURN_LEFT": ("a", 1), "TURN_RIGHT": ("a", -1), "LOOK_UP": ("b", -1), "LOOK_DOWN": ("b", 1)}
 # What this method can and cannot detect, reported with every result (spec §14 "where supported").
 COVERAGE = {
     "PRINTED_PHOTO": "PARTIAL_GEOMETRY_HEURISTIC",
@@ -33,7 +35,7 @@ COVERAGE = {
 
 @dataclass(frozen=True)
 class ActiveLivenessPolicy:
-    version: str = "ACTIVE-GEOMETRY-2026.10.2"
+    version: str = "ACTIVE-GEOMETRY-2026.10.3"
     calibrated: bool = False
     movement: float = 0.08           # minimum directed change of a/b (≈10° head turn)
     planar_deformation: float = 0.12  # eye/mouth triangle aspect change that should move the nose

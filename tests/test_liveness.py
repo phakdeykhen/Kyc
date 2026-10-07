@@ -24,7 +24,8 @@ from tests.helpers import call, multipart
 from tests.test_biometrics_api import BiometricAPICase, InjectedFaceEngine
 
 HEAD = np.array([(-32, 0, 0), (32, 0, 0), (0, 35, 28), (-24, 70, 4), (24, 70, 4)], float)
-POSES = {"LOOK_STRAIGHT": (0, 0), "TURN_LEFT": (22, 0), "TURN_RIGHT": (-22, 0), "LOOK_UP": (0, 16), "LOOK_DOWN": (0, -16)}
+# Image y points down and +z toward the camera: a negative pitch turns the face up (chin raised).
+POSES = {"LOOK_STRAIGHT": (0, 0), "TURN_LEFT": (22, 0), "TURN_RIGHT": (-22, 0), "LOOK_UP": (0, -16), "LOOK_DOWN": (0, 16)}
 
 
 def rotation(yaw=0.0, pitch=0.0):
@@ -116,8 +117,9 @@ class GeometryTests(unittest.TestCase):
         base = pose(real_head("LOOK_STRAIGHT"))
         self.assertGreater(pose(real_head("TURN_LEFT")).a - base.a, 0.15)
         self.assertLess(pose(real_head("TURN_RIGHT")).a - base.a, -0.15)
-        self.assertGreater(pose(real_head("LOOK_UP")).b - base.b, 0.1)
-        self.assertLess(pose(real_head("LOOK_DOWN")).b - base.b, -0.1)
+        # Looking up lifts the nose tip toward the eye line; looking down drops it toward the mouth.
+        self.assertLess(pose(real_head("LOOK_UP")).b - base.b, -0.1)
+        self.assertGreater(pose(real_head("LOOK_DOWN")).b - base.b, 0.1)
 
     def test_a_tilted_photo_cannot_fake_a_head_turn_even_under_perspective(self):
         base = pose(real_head("LOOK_STRAIGHT"))
@@ -283,8 +285,8 @@ class LivenessAPITests(BiometricAPICase):
     def follow(engine, issued, flat=False):
         frames = [(0, engine.frame(real_head("LOOK_STRAIGHT"))), (0, engine.frame(real_head("LOOK_STRAIGHT", 1)))]
         for item in issued["steps"][1:]:
-            landmarks = flat_photo(*{"TURN_LEFT": (35, 0), "TURN_RIGHT": (-35, 0), "LOOK_UP": (0, 30),
-                                     "LOOK_DOWN": (0, -30)}[item["step"]]) if flat else real_head(item["step"])
+            landmarks = flat_photo(*{"TURN_LEFT": (35, 0), "TURN_RIGHT": (-35, 0), "LOOK_UP": (0, -30),
+                                     "LOOK_DOWN": (0, 30)}[item["step"]]) if flat else real_head(item["step"])
             frames.append((item["index"], engine.frame(landmarks)))
         return frames
 

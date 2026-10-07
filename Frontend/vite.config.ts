@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import AutoImport from "unplugin-auto-import/vite";
 // import { readdyJsxRuntimeProxyPlugin } from "./vite.jsx-runtime-proxy";
@@ -82,6 +83,10 @@ export default defineConfig({
   server: {
     port: 3000,
     host: "0.0.0.0",
+    // Phone cameras need HTTPS. For testing on a phone over Wi-Fi, set DEV_HTTPS_KEY / DEV_HTTPS_CERT.
+    https: process.env.DEV_HTTPS_KEY && process.env.DEV_HTTPS_CERT
+      ? { key: readFileSync(process.env.DEV_HTTPS_KEY), cert: readFileSync(process.env.DEV_HTTPS_CERT) }
+      : undefined,
     // Same-origin API calls in development: /v1 goes to the KYC backend (override with KYC_API_URL).
     proxy: {
       "/v1": { target: process.env.KYC_API_URL || "http://127.0.0.1:8000", changeOrigin: true },
