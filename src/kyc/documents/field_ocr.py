@@ -9,10 +9,10 @@ import statistics
 
 import cv2
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageOps
 
 from kyc.documents import khmer
-from kyc.documents.adapters.khmer_label import LATIN_NAME_LINE, TITLE_CUES, is_mrz_line
+from kyc.documents.adapters.khmer_label import is_mrz_line
 from kyc.domain.identity import OCRLine
 
 Box = tuple[float, float, float, float]
@@ -50,17 +50,6 @@ def field_region(adapter, name: str, lines: list[OCRLine], located: bool) -> tup
         stop = min([stop, *below])
         pad = min(0.012, (y1 - y0) * 0.15)
         return (max(0.0, x0 - 0.008), max(0.0, y0 - pad), min(1.0, x1 + 0.008), min(stop, y1 + pad)), labelled
-    if name == "full_name_local":
-        # The printed Latin line anchors the Khmer row above it when its label was misread.
-        # It supplies coordinates only; its text is never used as the Khmer identity value.
-        headings = tuple(cue for cues in TITLE_CUES.values() for cue in cues) + ("KINGDOM OF CAMBODIA",)
-        latin = next((line for line in visual if LATIN_NAME_LINE.fullmatch(line.text) and len(line.text.split()) >= 2
-                      and not any(cue in line.text for cue in headings)), None)
-        if latin:
-            x0, y0, x1, y1 = latin.bbox
-            height = y1 - y0
-            return (max(0.0, x0 - (x1 - x0) * .65), max(0.0, y0 - height * 1.8),
-                    min(1.0, x1 + (x1 - x0) * .5), max(0.0, y0 - height * .08)), True
     region = adapter.layout.khmer_field_regions.get(name)
     return (region, True) if region and located else None
 
@@ -68,6 +57,8 @@ def field_region(adapter, name: str, lines: list[OCRLine], located: bool) -> tup
 def preprocessing_variants(crop: Image.Image) -> list[tuple[str, Image.Image]]:
     gray = crop.convert("L")
     clahe = Image.fromarray(cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(np.asarray(gray)))
+    # Colored security lines lighten in the maximum channel while dark printed ink stays dark.
+    suppressed = Image.fromarray(np.asarray(crop.convert("RGB")).max(axis=2))
     return [
         ("original", crop),
         ("upscale_2x", crop.resize((crop.width * 2, crop.height * 2), Image.Resampling.LANCZOS)),
@@ -75,10 +66,16 @@ def preprocessing_variants(crop: Image.Image) -> list[tuple[str, Image.Image]]:
         ("clahe", clahe),
         ("mild_sharpen", gray.filter(ImageFilter.UnsharpMask(radius=1, percent=45, threshold=3))),
         ("mild_denoise", gray.filter(ImageFilter.MedianFilter(size=3))),
+        ("color_pattern_suppression", suppressed),
     ]
 
 
 def _value(adapter, name: str, reads: list[OCRLine], labelled: bool) -> str:
+    # Security-pattern noise before a detected label is not part of the value.
+    first_label = next((index for index, line in enumerate(reads)
+                        if any(mark[2] == name for mark in adapter._marks(line))), None)
+    if first_label is not None:
+        reads = reads[first_label:]
     values = []
     started = False
     for line in reads:
@@ -147,6 +144,7 @@ def read_khmer_fields(ocr, image: Image.Image, adapter, lines: list[OCRLine], lo
             continue
         width, height = image.size
         crop = image.crop(tuple(round(value * (width if index % 2 == 0 else height)) for index, value in enumerate(region)))
+        crop = ImageOps.expand(crop, border=8, fill="white")
         candidates = []
         mode = 7 if name == "full_name_local" else 6
         variants = preprocessing_variants(crop)
@@ -158,6 +156,13 @@ def read_khmer_fields(ocr, image: Image.Image, adapter, lines: list[OCRLine], lo
             for variant, source in (variants[0], variants[3]):
                 reads = ocr.read_region(source, (0.0, 0.0, 1.0, 1.0), ("script/Khmer",), mode=mode)
                 candidates.append((f"{variant}/script_Khmer", _value(adapter, name, reads, labelled),
+                                   min((line.confidence for line in reads), default=0.0)))
+        if name == "full_name_local":
+            # Raw-line segmentation handles bold display fonts/security lines that
+            # the normal single-line segmenter can reject as an empty row.
+            for variant, source in (variants[0], variants[5], variants[6]):
+                reads = ocr.read_region(source, (0.0, 0.0, 1.0, 1.0), ("khm",), mode=13)
+                candidates.append((f"raw_line_{variant}/khm", _value(adapter, name, reads, labelled),
                                    min((line.confidence for line in reads), default=0.0)))
         tagged.append(vote_field(name, candidates, region))
     return tagged

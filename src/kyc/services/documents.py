@@ -143,11 +143,18 @@ class DocumentProcessor:
             prepared = normalize(prepared_images[side])
             layout = getattr(adapter, "layout", None)
             viz = layout.viz_regions.get(side) if layout else None
+            if layout and layout.mrz_on_front:
+                viz = layout.viz_regions.get("FRONT")
             languages = self.languages
             if layout and layout.ocr_languages and set(layout.ocr_languages) <= self.ocr.available_languages():
                 languages = layout.ocr_languages  # e.g. Latin-script foreign documents need no Khmer model
             read = (self.ocr.read_region(prepared, viz, languages) if viz and hasattr(self.ocr, "read_region")
                     else self.ocr.read_lines(prepared, languages))
+            if layout and layout.khmer_field_regions and viz and hasattr(self.ocr, "read_region"):
+                # Sparse text localization recovers rows that security patterns hide from block segmentation.
+                seen = {line.text for line in read}
+                read += [line for line in self.ocr.read_region(prepared, viz, languages, mode=11) if line.text not in seen]
+                read.sort(key=lambda line: (line.bbox[1], line.bbox[0]))
             refinement = getattr(adapter, "numeric_refinement", None)
             if refinement and set(refinement.languages) <= self.ocr.available_languages():
                 read = refine_numeric_words(self.ocr, prepared, read, refinement)

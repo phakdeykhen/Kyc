@@ -216,6 +216,8 @@ class CaptureError(BaseModel):
     detail: str
     reason_code: str
     attempts_remaining: int | None = None
+    result: Literal["TECHNICAL_ERROR"] | None = None
+    retry_allowed: bool | None = None
 
 
 class SelfieResponse(BaseModel):

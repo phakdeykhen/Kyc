@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from kyc.api.dependencies import TenantContext
 from kyc.biometrics import FaceEngineUnavailable, InvalidFaceEmbedding, compare_embeddings, serialize_embedding
+from kyc.core.errors import error_response
 from kyc.db.models import (AuditLog, BiometricTemplate, Consent, DocumentCheck, DocumentField, DocumentImage,
                            FaceComparison, FaceQualityCheck, IdentityDocument, KYCSession, MRZResult,
                            Organization, SelfieCapture)
@@ -39,8 +40,7 @@ class SelfieLimits:
 
 
 def _error(code: int, reason: str, detail: str, remaining: int | None = None) -> JSONResponse:
-    return JSONResponse(status_code=code, content={"detail": detail, "reason_code": reason,
-                                                  "attempts_remaining": remaining})
+    return error_response(code, reason, detail, attempts_remaining=remaining)
 
 
 def _audit(db, record, tenant, request_id, action, reasons=(), **metadata):

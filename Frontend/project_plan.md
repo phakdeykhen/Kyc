@@ -6,26 +6,27 @@ verification console where organizations start verification sessions, applicants
 capture their identity documents and a live selfie, and reviewers inspect flagged
 sessions and make decisions.
 
-- **Product positioning:** A KYC console + applicant verification flow that will
-  eventually power document verification, biometrics, liveness, risk scoring and
-  manual review.
+- **Product positioning:** A KYC console and applicant verification flow connected
+  to the project's FastAPI verification, risk and manual-review services.
 - **Target users:** Banks, fintechs, insurance, HR/ERP, telecom, e-commerce, schools
   and developers integrating identity verification via API.
 - **Core value:** One consistent verification experience across Cambodia and
   international documents, with a pluggable document-adapter model for new countries.
 
-> **Scope note (important):** This project is being built as a **front-end product
-> prototype with realistic mock data**. The heavy verification engines described in
-> the original spec (Khmer OCR, MRZ decoding, face embedding/1:1 match, liveness /
-> anti-spoof, ePassport NFC, GCP infrastructure) cannot run inside this platform and
-> are represented as UI flow + simulated results. They are designed to be swapped for
-> real external services later.
+> **Current scope:** The application calls the real KYC API for sessions, captures,
+> OCR, face comparison, guided liveness, results and reviewer decisions. Test doubles
+> belong to automated tests. Face matching and liveness remain uncalibrated, so their
+> results require review. The browser reports NFC as unsupported; native passport
+> readers and production cloud infrastructure remain unfinished. See the
+> [readiness report](../docs/production-readiness-2026-10-07.md).
 
 ## 2. Page Structure
-- `/` — Console dashboard (overview stats + recent verification sessions)
+- `/` — Redirect to `/console` (authenticated overview and recent sessions)
+- `/signin` — Staff reviewer authentication
 - `/verify/new` — Start a new verification (country, document type, level, consent)
-- `/verify/session/:sessionId` — Applicant capture flow (document → selfie → liveness → processing)
-- `/verify/result` — Verification result (document, identity, checks, decision)
+- `/verify/:sessionId` — Applicant capture flow (document → selfie → liveness → processing)
+- `/verify/:sessionId/done` — Applicant completion status
+- `/sessions/:sessionId` — Authorized staff result (document, identity, checks, decision)
 - `/review` — Reviewer queue
 - `/review/:sessionId` — Reviewer session detail + decision
 - `/developers` — API keys, webhooks, document types & countries
@@ -40,11 +41,13 @@ sessions and make decisions.
 - [x] Result view with masked document number, checks and reason codes
 - [x] Reviewer queue with filters (status / document type / priority / search) + session detail with fields, confidence, checks, fraud signals and APPROVE / REJECT / REQUEST_RECAPTURE actions (audited)
 - [x] Multi-tenant API keys, webhook endpoints + deliveries, and document-type/country registry
-- [x] "Simulate poor capture" demo toggle in the capture flow to showcase the recapture / low-quality rejection path
+- [x] Server-authoritative quality feedback and recapture handling
+- [x] Camera cancellation, request timeouts and polling recovery after temporary connection errors
 
 ## 4. Data Model Design
-No database is connected yet — this phase runs on mock data. When a backend
-(Readdy Backend or SaaS Supabase) is connected, the planned tables are:
+The FastAPI backend persists sessions and verification evidence in PostgreSQL with
+tenant policies and Alembic migrations. The table summaries below describe the core
+model; the complete current schema is in `src/kyc/db/models.py` and `migrations/`.
 
 ### Table: kyc_sessions
 | Field | Type | Description |
@@ -88,18 +91,19 @@ No database is connected yet — this phase runs on mock data. When a backend
 > and never exposed in normal API responses.
 
 ## 5. Backend / Third-party Integration Plan
-- **Database:** Not connected now — temporary demo data (mock). Readdy Backend or SaaS Supabase can be connected later for persistence, auth, storage and edge functions.
+- **Database:** PostgreSQL through FastAPI/SQLAlchemy; authentication, scoped credentials, encrypted storage and tenant isolation are implemented in the backend.
 - **Shopify:** Not needed.
 - **Stripe / payments:** Not needed.
 - **Email (Resend):** Not needed yet.
-- **OCR / Biometrics / NFC:** External integration points (not runnable here); simulated in UI.
+- **OCR / Biometrics:** CPU Tesseract/OpenCV engines run in the backend. Accuracy calibration and physical-device validation are outstanding.
+- **NFC:** Server-side passive/active authentication is implemented; native chip-reading clients and governed issuer trust inputs are outstanding.
 
 ## 6. Development Phase Plan
 
 ### Phase 1: Console + Applicant Verification Flow (UI)
 - Goal: Show the core verification experience end-to-end.
 - Deliverable: Console dashboard, New verification setup, document capture, selfie
-  capture, liveness challenge, processing pipeline, and result view — all on mock data.
+  capture, liveness challenge, processing status and result views connected to the KYC API.
 
 ### Phase 2: Reviewer / Manual Review Dashboard
 - Goal: Let reviewers inspect flagged sessions and decide APPROVE / REJECT / REQUEST_RECAPTURE.
@@ -110,7 +114,10 @@ No database is connected yet — this phase runs on mock data. When a backend
 - Goal: Manage API keys, webhook endpoints and document-type / country registry.
 - Deliverable: Developer console pages with API key management and webhook settings.
 
-### Phase 4: Persistence & Real Integrations
-- Goal: Persist sessions/documents and wire real services.
-- Deliverable: Backend connection, KYC tables, storage for captures, and adapter
-  interface for external OCR / biometrics / NFC providers.
+### Phase 4: Production Validation and Remaining Integrations
+- Persistence, encrypted capture storage and document-adapter interfaces are implemented.
+- Remaining work: single-use mobile handoff/device binding, server-driven challenge-step
+  disclosure, native NFC readers, signed result envelopes, cloud KMS/operations, labelled
+  OCR and biometric calibration, and physical iPhone/Android validation.
+- Release evidence and limitations are tracked in the
+  [correctness review](../docs/kyc-review-2026-10-07.md).

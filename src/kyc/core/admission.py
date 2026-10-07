@@ -67,7 +67,7 @@ class AdmissionControl:
     async def _busy(send) -> None:
         request_id = str(uuid4())
         body = json.dumps({"detail": "The service is busy; retry shortly.", "reason_code": "OVERLOADED",
-                           "request_id": request_id}).encode()
+                           "request_id": request_id, "result": "TECHNICAL_ERROR", "retry_allowed": True}).encode()
         headers = [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode()),
                    (b"retry-after", b"1"), (b"cache-control", b"no-store"), (b"x-content-type-options", b"nosniff"),
                    (b"x-request-id", request_id.encode()),

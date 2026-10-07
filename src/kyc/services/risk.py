@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from kyc.api.dependencies import TenantContext
 from kyc.api.schemas import VerifyResponse
+from kyc.core.errors import error_response
 from kyc.db.models import AuditLog, BarcodeResult, KYCSession, RiskAssessmentRecord
 from kyc.db.session import set_tenant
 from kyc.domain.enums import RiskDecision, SessionStatus
@@ -115,7 +116,7 @@ def authenticity_sources(db: Session, record: KYCSession, checks: dict, coverage
 
 
 def _error(code: int, reason: str, detail: str) -> JSONResponse:
-    return JSONResponse(status_code=code, content={"detail": detail, "reason_code": reason, "attempts_remaining": None})
+    return error_response(code, reason, detail, attempts_remaining=None)
 
 
 def verify_session(db: Session, tenant: TenantContext, record: KYCSession, assessor: SessionAssessor,

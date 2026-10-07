@@ -40,9 +40,11 @@ LAYOUT = CardLayout(
     mrz_regions={"FRONT": (0.0, 0.62, 1.0, 1.0)},
     mrz_document_code="ID",
     mrz_issuing_state="KHM",
+    # Locate labels in the printed visual zone, away from portrait and MRZ interference.
+    viz_regions={"FRONT": (0.24, 0.015, 0.99, 0.65)},
     portrait_regions={"FRONT": (0.0, 0.15, 0.27, 0.83)},
     # Fallback bands on a rectified portrait side. Detected labels/word boxes take priority.
-    khmer_field_regions={"full_name_local": (0.26, 0.07, 0.98, 0.20),
+    khmer_field_regions={"full_name_local": (0.23, 0.055, 0.98, 0.155),
                          "place_of_birth": (0.26, 0.26, 0.98, 0.37),
                          "address": (0.26, 0.36, 0.98, 0.56)},
 )

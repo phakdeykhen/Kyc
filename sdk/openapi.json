@@ -574,6 +574,29 @@
           "reason_code": {
             "title": "Reason Code",
             "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "const": "TECHNICAL_ERROR",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "retry_allowed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Allowed"
           }
         },
         "required": [
@@ -3919,6 +3942,16 @@
             "description": "Face models unavailable."
           }
         },
+        "security": [
+          {
+            "ApiKey": [],
+            "Organization": []
+          },
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
         "summary": "Guide Liveness"
       }
     },
@@ -4032,6 +4065,16 @@
             "description": "Face models unavailable."
           }
         },
+        "security": [
+          {
+            "ApiKey": [],
+            "Organization": []
+          },
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
         "summary": "Position Liveness"
       }
     },

@@ -17,7 +17,8 @@ from kyc.services.government import build_government_verification
 NFC_CHECK = {"NFC_VERIFIED": "PASS", "NFC_READ": "REVIEW", "NFC_FAILED": "FAIL", "NFC_NOT_AVAILABLE": "REVIEW",
              "NFC_NOT_SUPPORTED": "NOT_APPLICABLE"}
 
-SEVERITY = {CheckResult.FAIL: 3, CheckResult.REVIEW: 2, CheckResult.PASS: 1, CheckResult.NOT_APPLICABLE: 0}
+SEVERITY = {CheckResult.FAIL: 3, CheckResult.REVIEW: 2, CheckResult.UNAVAILABLE: 2,
+            CheckResult.PASS: 1, CheckResult.NOT_APPLICABLE: 0}
 CHECK_GROUPS = {"CLASSIFICATION": "document_classification", "EXPIRY": "expiry", "MRZ": "mrz", "PORTRAIT": "document_portrait",
                 "MRZ_CONSISTENCY": "mrz_consistency", "BARCODE": "barcode", "ISSUING_COUNTRY": "issuing_country",
                 "CROSS_CHECK": "cross_check", "FRAUD_ANALYSIS": "fraud"}
@@ -70,7 +71,7 @@ def collect_evidence(db: Session, record: KYCSession) -> Evidence:
         quality = db.scalar(query.order_by(FaceQualityCheck.created_at.desc()).limit(1))
         if quality is not None:
             checks[key] = quality.result.value
-            if quality.result in (CheckResult.REVIEW, CheckResult.FAIL):
+            if quality.result in (CheckResult.REVIEW, CheckResult.FAIL, CheckResult.UNAVAILABLE):
                 flags.extend(quality.evidence_metadata.get("reason_codes", []))
                 unverified_codes = {"EYES_VISIBLE": "FACE_EYE_VISIBILITY_UNVERIFIED",
                                     "SEVERE_OCCLUSION": "FACE_OCCLUSION_UNVERIFIED"}
@@ -107,6 +108,7 @@ def collect_evidence(db: Session, record: KYCSession) -> Evidence:
         .join(live, FaceComparison.live_template_id == live.id).where(
             FaceComparison.organization_id == record.organization_id, FaceComparison.session_id == record.id,
             reference.organization_id == record.organization_id, live.organization_id == record.organization_id,
+            reference.source == "DOCUMENT_PORTRAIT",
             reference.delete_after > now, live.delete_after > now)
         .order_by(FaceComparison.created_at.desc()).limit(1))
     summary = None
@@ -140,7 +142,7 @@ def collect_evidence(db: Session, record: KYCSession) -> Evidence:
                 checks[CHECK_GROUPS[row.check_type]] = row.result.value
             if row.check_type in DATA_CHECKS and (data_result is None or SEVERITY.get(row.result, 0) > SEVERITY.get(data_result, 0)):
                 data_result = row.result
-            if row.result in (CheckResult.REVIEW, CheckResult.FAIL):
+            if row.result in (CheckResult.REVIEW, CheckResult.FAIL, CheckResult.UNAVAILABLE):
                 flags.extend(row.evidence_metadata.get("reason_codes", []))
         if data_result is not None:
             checks["document_data"] = data_result.value

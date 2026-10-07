@@ -210,6 +210,8 @@ class HTTPHardeningTests(TenantCase):
         body = json.loads(b"".join(message.get("body", b"") for message in sent if message["type"] == "http.response.body"))
         self.assertEqual(start["status"], 500)
         self.assertEqual(body["detail"], "Internal server error.")
+        self.assertEqual((body["result"], body["reason_code"], body["retry_allowed"]),
+                         ("TECHNICAL_ERROR", "INTERNAL_ERROR", True))
         self.assertNotIn(secret, json.dumps(body))
         formatted = JSONFormatter().format(logs.records[0])
         self.assertIn("RuntimeError", formatted)
@@ -225,6 +227,8 @@ class HTTPHardeningTests(TenantCase):
         with self.assertLogs("kyc.api", logging.ERROR) as logs:
             code, body, headers = await call(self.app, "/v1/database-failure")
         self.assertEqual((code, body["detail"]), (503, "Database unavailable."))
+        self.assertEqual((body["result"], body["reason_code"], body["retry_allowed"]),
+                         ("TECHNICAL_ERROR", "DATABASE_UNAVAILABLE", True))
         self.assertEqual(headers["cache-control"], "no-store")
         output = "\n".join(JSONFormatter().format(record) for record in logs.records)
         self.assertIn("StatementError", output)

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 import unittest
 
 from kyc.core.crypto import FieldCipher
+from kyc.biometrics.types import FaceMatchPolicy
 from kyc.db.models import BiometricTemplate, DocumentField, FaceComparison, IdentityDocument, KYCSession, NFCChallenge, NFCResult
 from kyc.domain.enums import NFCStatus
 from kyc.nfc import active_auth
@@ -178,6 +179,24 @@ class NFCAPICase(BiometricAPICase):
 
 
 class NFCAPITests(NFCAPICase):
+    async def test_chip_face_match_cannot_hide_a_document_portrait_mismatch(self):
+        session_id = await self.at_nfc()
+        self.app.state.face_match_policy = FaceMatchPolicy(calibrated=True, version="CALIBRATED-TEST-v1")
+        with Session(self.engine) as db, db.begin():
+            comparison = db.scalar(sa.select(FaceComparison))
+            comparison.result, comparison.comparison_score = "FAIL", 0.1
+            comparison.evidence_metadata = {"calibrated": True, "reason_codes": ["FACE_MATCH_BELOW_THRESHOLD"]}
+        code, body, _ = await self.send(session_id)
+        self.assertEqual(code, 200, body)
+        self.assertEqual(body["chip_face_match"]["result"], "PASS")
+        code, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual(code, 200, result)
+        self.assertEqual(result["checks"]["face_match"], "FAIL")
+        self.assertEqual(result["checks"]["chip_face_match"], "PASS")
+        self.assertEqual(result["face_comparison"]["score"], 0.1)
+        self.assertEqual(result["decision"]["result"], "FAIL")
+        self.assertIn("FACE_MISMATCH", result["decision"]["reason_codes"])
+
     async def test_genuine_chip_is_verified_matched_and_never_stored(self):
         session_id = await self.at_nfc()
         code, issued, _ = await self.challenge(session_id)

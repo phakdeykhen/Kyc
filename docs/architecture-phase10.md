@@ -13,8 +13,8 @@ SFace templates). No trained presentation-attack model is assumed.
 ```
 LIVENESS_REQUIRED
   → POST /v1/kyc/{id}/liveness/challenge   random sequence + 256-bit nonce, 120 s, single use
-  → client shows each instruction, captures 1–3 raw frames per step
-  → POST /v1/kyc/{id}/liveness             challenge_id, nonce, frame_steps, 4–12 frames
+  → client shows each instruction, captures 2–3 raw frames per step
+  → POST /v1/kyc/{id}/liveness             challenge_id, nonce, frame_steps, 8–12 frames
   → geometry · replay · identity continuity (frames assessed in memory, never stored)
   → retry (same state, new challenge)  or  final PASS/REVIEW/FAIL → LIVENESS_ACCEPTED → PROCESSING/NFC_REQUIRED
 ```
@@ -24,7 +24,8 @@ LIVENESS_REQUIRED
 `LOOK_STRAIGHT` followed by three distinct moves from TURN_LEFT/TURN_RIGHT/LOOK_UP/LOOK_DOWN,
 in random order (24 sequences), drawn with `secrets.SystemRandom`. Only the nonce's
 SHA-256 is stored. A challenge is refused if its nonce is wrong, if it has been used
-(it is consumed on first submission, whatever the outcome), or if it has expired.
+for an assessment, or if it has expired. Model/reference/storage unavailability
+leaves the challenge open for retry within its original TTL; it does not extend that TTL.
 Issuing a new challenge voids older unused ones. Blinking is not used.
 
 ### The 3D geometry test
@@ -42,7 +43,8 @@ looking up/down changes `b`; the centred frame keeps the two nearly independent.
 | flat photo tilted 35° (close, perspective) | +0.032 | 0.00 | −18 % |
 | flat photo tilted 45° at 30 cm | +0.053 | −0.006 | −29 % |
 
-* A step is completed when its frames move the right coordinate by at least the policy
+* Frames must remain in step order, and a movement needs at least two consecutive
+  qualifying frames. A step is completed when its frames move the right coordinate by at least the policy
   movement (a ~10° turn) in the right direction. Frames must be raw, unmirrored camera frames.
 * A **flat-geometry finding** is a frame whose eye/mouth triangle deformed strongly
   while the nose's relative coordinates barely changed. Expression, perspective and
@@ -53,14 +55,20 @@ looking up/down changes `b`; the centred frame keeps the two nearly independent.
   behavior, which requires validation on genuine users and attack media.
 * The same image submitted for every step is FAIL, `STATIC_REPLAY`.
 * **Identity continuity.** Every frame is embedded and compared with the session's
-  encrypted selfie template. A frame below the face-match fail boundary gives REVIEW,
+  unexpired encrypted selfie template. A frame below the face-match pass boundary gives REVIEW,
   `POSSIBLE_FACE_SWAP`.
+* **Final face comparison.** For a completed challenge with sufficient continuity,
+  select the best accepted frontal baseline frame by its weakest quality measurement,
+  then the sum of its measurements. The React client captures these frames after
+  issuance. Store only its encrypted embedding and quality/provenance, and compare
+  it with the current unexpired document portrait. The original consented selfie
+  remains the continuity reference. Raw liveness frames are discarded.
 * A missing baseline, more than one face, or uncompleted moves are **retryable**: the
   session stays in `LIVENESS_REQUIRED`, and attempts are limited (`MAX_LIVENESS_ATTEMPTS`).
 
 ### Results and honesty
 
-* `ACTIVE-GEOMETRY-2026.10.2` is **uncalibrated**. A completed challenge returns REVIEW
+* `ACTIVE-GEOMETRY-2026.10.5` is **uncalibrated**. A completed challenge returns REVIEW
   (`UNCALIBRATED_LIVENESS_POLICY`) until the policy is validated on presentation-attack
   data and `LIVENESS_CALIBRATED=true`. Uncertain flat geometry also requires REVIEW;
   byte-identical replay still returns FAIL.
@@ -105,7 +113,8 @@ requests/phase10.postman.json     + challenge and frame requests
 ## 4. Security concerns and limits
 
 * **Frames are biometric data.** They are held only in request memory and never written
-  to storage. Evidence keeps outcomes, measurements and the nonce hash.
+  to storage. Evidence keeps outcomes, measurements and the nonce hash; the best
+  accepted frontal frame can supply an encrypted template with the existing retention deadline.
 * **Injection.** The server cannot attest the camera. A virtual camera driven in real
   time by an attacker who reproduces 3D motion (e.g. a deep-fake puppet) is not
   defeated. Mitigating that needs device attestation or a certified passive model.

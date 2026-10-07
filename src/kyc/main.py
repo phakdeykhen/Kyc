@@ -11,6 +11,7 @@ from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.formparsers import MultiPartParser
+from starlette.exceptions import HTTPException as StarletteHTTPException
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 
@@ -22,6 +23,7 @@ from kyc.api.webhook_routes import router as webhook_router
 from kyc.biometrics import FaceMatchPolicy, OpenCVFaceEngine
 from kyc.core.admission import AdmissionControl
 from kyc.core.config import Settings, get_settings
+from kyc.core.errors import error_response
 from kyc.core.hardening import allowed_host_list
 from kyc.core.observability import configure_logging, route_label, security_event
 from kyc.db.session import build_engine
@@ -46,6 +48,7 @@ from kyc.webhooks.secrets import build_webhook_cipher
 UPLOAD_PATH = re.compile(r"^/v1/kyc/[^/]+/documents(/front|/back)?$")
 SELFIE_PATH = re.compile(r"^/v1/kyc/[^/]+/selfie$")
 LIVENESS_PATH = re.compile(r"^/v1/kyc/[^/]+/liveness$")
+LIVENESS_FEEDBACK_PATH = re.compile(r"^/v1/kyc/[^/]+/liveness/(position|guide)$")
 NFC_PATH = re.compile(r"^/v1/kyc/[^/]+/nfc$")
 JSON_BODY_LIMIT = 64 * 1024
 MULTIPART_OVERHEAD = 256 * 1024
@@ -208,6 +211,10 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
                 limit = request.app.state.settings.max_selfie_bytes + MULTIPART_OVERHEAD
             elif LIVENESS_PATH.match(request.url.path):
                 limit = request.app.state.settings.max_liveness_bytes + MULTIPART_OVERHEAD
+            elif feedback := LIVENESS_FEEDBACK_PATH.match(request.url.path):
+                settings_now = request.app.state.settings
+                frame_limit = min(settings_now.max_selfie_bytes, settings_now.max_liveness_bytes)
+                limit = frame_limit * (2 if feedback[1] == "guide" else 1) + MULTIPART_OVERHEAD
             elif NFC_PATH.match(request.url.path):
                 limit = request.app.state.settings.max_nfc_bytes + MULTIPART_OVERHEAD
             else:
@@ -257,7 +264,15 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
     async def database_unavailable(request: Request, error: sa.exc.SQLAlchemyError):
         log.error("database error %s on %s", type(error).__name__, route_label(request),
                   extra={"request_id": str(getattr(request.state, "request_id", ""))})
-        return JSONResponse(status_code=503, content={"detail": "Database unavailable.", "request_id": str(request.state.request_id)})
+        return error_response(503, "DATABASE_UNAVAILABLE", "Database unavailable.",
+                              request_id=str(request.state.request_id))
+
+    @application.exception_handler(StarletteHTTPException)
+    async def http_error(request: Request, error: StarletteHTTPException):
+        if error.status_code >= 500:
+            return error_response(error.status_code, "SERVICE_UNAVAILABLE", str(error.detail), headers=error.headers,
+                                  request_id=str(request.state.request_id))
+        return JSONResponse(status_code=error.status_code, content={"detail": error.detail}, headers=error.headers)
 
     @application.exception_handler(Exception)
     async def unexpected_error(request: Request, error: Exception):
@@ -265,7 +280,8 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
         request_id = str(getattr(request.state, "request_id", "") or uuid4())
         request.state.request_id = request_id
         log.exception("unhandled %s on %s request_id=%s", type(error).__name__, route_label(request), request_id)
-        return apply_security_headers(JSONResponse(status_code=500, content={"detail": "Internal server error.", "request_id": request_id}), request)
+        return apply_security_headers(error_response(500, "INTERNAL_ERROR", "Internal server error.",
+                                                     request_id=request_id), request)
 
     def require_docs(request: Request) -> None:
         if not request.app.state.settings.expose_api_docs:

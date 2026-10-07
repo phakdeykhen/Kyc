@@ -37,8 +37,8 @@ class DecodedCapture:
 
 @dataclass(frozen=True)
 class DocumentQualityPolicy:
-    # 2026.10.2: an image already cropped to the document (uploads, scanner apps) is accepted.
-    version: str = "DOC-CAPTURE-HEURISTIC-2026.10.2"
+    # 2026.10.3: reject whole-camera-frame quadrilaterals and recover paper boundaries.
+    version: str = "DOC-CAPTURE-HEURISTIC-2026.10.3"
     calibrated: bool = False
     analysis_long_side: int = 400
     detail_long_side: int = 1000
@@ -205,6 +205,15 @@ class HeuristicDocumentQualityEngine:
                 instructions.append(instruction)
 
         document = self._locate(small)
+        if not self._precropped(height, width, document, expected_aspect) and (
+                document is None or not self._usable_corners(document, expected_aspect)):
+            recovered = self._edge_corners(small.astype(np.uint8), expected_aspect)
+            if recovered is not None:
+                touches = sum((recovered[:, 0].min() <= 1, recovered[:, 1].min() <= 1,
+                               recovered[:, 0].max() >= small.shape[1] - 2,
+                               recovered[:, 1].max() >= small.shape[0] - 2))
+                document = (recovered, _shoelace(recovered) / (small.shape[0] * small.shape[1]),
+                            int(touches), bool(document and document[3]))
         geometry: dict = {"document_detected": document is not None}
         scores = dict.fromkeys(SCORE_NAMES, 0.0)
         precropped = self._precropped(height, width, document, expected_aspect)
@@ -322,17 +331,19 @@ class HeuristicDocumentQualityEngine:
             return np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype=np.float32)
         if found is None:
             return self._edge_corners(pixels, expected_aspect) if expected_aspect is not None else None
-        if expected_aspect is not None:
-            corners = found[0]
-            top, right, bottom, left = [float(np.linalg.norm(corners[(i + 1) % 4] - corners[i])) for i in range(4)]
-            horizontal, vertical = (top + bottom) / 2, (left + right) / 2
-            aspect = max(horizontal, vertical) / max(1e-6, min(horizontal, vertical))
-            if abs(aspect / expected_aspect - 1) > self.policy.aspect_tolerance:
-                # Printed ink/portraits on a light scanner crop can be the foreground component.
-                # Warping that component as a card discards fields and destroys glyph proportions.
-                return self._edge_corners(pixels, expected_aspect)
+        if expected_aspect is not None and not self._usable_corners(found, expected_aspect):
+            # A camera frame or printed ink region is not the card boundary.
+            return self._edge_corners(pixels, expected_aspect)
         factor = max(pixels.shape[:2]) / max(small.shape[:2])
         return found[0] * factor
+
+    def _usable_corners(self, document, expected_aspect: float) -> bool:
+        corners, _, touches, _ = document
+        top, right, bottom, left = [float(np.linalg.norm(corners[(i + 1) % 4] - corners[i])) for i in range(4)]
+        horizontal, vertical = (top + bottom) / 2, (left + right) / 2
+        aspect = max(horizontal, vertical) / max(1e-6, min(horizontal, vertical))
+        tolerance = self.policy.precrop_aspect_tolerance if touches == 4 else self.policy.aspect_tolerance
+        return abs(aspect / expected_aspect - 1) <= tolerance
 
     def _edge_corners(self, pixels: np.ndarray, expected_aspect: float) -> np.ndarray | None:
         """Geometry fallback for complex phone backgrounds and cropped scanner images.
@@ -345,6 +356,39 @@ class HeuristicDocumentQualityEngine:
         edges = cv2.Canny(cv2.GaussianBlur(gray, (5, 5), 0), 40, 120)
         edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
         contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        contours = list(contours)
+        # Hands and patterned desks can connect to the border. A light, neutral/warm
+        # paper seed lets GrabCut recover the card without treating the whole photo
+        # as the document. Shape/coverage checks below still apply to every candidate.
+        hsv = cv2.cvtColor(small, cv2.COLOR_RGB2HSV)
+        paper = (((hsv[..., 0] >= 15) & (hsv[..., 0] <= 95) & (hsv[..., 1] < 100)
+                  & (hsv[..., 2] > 65)).astype(np.uint8) * 255)
+        paper = cv2.morphologyEx(paper, cv2.MORPH_CLOSE, np.ones((11, 11), np.uint8))
+        seeds, _ = cv2.findContours(paper, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for seed in sorted(seeds, key=cv2.contourArea, reverse=True)[:2]:
+            if cv2.contourArea(cv2.convexHull(seed)) < self.policy.min_coverage * paper.size:
+                continue
+            x, y, w, h = cv2.boundingRect(seed)
+            mask = np.zeros(paper.shape, np.uint8)
+            x0, x1 = max(0, x - round(w * .1)), min(small.shape[1], x + w + round(w * .1))
+            y0, y1 = max(0, y - round(h * .15)), min(small.shape[0], y + h + round(h * .15))
+            if x0 == 0 and y0 == 0 and x1 == small.shape[1] and y1 == small.shape[0]:
+                continue  # GrabCut needs actual background samples.
+            mask[y0:y1, x0:x1] = cv2.GC_PR_BGD
+            hull = np.zeros(paper.shape, np.uint8)
+            cv2.drawContours(hull, [cv2.convexHull(seed)], -1, 255, -1)
+            mask[hull > 0] = cv2.GC_PR_FGD
+            core = cv2.erode(hull & paper, np.ones((11, 11), np.uint8))
+            if not np.any(core):
+                continue
+            mask[core > 0] = cv2.GC_FGD
+            try:
+                cv2.grabCut(small, mask, None, np.zeros((1, 65)), np.zeros((1, 65)), 3, cv2.GC_INIT_WITH_MASK)
+            except cv2.error:
+                continue
+            foreground = np.isin(mask, [cv2.GC_FGD, cv2.GC_PR_FGD]).astype(np.uint8)
+            recovered, _ = cv2.findContours(foreground, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours.extend(cv2.convexHull(contour) for contour in recovered)
         candidates = []
         image_area = small.shape[0] * small.shape[1]
         for contour in contours:
@@ -359,6 +403,10 @@ class HeuristicDocumentQualityEngine:
             corners = np.array([points[sums.argmin()], points[differences.argmax()],
                                 points[sums.argmax()], points[differences.argmin()]])
             if len(np.unique(corners, axis=0)) != 4:
+                continue
+            touches = sum((corners[:, 0].min() <= 1, corners[:, 1].min() <= 1,
+                           corners[:, 0].max() >= small.shape[1] - 2, corners[:, 1].max() >= small.shape[0] - 2))
+            if not self._usable_corners((corners, area / image_area, touches, False), expected_aspect):
                 continue
             top, right, bottom, left = [float(np.linalg.norm(corners[(i + 1) % 4] - corners[i])) for i in range(4)]
             horizontal, vertical = (top + bottom) / 2, (left + right) / 2
@@ -390,7 +438,9 @@ class HeuristicDocumentQualityEngine:
         vertical = (np.linalg.norm(corners[3] - corners[0]) + np.linalg.norm(corners[2] - corners[1])) / 2
         aspect = max(horizontal, vertical) / max(1e-6, min(horizontal, vertical))
         framed_card = coverage >= p.min_coverage and abs(aspect / expected_aspect - 1) <= p.aspect_tolerance
-        return not framed_card and not sides_touched
+        # On an exact card-shaped scanner crop, foreground ink may itself touch
+        # an edge. That must not cause a stretch of the ink block into a new card.
+        return not framed_card
 
     def _locate(self, small: np.ndarray):
         """Largest foreground region that contrasts with the frame border, as a quadrilateral."""

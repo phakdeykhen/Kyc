@@ -12,6 +12,7 @@ import hashlib
 import hmac
 from uuid import UUID, uuid4
 
+from cryptography.exceptions import InvalidTag
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 from PIL import Image
@@ -19,17 +20,19 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from kyc.api.dependencies import TenantContext
-from kyc.biometrics.embeddings import deserialize_embedding
-from kyc.biometrics.types import FaceEngineUnavailable
+from kyc.biometrics.embeddings import compare_embeddings, deserialize_embedding, serialize_embedding
+from kyc.biometrics.types import FaceEngineUnavailable, InvalidFaceEmbedding
 from kyc.biometrics.quality import assess_face_quality
-from kyc.db.models import AuditLog, BiometricTemplate, KYCSession, LivenessChallenge, LivenessCheck
+from kyc.core.errors import error_response
+from kyc.db.models import (AuditLog, BiometricTemplate, FaceComparison, FaceQualityCheck, IdentityDocument,
+                           KYCSession, LivenessChallenge, LivenessCheck, Organization)
 from kyc.domain.enums import CheckResult, SessionStatus, VerificationLevel
 from kyc.domain.state_machine import Event
 from kyc.engines.capture_quality import CaptureRejected, decode_capture
 from kyc.liveness import challenge as challenges
 from kyc.liveness.active import COVERAGE, ActiveLivenessPolicy, assess, guide
 from kyc.liveness.geometry import pose
-from kyc.services.biometrics import _template_context
+from kyc.services.biometrics import _quality_metadata, _template_context
 from kyc.services.sessions import apply_event, aware, is_expired
 
 METHOD = "ACTIVE_LIVENESS"
@@ -46,7 +49,7 @@ class LivenessLimits:
 
 
 def _error(code: int, reason: str, detail: str, remaining: int | None = None) -> JSONResponse:
-    return JSONResponse(status_code=code, content={"detail": detail, "reason_code": reason, "attempts_remaining": remaining})
+    return error_response(code, reason, detail, attempts_remaining=remaining)
 
 
 def _audit(db, record, tenant, request_id, action, reasons=(), **metadata):
@@ -99,8 +102,10 @@ def issue_challenge(db: Session, tenant: TenantContext, session_id: UUID, limits
     return {"session_id": record.id, "challenge_id": item.id, "nonce": issued.nonce,
             "steps": [{"index": index, "step": step, "instruction": challenges.INSTRUCTIONS[step]}
                       for index, step in enumerate(issued.steps)],
-            "expires_at": item.expires_at, "frames": {"min": policy.min_frames, "max": policy.max_frames,
-                                                      "per_step": "1-3 frames, tagged with the step index"},
+            "expires_at": item.expires_at,
+            "frames": {"min": max(policy.min_frames, len(item.steps) * policy.stable_frames_per_step),
+                       "max": policy.max_frames,
+                       "per_step": f"{policy.stable_frames_per_step}-3 frames, tagged with the step index"},
             "attempts_remaining": limits.max_attempts - attempts - 1}
 
 
@@ -198,15 +203,72 @@ def guide_step(db: Session, tenant: TenantContext, session_id: UUID, challenge_i
     return {"step": step, "face": face, "state": advice.state, "progress": advice.progress}
 
 
-def _selfie_reference(db, record, cipher):
-    template = db.scalar(sa.select(BiometricTemplate).where(
+def _selfie_template(db, record):
+    return db.scalar(sa.select(BiometricTemplate).where(
         BiometricTemplate.organization_id == record.organization_id, BiometricTemplate.session_id == record.id,
-        BiometricTemplate.source == "LIVE_SELFIE").order_by(BiometricTemplate.created_at.desc()).limit(1))
+        BiometricTemplate.source == "LIVE_SELFIE", BiometricTemplate.delete_after > datetime.now(timezone.utc))
+        .order_by(BiometricTemplate.created_at.desc()).limit(1))
+
+
+def _selfie_reference(db, record, cipher):
+    template = _selfie_template(db, record)
     if template is None or cipher is None:
         return None
     payload = cipher.open(template.template_ciphertext, template.key_version,
                           _template_context(record, template.id, "LIVE_SELFIE", template))
     return deserialize_embedding(payload)
+
+
+def _record_live_face(db, record, tenant, request_id, item, outcome, cipher, match_policy):
+    """Compare the best accepted challenge frame to the current encrypted document portrait.
+
+    Retain an encrypted embedding and quality/provenance only; the image stays in memory.
+    All preparation finishes before any rows are added, so failures leave no partial evidence.
+    """
+    now = datetime.now(timezone.utc)
+    portrait = db.scalar(sa.select(BiometricTemplate).join(IdentityDocument, sa.and_(
+        BiometricTemplate.document_id == IdentityDocument.id,
+        BiometricTemplate.organization_id == IdentityDocument.organization_id,
+        BiometricTemplate.session_id == IdentityDocument.session_id)).where(
+        BiometricTemplate.organization_id == record.organization_id, BiometricTemplate.session_id == record.id,
+        BiometricTemplate.source == "DOCUMENT_PORTRAIT", BiometricTemplate.delete_after > now,
+        IdentityDocument.processed_at.is_not(None), IdentityDocument.delete_after > now,
+        BiometricTemplate.created_at >= IdentityDocument.processed_at)
+        .order_by(BiometricTemplate.created_at.desc()).limit(1))
+    selfie = _selfie_template(db, record)
+    if portrait is None or selfie is None or cipher is None:
+        return "REFERENCE_FACE_UNAVAILABLE"
+    live = outcome.live_embedding
+    quality = outcome.live_quality
+    payload = cipher.open(portrait.template_ciphertext, portrait.key_version,
+                          _template_context(record, portrait.id, "DOCUMENT_PORTRAIT", portrait))
+    comparison = compare_embeddings(deserialize_embedding(payload), live, match_policy)
+    template_id = uuid4()
+    sealed, key = cipher.seal(serialize_embedding(live), _template_context(record, template_id, "LIVE_SELFIE", live))
+    organization = db.get(Organization, record.organization_id)
+    delete_after = min(now + timedelta(hours=organization.template_retention_hours),
+                       aware(portrait.delete_after), aware(selfie.delete_after))
+    provenance = {"live_capture_method": METHOD, "challenge_id": str(item.id),
+                  "selected_frame_index": outcome.metrics["selected_frame_index"],
+                  "frame_selection_policy": outcome.metrics["frame_selection_policy"]}
+    db.add(BiometricTemplate(id=template_id, organization_id=record.organization_id, session_id=record.id,
+        source="LIVE_SELFIE", model_name=live.model_name, model_version=live.model_version,
+        model_sha256=live.model_sha256, embedding_dimension=live.dimension, template_ciphertext=sealed,
+        key_version=key, delete_after=delete_after, created_at=now))
+    db.flush()
+    db.add(FaceQualityCheck(organization_id=record.organization_id, session_id=record.id, source="LIVE_SELFIE",
+        result=CheckResult.REVIEW if quality.unverified_checks else CheckResult.PASS, delete_after=delete_after,
+        evidence_metadata={"outcome": "ACCEPTED", **_quality_metadata(quality), **provenance}, created_at=now))
+    db.add(FaceComparison(organization_id=record.organization_id, session_id=record.id,
+        reference_template_id=portrait.id, live_template_id=template_id, model_name=comparison.model_name,
+        model_version=comparison.model_version, model_sha256=comparison.model_sha256,
+        threshold_policy_version=comparison.threshold_policy_version, comparison_score=comparison.score,
+        comparison_metric=comparison.metric, result=comparison.decision, created_at=now,
+        evidence_metadata={"reason_codes": list(comparison.reason_codes), "calibrated": comparison.calibrated,
+                           "calibration_reference": match_policy.calibration_reference, **provenance}))
+    _audit(db, record, tenant, request_id, "LIVENESS_FACE_COMPARISON_RECORDED", comparison.reason_codes,
+           result=comparison.decision, policy_version=comparison.threshold_policy_version, **provenance)
+    return None
 
 
 def submit_liveness(db: Session, tenant: TenantContext, session_id: UUID, challenge_id: UUID, nonce: str,
@@ -226,7 +288,7 @@ def submit_liveness(db: Session, tenant: TenantContext, session_id: UUID, challe
     if item.used_at is not None:
         _audit(db, record, tenant, request_id, "LIVENESS_CHALLENGE_REJECTED", ("CHALLENGE_ALREADY_USED",))
         return _error(409, "CHALLENGE_ALREADY_USED", "This challenge was already used. Request a new one.", remaining)
-    item.used_at = now  # single use, whatever the outcome
+    item.used_at = now  # Single use for evidence outcomes; technical failures below remain retryable.
     if aware(item.expires_at) <= now:
         _audit(db, record, tenant, request_id, "LIVENESS_CHALLENGE_REJECTED", ("CHALLENGE_EXPIRED",))
         return _error(409, "CHALLENGE_EXPIRED", "The challenge expired. Request a new one.", remaining)
@@ -234,6 +296,7 @@ def submit_liveness(db: Session, tenant: TenantContext, session_id: UUID, challe
         return _error(422, "FRAME_STEPS_MISMATCH", "Give one step index per frame.", remaining)
     reason = engine.unavailable_reason() if engine is not None else "FACE_MODELS_UNAVAILABLE"
     if reason:
+        item.used_at = None  # Technical unavailability can be retried within this challenge's TTL.
         _audit(db, record, tenant, request_id, "LIVENESS_UNAVAILABLE", (reason,))
         return _error(503, reason, "Liveness checking is unavailable. Retry later.", remaining)
 
@@ -246,9 +309,30 @@ def submit_liveness(db: Session, tenant: TenantContext, session_id: UUID, challe
         decoded.append((index, Image.fromarray(capture.pixels), hashlib.sha256(data).hexdigest()))
     try:
         reference = _selfie_reference(db, record, cipher)
+    except (InvalidFaceEmbedding, InvalidTag, ValueError):
+        item.used_at = None
+        return _error(503, "BIOMETRIC_REFERENCE_UNAVAILABLE", "The biometric reference is unavailable. Retry later.", remaining)
+    try:
         outcome = assess(decoded, tuple(item.steps), engine, reference, match_policy, policy)
-    except FaceEngineUnavailable:
-        return _error(503, "FACE_MODELS_UNAVAILABLE", "Liveness checking is unavailable. Retry later.", remaining)
+    except (FaceEngineUnavailable, InvalidFaceEmbedding):
+        item.used_at = None
+        return _error(503, "FACE_ENGINE_UNAVAILABLE", "Liveness checking is unavailable. Retry later.", remaining)
+
+    now = datetime.now(timezone.utc)
+    if is_expired(record, now):
+        apply_event(db, record, tenant, Event.EXPIRE, request_id)
+        return _error(409, "SESSION_EXPIRED", "The session has expired. Create a new session.", remaining)
+    if aware(item.expires_at) <= now:
+        return _error(409, "CHALLENGE_EXPIRED", "The challenge expired. Request a new one.", remaining)
+    if outcome.live_embedding is not None:
+        try:
+            reason = _record_live_face(db, record, tenant, request_id, item, outcome, cipher, match_policy)
+        except (InvalidFaceEmbedding, InvalidTag, ValueError, OSError):
+            reason = "BIOMETRIC_STORAGE_UNAVAILABLE"
+        if reason:
+            item.used_at = None
+            _audit(db, record, tenant, request_id, "LIVENESS_UNAVAILABLE", (reason,))
+            return _error(503, reason, "The live face comparison is unavailable. Retry later.", remaining)
 
     evidence = {"reason_codes": outcome.reason_codes, "steps": outcome.steps, "metrics": outcome.metrics,
                 "policy_version": policy.version, "calibrated": policy.calibrated, "coverage": COVERAGE,

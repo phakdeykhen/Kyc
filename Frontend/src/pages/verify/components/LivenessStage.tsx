@@ -67,6 +67,7 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
   const camera = useCamera("user");
   const runRef = useRef<Run | null>(null);
   const preflightRef = useRef<AbortController | null>(null);
+  const preflightReasonRef = useRef<StopReason | null>(null);
   const mountedRef = useRef(true);
   const [running, setRunning] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -126,16 +127,21 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
     showStep(run, index, kind);
     let held: Blob[] = [];
     const started = Date.now();
+    const expiresAt = Date.parse(run.challenge.expires_at);
+    let lastFrame = started;
     let tipsShown = false;
     for (;;) {
       if (run.stopped) throw new LivenessStop(run.stopped);
+      if (Date.now() >= expiresAt) throw new LivenessStop("CHALLENGE_CLOSED");
       const tick = Date.now();
       const blob = await grab(640, 0.85);
       let satisfied = false;
       if (blob) {
+        lastFrame = Date.now();
         try {
           const body = await kycApi.livenessGuide(credential, sessionId, run.challenge, index, blob, run.baseline, run.abort.signal);
           if (run.stopped) throw new LivenessStop(run.stopped);
+          if (Date.now() >= expiresAt) throw new LivenessStop("CHALLENGE_CLOSED");
           if (body.face !== "OK") {
             held = [];
             setCoach({ text: FACE_TEXT[body.face] ?? FACE_TEXT.UNCLEAR, progress: 0, good: false });
@@ -156,6 +162,8 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
           if (failure.status !== 0 && failure.status !== 429 && failure.status < 500) throw new LivenessStop("ERROR", failure);
           setCoach({ text: "The connection is slow. Keep still…", progress: null, good: false });
         }
+      } else if (Date.now() - lastFrame > 5000) {
+        throw new LivenessStop("ERROR", new ApiError(0, "The camera stopped. Restart the camera and try again.", "CAMERA_STOPPED", null));
       }
       if (satisfied && blob) {
         held.push(blob);
@@ -215,6 +223,7 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
     setStep({ text: "Position your face in the circle", kind: "baseline", index: 0, total: 0 });
     setCoach({ text: "Look straight at the camera and hold still.", progress: 0, good: false });
     const preflight = new AbortController();
+    preflightReasonRef.current = null;
     preflightRef.current = preflight;
     let baseline: Blob[] = [];
     let challenge: LivenessChallenge;
@@ -240,8 +249,11 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
           setCoach({ text: body.state === "READY" ? "Hold still…" : FACE_TEXT[body.face]
             ?? positionText[body.instructions[0]] ?? instructionText(body.instructions[0] ?? "FACE_CAMERA"),
             progress: baseline.length / HOLD_FRAMES, good: body.state === "READY" });
-        } else if (Date.now() - lastFrame > 5000) {
-          throw new ApiError(0, "The camera stopped. Restart the camera and try again.", "CAMERA_STOPPED", null);
+        } else {
+          baseline = [];
+          if (Date.now() - lastFrame > 5000) {
+            throw new ApiError(0, "The camera stopped. Restart the camera and try again.", "CAMERA_STOPPED", null);
+          }
         }
         if (Date.now() - started > HELP_AFTER_MS) setHelp([
           "Hold the phone at eye level and fit your whole face inside the circle.",
@@ -256,7 +268,10 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
     } catch (caught) {
       if (!mountedRef.current) return;
       finish();
-      if (preflight.signal.aborted || caught instanceof LivenessStop) return;
+      if (preflight.signal.aborted || caught instanceof LivenessStop) {
+        if (preflightReasonRef.current === "RESTART") return run();
+        return;
+      }
       const failure = caught as ApiError;
       if (failure.status === 409) return onSessionChanged("LIVENESS_REQUIRED");
       const exhausted = failure.reasonCode === "LIVENESS_ATTEMPTS_EXCEEDED";
@@ -273,7 +288,9 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
     const indexes: number[] = [];
     try {
       setDots({ steps: stepNames, current: 0, done: 0 });
-      baseline.forEach((blob) => { frames.push(blob); indexes.push(0); });
+      const acceptedBaseline = await followStep(current, 0, "baseline");
+      current.baseline = acceptedBaseline[acceptedBaseline.length - 1];
+      acceptedBaseline.forEach((blob) => { frames.push(blob); indexes.push(0); });
       for (let index = 1; index < challenge.steps.length; index++) {
         setDots({ steps: stepNames, current: index, done: index });
         const done = await followStep(current, index, "move");
@@ -300,20 +317,23 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
     setStep({ text: "Checking…", kind: "checking", index: 0, total: 0 });
     setCoach({ text: "All steps done. Checking…", progress: null, good: true });
     try {
-      const result = await kycApi.submitLiveness(credential, sessionId, challenge, frames, indexes);
+      const result = await kycApi.submitLiveness(credential, sessionId, challenge, frames, indexes, current.abort.signal);
+      if (!mountedRef.current) return;
       finish();
       await show(result);
     } catch (caught) {
+      if (!mountedRef.current) return;
       finish();
       const failure = caught as ApiError;
       setOutcome({ tone: "retry", title: "The check could not be completed", detail: failure.message, instructions: [] });
     } finally {
-      setChecking(false);
+      if (mountedRef.current) setChecking(false);
     }
   };
 
   const stopRun = (reason: StopReason) => {
     if (preflightRef.current) {
+      preflightReasonRef.current = reason;
       preflightRef.current.abort();
       return;
     }

@@ -17,6 +17,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from kyc.api.dependencies import TenantContext
+from kyc.core.errors import error_response
 from kyc.db.models import (AuditLog, BarcodeResult, DocumentField, DocumentImage, FaceComparison, FraudSignal,
                            IdentityDocument, KYCSession, LivenessCheck, ManualReview, MRZResult, NFCResult,
                            Reviewer, RiskAssessmentRecord, SelfieCapture)
@@ -33,7 +34,7 @@ IDENTITY_FIELDS = ("full_name", "full_name_local", "date_of_birth", "sex", "nati
 
 
 def _error(code: int, reason: str, detail: str, **extra) -> JSONResponse:
-    return JSONResponse(status_code=code, content={"detail": detail, "reason_code": reason, **extra})
+    return error_response(code, reason, detail, **extra)
 
 
 def _audit(db, reviewer: ReviewerContext, record, request_id, action, reasons=(), **metadata):

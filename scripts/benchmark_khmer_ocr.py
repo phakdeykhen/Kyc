@@ -46,10 +46,16 @@ def main():
         data = path.read_bytes()
         capture = decode_capture(data, max_bytes=len(data), max_pixels=24_000_000)
         prepared, located = prepare_side(capture.pixels, 85.6 / 53.98, normalize_text=False)
-        visual = ocr.read_lines(normalize(prepared), ("khm", "eng"))
+        region = adapter.layout.viz_regions["FRONT"]
+        def locate(image):
+            block = ocr.read_region(normalize(image), region, ("khm", "eng"))
+            seen = {line.text for line in block}
+            return sorted(block + [line for line in ocr.read_region(normalize(image), region, ("khm", "eng"), mode=11)
+                                   if line.text not in seen], key=lambda line: (line.bbox[1], line.bbox[0]))
+        visual = locate(prepared)
         if adapter.classify(visual, "FRONT").document_side != "FRONT":
             turned = prepared.rotate(180)
-            alternative = ocr.read_lines(normalize(turned), ("khm", "eng"))
+            alternative = locate(turned)
             if adapter.classify(alternative, "FRONT").confidence > adapter.classify(visual, "FRONT").confidence:
                 prepared, visual = turned, alternative
         reads = visual + read_mrz_lines(ocr, normalize(prepared), adapter.layout.mrz_regions["FRONT"])

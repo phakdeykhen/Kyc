@@ -1,4 +1,9 @@
-# Universal Identity Platform — Phases 1–5 and 8–9
+# Universal Identity Platform — Phases 1–18
+
+The React client is connected to the FastAPI backend. The current implementation
+and verification evidence are recorded in the [correctness review](docs/kyc-review-2026-10-07.md)
+and [production readiness report](docs/production-readiness-2026-10-07.md).
+Production readiness remains **NOT_READY** pending the release gates in those reports.
 
 Phase 1 implements the architecture contracts, a 17-table PostgreSQL schema with
 tenant policies, a frozen Alembic migration, and the KYC session state machine.

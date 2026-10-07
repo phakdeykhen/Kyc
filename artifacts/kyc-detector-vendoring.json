@@ -1,0 +1,11 @@
+{
+  "nested_git_removed": true,
+  "parent_repository": "/Users/mac/Documents/1.1 OPS Sulotion/6-KYC",
+  "gitlink_replaced_with_files": true,
+  "parent_tracked_detector_files": 106,
+  "original_files_preserved": 106,
+  "original_readme": "realtime-face-liveness-detector/UPSTREAM_README.md",
+  "upstream_commit": "d0e33110d76cf03e9341b4acf6143f24e5a31c24",
+  "license_preserved": true,
+  "live_kyc_model_integration": "reference_only"
+}

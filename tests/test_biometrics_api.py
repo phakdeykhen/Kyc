@@ -440,6 +440,22 @@ class BiometricAPITests(BiometricAPICase):
         self.assertIsNone(body["decision"])
         self.assertEqual(self.count(FaceComparison), 1)  # The read path itself enforces expiry.
 
+    async def test_unavailable_document_check_cannot_be_aggregated_as_pass(self):
+        session_id = self.ready()
+        with Session(self.engine) as db, db.begin():
+            document = db.scalar(sa.select(IdentityDocument))
+            db.add_all([
+                DocumentCheck(organization_id=self.org, session_id=session_id, document_id=document.id,
+                    check_type="OCR_CONFIDENCE", result=CheckResult.UNAVAILABLE,
+                    evidence_metadata={"reason_codes": ["OCR_ENGINE_UNAVAILABLE"]}),
+                DocumentCheck(organization_id=self.org, session_id=session_id, document_id=document.id,
+                    check_type="REQUIRED_FIELDS", result=CheckResult.PASS, evidence_metadata={}),
+            ])
+        code, body, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual(code, 200, body)
+        self.assertEqual(body["checks"]["document_data"], "UNAVAILABLE")
+        self.assertIn("OCR_ENGINE_UNAVAILABLE", body["review_flags"])
+
     async def test_result_excludes_quality_from_an_earlier_document_attempt(self):
         session_id = self.ready()
         self.face.reference_faces = 2

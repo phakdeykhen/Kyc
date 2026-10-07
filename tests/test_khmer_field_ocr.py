@@ -5,7 +5,7 @@ from PIL import Image
 
 from kyc.documents import khmer
 from kyc.documents.adapters.kh_national_id import CambodiaNationalIDAdapter
-from kyc.documents.field_ocr import field_region, read_khmer_fields, vote_field
+from kyc.documents.field_ocr import _value, field_region, read_khmer_fields, vote_field
 from kyc.domain.enums import CheckResult
 from kyc.domain.identity import OCRLine, OCRWord
 from tests.test_kh_national_id import BACK, front_lines, line
@@ -40,6 +40,16 @@ class FieldCropTests(unittest.TestCase):
     def test_template_fallback_requires_a_rectified_document(self):
         self.assertIsNone(field_region(self.adapter, "full_name_local", [], False))
         self.assertIsNotNone(field_region(self.adapter, "full_name_local", [], True))
+
+    def test_name_template_does_not_shift_to_a_latin_name_row(self):
+        latin = line("REN RANIT", .95)
+        region, labelled = field_region(self.adapter, "full_name_local", [latin], True)
+        self.assertTrue(labelled)
+        self.assertEqual(region, self.adapter.layout.khmer_field_regions["full_name_local"])
+
+    def test_detected_label_excludes_preceding_pattern_noise(self):
+        reads = [line("ពពព: ហាហា", .05), line("គោត្តនាម និងនាម: សុខ សុភា", .1)]
+        self.assertEqual(_value(self.adapter, "full_name_local", reads, True), "សុខ សុភា")
 
 
 class VoteTests(unittest.TestCase):
@@ -107,7 +117,7 @@ class ReaderTests(unittest.TestCase):
         # No template fallback for the other fields because the document was not located.
         [result] = read_khmer_fields(reader, Image.new("RGB", (1600, 1000)), adapter, [row], False)
         self.assertEqual(result.text, "សុខ សុភា")
-        self.assertTrue(all(call[1] in (("khm",), ("script/Khmer",)) and call[2] is None and call[3] == 7 for call in reader.calls))
+        self.assertTrue(all(call[1] in (("khm",), ("script/Khmer",)) and call[2] is None and call[3] in (7, 13) for call in reader.calls))
         sizes = {call[0] for call in reader.calls}
         self.assertEqual(len(sizes), 3)
 

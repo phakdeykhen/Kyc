@@ -12,7 +12,7 @@ import statistics
 from PIL import Image
 
 from kyc.biometrics import compare_embeddings
-from kyc.biometrics.types import FaceEmbedding, FaceMatchPolicy
+from kyc.biometrics.types import FaceAssessment, FaceEmbedding, FaceMatchPolicy
 from kyc.biometrics.quality import assess_face_quality
 from kyc.domain.enums import CheckResult
 from kyc.liveness.challenge import BASELINE
@@ -36,7 +36,7 @@ COVERAGE = {
 
 @dataclass(frozen=True)
 class ActiveLivenessPolicy:
-    version: str = "ACTIVE-GEOMETRY-2026.10.4"
+    version: str = "ACTIVE-GEOMETRY-2026.10.5"
     calibrated: bool = False
     movement: float = 0.08           # minimum directed change of a/b (≈10° head turn)
     planar_deformation: float = 0.12  # eye/mouth triangle aspect change that should move the nose
@@ -56,6 +56,9 @@ class LivenessOutcome:
     steps: list[dict] = field(default_factory=list)
     metrics: dict = field(default_factory=dict)
     instructions: list[str] = field(default_factory=list)
+    # Private request-memory values. Only the encrypted template may be retained.
+    live_embedding: FaceEmbedding | None = field(default=None, repr=False)
+    live_quality: FaceAssessment | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True)
@@ -96,6 +99,9 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
         return _retry(["FRAME_COUNT_INVALID"])
     if any(not 0 <= index < len(steps) for index, _, _ in frames):
         return _retry(["FRAME_STEP_INVALID"])
+    indexes = [index for index, _, _ in frames]
+    if indexes != sorted(indexes):
+        return _retry(["FRAME_SEQUENCE_INVALID"])
     hashes = [digest for _, _, digest in frames]
     if len(set(hashes)) == 1:
         # One image submitted for every step: a still replay, not a live capture.
@@ -106,7 +112,7 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
     observed: dict[int, list[PoseSample | None]] = {}
     detections = []
     reasons: list[str] = []
-    for index, image, _ in frames:
+    for frame_number, (index, image, _) in enumerate(frames):
         faces = engine.detect(image)
         if len(faces) != 1:
             observed.setdefault(index, []).append(None)
@@ -120,23 +126,32 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
             continue
         samples.setdefault(index, []).append(sample)
         observed.setdefault(index, []).append(sample)
-        detections.append((index, image, faces[0]))
+        detections.append((frame_number, index, image, faces[0]))
     if "MULTIPLE_FACES" in reasons:
         return _retry(["MULTIPLE_FACES"], instructions=["ONLY_YOU_IN_FRAME"])
+    if reasons:
+        return _retry(sorted(set(reasons)), instructions=["FACE_CAMERA", "MORE_LIGHT"])
     if 0 not in samples:
         return _retry(sorted(set(reasons)) or ["BASELINE_NOT_CAPTURED"], instructions=["LOOK_STRAIGHT", "MORE_LIGHT"])
 
     if len(samples[0]) < policy.stable_frames_per_step:
         return _retry(["BASELINE_NOT_STABLE"], instructions=["HOLD_STILL", "LOOK_STRAIGHT"])
-    for index, image, face in detections:
+    if any(abs(sample.a) > policy.movement / 2 for sample in samples[0]):
+        return _retry(["BASELINE_NOT_FRONTAL"], instructions=["LOOK_STRAIGHT"])
+    qualities: dict[int, FaceAssessment] = {}
+    for frame_number, index, image, face in detections:
         if index == 0:
             quality = assess_face_quality(image, [face])
             if not quality.accepted:
                 return _retry(["BASELINE_QUALITY_UNUSABLE"], instructions=quality.instructions)
+            qualities[frame_number] = quality
 
     baseline = PoseSample(a=statistics.median(s.a for s in samples[0]), b=statistics.median(s.b for s in samples[0]),
                           aspect=statistics.median(s.aspect for s in samples[0]),
                           scale=statistics.median(s.scale for s in samples[0]), centre=samples[0][0].centre)
+    if any(max(abs(sample.a - baseline.a), abs(sample.b - baseline.b)) > policy.movement / 2
+           for sample in samples[0]):
+        return _retry(["BASELINE_NOT_STABLE"], instructions=["HOLD_STILL", "LOOK_STRAIGHT"])
     step_results = [{"step": BASELINE, "completed": True}]
     for index, name in enumerate(steps[1:], start=1):
         axis, sign = DIRECTIONS[name]
@@ -175,10 +190,13 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
     # Identity continuity: every frame must still be the person who took the selfie.
     if reference is not None:
         scores = []
-        for _, image, detection in detections:
-            scores.append(compare_embeddings(reference, engine.embed(image, detection), match_policy).score)
+        embeddings: dict[int, FaceEmbedding] = {}
+        for frame_number, _, image, detection in detections:
+            embedding = engine.embed(image, detection)
+            scores.append(compare_embeddings(reference, embedding, match_policy).score)
+            embeddings[frame_number] = embedding
         metrics["identity_frames"] = len(scores)
-        if scores and min(scores) < match_policy.fail_threshold:
+        if scores and min(scores) < match_policy.pass_threshold:
             reasons_out = ["IDENTITY_CONTINUITY_NOT_ESTABLISHED"]
             return LivenessOutcome(CheckResult.REVIEW, round(completed / (len(steps) - 1) * 0.5, 3), reasons_out, False,
                                    attack_type="POSSIBLE_FACE_SWAP", steps=step_results, metrics=metrics)
@@ -191,8 +209,15 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
         reasons.append("DUPLICATE_FRAMES")
     score = round(completed / (len(steps) - 1), 3)
     final_reasons = ["CHALLENGE_COMPLETED", *sorted(set(r for r in reasons if r == "DUPLICATE_FRAMES"))]
+    # Frontal baseline frames are captured during this challenge and have passed the
+    # usability gate. Rank their weakest quality measurement first, then their sum.
+    selected, quality = max(qualities.items(), key=lambda item: (min(item[1].scores.values()),
+                                                               sum(item[1].scores.values())))
+    metrics.update(selected_frame_index=selected, selected_frame_step=0,
+                   frame_selection_policy="BEST_ACCEPTED_FRONTAL_FRAME_V1")
+    selected_values = {"live_embedding": embeddings[selected], "live_quality": quality}
     if not policy.calibrated:
         return LivenessOutcome(CheckResult.REVIEW, score, final_reasons + ["UNCALIBRATED_LIVENESS_POLICY"], False,
-                               steps=step_results, metrics=metrics)
+                               steps=step_results, metrics=metrics, **selected_values)
     result = CheckResult.REVIEW if "DUPLICATE_FRAMES" in final_reasons else CheckResult.PASS
-    return LivenessOutcome(result, score, final_reasons, False, steps=step_results, metrics=metrics)
+    return LivenessOutcome(result, score, final_reasons, False, steps=step_results, metrics=metrics, **selected_values)

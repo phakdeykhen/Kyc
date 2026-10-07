@@ -38,6 +38,11 @@ export function useCamera(facing: "user" | "environment") {
         return;
       }
       streamRef.current = stream;
+      stream.getVideoTracks().forEach((track) => track.addEventListener("ended", () => {
+        if (generation !== generationRef.current) return;
+        stop();
+        setState("unavailable");
+      }, { once: true }));
       const video = videoRef.current;
       if (!video) throw new Error("Camera preview is unavailable");
       video.srcObject = stream;
@@ -65,7 +70,8 @@ export function useCamera(facing: "user" | "environment") {
   /** A JPEG of the current frame, scaled down to maxWidth when given. */
   const grab = useCallback((maxWidth?: number, quality = 0.92): Promise<Blob | null> => {
     const video = videoRef.current;
-    if (!video || !video.videoWidth || !video.videoHeight) return Promise.resolve(null);
+    if (!video || !video.videoWidth || !video.videoHeight || video.paused || video.readyState < 2
+        || !streamRef.current?.getVideoTracks().some((track) => track.readyState === "live" && track.enabled && !track.muted)) return Promise.resolve(null);
     const scale = maxWidth ? Math.min(1, maxWidth / video.videoWidth) : 1;
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(video.videoWidth * scale);

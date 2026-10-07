@@ -1,12 +1,14 @@
 """Phase 10: active liveness. Landmarks come from a projected 3D head model, so geometry is exact."""
 
 from collections import Counter
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 import json
 import os
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -14,12 +16,15 @@ from PIL import Image
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
+from kyc.biometrics.embeddings import deserialize_embedding
+from kyc.biometrics.quality import assess_face_quality
 from kyc.biometrics.types import FaceDetection, FaceEmbedding, FaceMatchPolicy
-from kyc.db.models import KYCSession, LivenessChallenge, LivenessCheck, SelfieCapture
+from kyc.db.models import BiometricTemplate, FaceComparison, KYCSession, LivenessChallenge, LivenessCheck, SelfieCapture
 from kyc.domain.enums import CheckResult
 from kyc.liveness import challenge as challenges
 from kyc.liveness.active import ActiveLivenessPolicy, assess, guide
 from kyc.liveness.geometry import pose
+from kyc.services.biometrics import _template_context
 from tests.helpers import call, multipart
 from tests.test_biometrics_api import BiometricAPICase, InjectedFaceEngine
 
@@ -173,6 +178,57 @@ class AssessorTests(unittest.TestCase):
         outcome = self.run_frames(self.live(), ActiveLivenessPolicy(calibrated=True), reference=None)
         self.assertEqual(outcome.result, CheckResult.REVIEW)
         self.assertIn("IDENTITY_CONTINUITY_NOT_ESTABLISHED", outcome.reason_codes)
+
+    def test_interleaved_step_frames_do_not_complete_the_ordered_challenge(self):
+        frames = self.live()
+        frames[3], frames[4] = frames[4], frames[3]
+        outcome = self.run_frames(frames, ActiveLivenessPolicy(calibrated=True))
+        self.assertEqual(outcome.result, CheckResult.REVIEW)
+        self.assertTrue(outcome.retryable)
+        self.assertIn("FRAME_SEQUENCE_INVALID", outcome.reason_codes)
+
+    def test_a_missing_face_between_baseline_frames_requires_recapture(self):
+        frames = self.live()
+        frames.insert(1, (0, real_head("LOOK_STRAIGHT"), 0))
+        outcome = self.run_frames(frames, ActiveLivenessPolicy(calibrated=True))
+        self.assertEqual(outcome.result, CheckResult.REVIEW)
+        self.assertTrue(outcome.retryable)
+        self.assertIn("NO_FACE_IN_FRAME", outcome.reason_codes)
+
+    def test_a_turned_baseline_cannot_be_selected_as_a_frontal_live_frame(self):
+        engine = FrameEngine()
+        steps = ("LOOK_STRAIGHT", "TURN_LEFT", "LOOK_UP", "LOOK_DOWN")
+        frames = image_frames(engine, [(0, real_head("TURN_RIGHT")), (0, real_head("TURN_RIGHT", .5)),
+            (1, real_head("TURN_LEFT")), (1, real_head("TURN_LEFT", .5)),
+            (2, real_head("LOOK_UP")), (2, real_head("LOOK_UP", .5)),
+            (3, real_head("LOOK_DOWN")), (3, real_head("LOOK_DOWN", .5))])
+        outcome = assess(frames, steps, engine, unit(0), self.match, ActiveLivenessPolicy(calibrated=True))
+        self.assertEqual(outcome.result, CheckResult.REVIEW)
+        self.assertTrue(outcome.retryable)
+        self.assertIn("BASELINE_NOT_FRONTAL", outcome.reason_codes)
+        self.assertIsNone(outcome.live_embedding)
+
+    def test_ambiguous_continuity_does_not_pass_liveness(self):
+        vector = np.zeros(128, dtype=np.float32)
+        vector[0], vector[1] = 0.3, np.sqrt(1 - 0.3 ** 2)
+        with patch.object(self.engine, "embed", return_value=FaceEmbedding(vector)):
+            outcome = self.run_frames(self.live(), ActiveLivenessPolicy(calibrated=True))
+        self.assertEqual(outcome.result, CheckResult.REVIEW)
+        self.assertIn("IDENTITY_CONTINUITY_NOT_ESTABLISHED", outcome.reason_codes)
+
+    def test_best_accepted_frontal_frame_supplies_the_live_embedding(self):
+        frames = image_frames(self.engine, self.live())
+        def quality(image, faces):
+            assessed = assess_face_quality(image, faces)
+            return replace(assessed, scores={"sharpness": image.getpixel((5, 5))[0] / 255})
+
+        with patch("kyc.liveness.active.assess_face_quality", side_effect=quality):
+            outcome = assess(frames, self.steps, self.engine, unit(0), self.match)
+        self.assertEqual(outcome.metrics["selected_frame_index"], 1)
+        self.assertEqual(outcome.metrics["selected_frame_step"], 0)
+        self.assertIsNotNone(outcome.live_embedding)
+        self.assertTrue(np.array_equal(outcome.live_embedding.vector, unit(0).vector))
+        self.assertEqual(outcome.live_quality.scores["sharpness"], frames[1][1].getpixel((5, 5))[0] / 255)
 
     def test_a_live_person_completes_the_challenge_but_stays_review_until_calibrated(self):
         outcome = self.run_frames(self.live())
@@ -395,6 +451,92 @@ class LivenessAPITests(BiometricAPICase):
         self.assertEqual((code, body["reason_code"]), (503, "FACE_MODELS_UNAVAILABLE"))
         with Session(self.engine) as db:
             self.assertEqual(db.scalar(sa.select(sa.func.count()).select_from(LivenessChallenge)), 0)
+
+    async def test_positioning_and_guidance_accept_camera_frames_above_json_limit(self):
+        session_id, engine = await self.at_liveness()
+        # Noise outside the scripted lookup pixel preserves the face while making a realistic-sized upload.
+        def camera_frame(step):
+            image = Image.open(BytesIO(engine.frame(real_head(step)))).convert("RGB")
+            pixels = np.array(image)
+            pixels[20:90] = np.random.default_rng(4).integers(0, 256, pixels[20:90].shape, dtype=np.uint8)
+            encoded = BytesIO()
+            Image.fromarray(pixels).save(encoded, "PNG")
+            self.assertGreater(len(encoded.getvalue()), 64 * 1024)
+            return encoded.getvalue()
+
+        baseline = camera_frame("LOOK_STRAIGHT")
+        code, body, _ = await self.position(session_id, baseline)
+        self.assertEqual((code, body.get("state")), (200, "READY"), body)
+        _, issued, _ = await self.challenge(session_id)
+        step = issued["steps"][1]["step"]
+        code, body, _ = await self.guide(session_id, issued, 1, camera_frame(step), baseline)
+        self.assertEqual((code, body.get("state")), (200, "DONE"), body)
+
+    async def test_expired_selfie_template_is_not_used_for_continuity(self):
+        session_id, engine = await self.at_liveness()
+        with Session(self.engine) as db, db.begin():
+            template = db.scalar(sa.select(BiometricTemplate).where(BiometricTemplate.source == "LIVE_SELFIE"))
+            template.delete_after = datetime.now(timezone.utc) - timedelta(seconds=1)
+        _, issued, _ = await self.challenge(session_id)
+        code, body, _ = await self.submit(session_id, issued, self.follow(engine, issued))
+        self.assertEqual(code, 200, body)
+        self.assertIn("IDENTITY_CONTINUITY_NOT_ESTABLISHED", body["reason_codes"])
+
+    async def test_completed_challenge_compares_its_frame_to_the_document_without_storing_images(self):
+        session_id, engine = await self.at_liveness()
+        _, issued, _ = await self.challenge(session_id)
+        code, body, _ = await self.submit(session_id, issued, self.follow(engine, issued))
+        self.assertEqual(code, 200, body)
+        with Session(self.engine) as db:
+            comparisons = db.scalars(sa.select(FaceComparison).order_by(FaceComparison.created_at)).all()
+            self.assertEqual(len(comparisons), 2)
+            selected = comparisons[-1]
+            self.assertEqual(selected.evidence_metadata["live_capture_method"], "ACTIVE_LIVENESS")
+            self.assertEqual(selected.evidence_metadata["challenge_id"], issued["challenge_id"])
+            self.assertNotEqual(selected.live_template_id, comparisons[0].live_template_id)
+            template = db.get(BiometricTemplate, selected.live_template_id)
+            payload = self.app.state.biometric_cipher.open(template.template_ciphertext, template.key_version,
+                _template_context(db.get(KYCSession, session_id), template.id, template.source, template))
+            self.assertTrue(np.array_equal(deserialize_embedding(payload).vector, unit(0).vector))
+            self.assertEqual(db.scalar(sa.select(sa.func.count()).select_from(SelfieCapture)), 1)
+            self.assertFalse(db.scalar(sa.select(LivenessCheck)).evidence_metadata["frames_retained"])
+        _, result, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=self.headers)
+        self.assertEqual(result["face_comparison"]["result"], "REVIEW")
+        self.assertFalse(result["face_comparison"]["calibrated"])
+
+    async def test_unavailable_final_face_comparison_can_retry_the_same_challenge(self):
+        session_id, engine = await self.at_liveness()
+        _, issued, _ = await self.challenge(session_id)
+        frames = self.follow(engine, issued)
+        with patch.object(self.app.state.biometric_cipher, "seal", side_effect=OSError("test storage failure")):
+            code, body, _ = await self.submit(session_id, issued, frames)
+        self.assertEqual((code, body["result"], body["retry_allowed"]), (503, "TECHNICAL_ERROR", True), body)
+        with Session(self.engine) as db:
+            self.assertIsNone(db.get(LivenessChallenge, UUID(issued["challenge_id"])).used_at)
+            self.assertEqual(db.get(KYCSession, session_id).status.value, "LIVENESS_REQUIRED")
+            self.assertEqual(db.scalar(sa.select(sa.func.count()).select_from(LivenessCheck)), 0)
+            self.assertEqual(db.scalar(sa.select(sa.func.count()).select_from(FaceComparison)), 1)
+        code, body, _ = await self.submit(session_id, issued, frames)
+        self.assertEqual((code, body["status"]), (200, "PROCESSING"), body)
+
+    async def test_corrupt_biometric_reference_is_a_retryable_technical_error(self):
+        session_id, engine = await self.at_liveness()
+        _, issued, _ = await self.challenge(session_id)
+        with Session(self.engine) as db, db.begin():
+            template = db.scalar(sa.select(BiometricTemplate).where(BiometricTemplate.source == "LIVE_SELFIE"))
+            original = template.template_ciphertext
+            template.template_ciphertext = original[:-1] + bytes([original[-1] ^ 1])
+        frames = self.follow(engine, issued)
+        code, body, _ = await self.submit(session_id, issued, frames)
+        self.assertEqual((code, body["result"], body["reason_code"]),
+                         (503, "TECHNICAL_ERROR", "BIOMETRIC_REFERENCE_UNAVAILABLE"), body)
+        with Session(self.engine) as db, db.begin():
+            self.assertIsNone(db.get(LivenessChallenge, UUID(issued["challenge_id"])).used_at)
+            self.assertEqual(db.scalar(sa.select(sa.func.count()).select_from(LivenessCheck)), 0)
+            template = db.scalar(sa.select(BiometricTemplate).where(BiometricTemplate.source == "LIVE_SELFIE"))
+            template.template_ciphertext = original
+        code, body, _ = await self.submit(session_id, issued, frames)
+        self.assertEqual((code, body["status"]), (200, "PROCESSING"), body)
 
     async def test_guidance_confirms_each_step_without_using_the_challenge(self):
         session_id, engine = await self.at_liveness()

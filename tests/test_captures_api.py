@@ -77,7 +77,7 @@ class CaptureAPITests(CaptureAPICase):
         self.assertEqual(body["status"], "DOCUMENT_REQUIRED")
         self.assertEqual(body["sides"], {"FRONT": "ACCEPTED", "BACK": "REQUIRED"})
         self.assertEqual(body["next_step"], "CAPTURE_BACK")
-        self.assertEqual(body["quality"]["policy_version"], "DOC-CAPTURE-HEURISTIC-2026.10.2")
+        self.assertEqual(body["quality"]["policy_version"], "DOC-CAPTURE-HEURISTIC-2026.10.3")
         self.assertTrue(body["geometry"]["document_detected"])
         code, body, _ = await self.upload(session_id, GOOD_BACK, "back")
         self.assertEqual(code, 200, body)

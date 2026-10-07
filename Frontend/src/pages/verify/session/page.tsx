@@ -56,7 +56,6 @@ export default function VerificationSession() {
     try {
       const current = await kycApi.getSession(credential, sessionId);
       setSession(current);
-      setCheckedAt(Date.now());
       setError("");
       if (APPLICANT_FINISHED.has(current.status)) navigate(`/verify/${encodeURIComponent(sessionId)}/done`, { replace: true });
     } catch (caught) {
@@ -64,6 +63,9 @@ export default function VerificationSession() {
       setError(failure.status === 401 ? "This link is no longer valid. It may have expired, or a newer link was sent to you."
         : failure.status === 404 || failure.status === 422 ? "This verification link is not valid."
         : failure.message);
+    } finally {
+      // Schedule the next poll after failed requests too, so a brief outage can recover.
+      setCheckedAt(Date.now());
     }
   }, [credential, sessionId, navigate]);
 
