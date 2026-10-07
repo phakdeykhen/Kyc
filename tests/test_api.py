@@ -203,6 +203,8 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((found["face_model"]["status"], found["liveness_model"]["status"]), ("DOWN", "DOWN"))
         self.assertEqual(found["pii_encryption"]["status"], "NOT_CONFIGURED")
         self.assertEqual(found["kms"]["status"], "NOT_IMPLEMENTED")
+        self.assertIn(found["ocr_khmer_digit_model"]["status"], ("UP", "DOWN"))
+        self.assertFalse(found["ocr_khmer_digit_model"]["critical"])
         self.assertNotIn("UP", {found[name]["status"] for name in ("object_storage", "biometric_encryption")})
         self.app.state.settings.environment = "production"
         try:

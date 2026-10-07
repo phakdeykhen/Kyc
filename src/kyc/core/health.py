@@ -65,6 +65,20 @@ def _ocr(state) -> Dependency:
     return Dependency("ocr_worker", "UP", True)
 
 
+def _khmer_digits(state) -> Dependency:
+    """The constrained Khmer-digit re-read (dates, ID numbers) silently degrades without its model."""
+    from kyc.documents.adapters.khmer_label import KHMER_NUMERIC_REFINEMENT
+    from kyc.documents.refine import installed_languages
+    from kyc.ocr.tesseract import OCRUnavailable
+    ocr = getattr(state.document_processor, "ocr", None)
+    try:
+        installed = ocr is not None and installed_languages(KHMER_NUMERIC_REFINEMENT.languages, ocr.available_languages())
+    except OCRUnavailable:
+        installed = False
+    return Dependency("ocr_khmer_digit_model", "UP" if installed else "DOWN", False,
+                      None if installed else "KHMER_SCRIPT_MODEL_MISSING")
+
+
 def _face(state) -> list[Dependency]:
     engine = state.face_engine
     reason = engine.unavailable_reason() if engine is not None else "FACE_ENGINE_NOT_CONFIGURED"
@@ -104,7 +118,7 @@ def _workers(state) -> list[Dependency]:
 
 
 def _others(state) -> list[Dependency]:
-    return [_object_storage(state), _ocr(state), *_face(state), *_keys(state), _nfc(state), *_workers(state)]
+    return [_object_storage(state), _ocr(state), _khmer_digits(state), *_face(state), *_keys(state), _nfc(state), *_workers(state)]
 
 
 class HealthCache:
