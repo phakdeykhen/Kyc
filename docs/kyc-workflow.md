@@ -126,11 +126,48 @@ POST /v1/kyc/{session_id}/documents/back   (file)
    This happens inline after the response, or by a worker when `DOCUMENT_PROCESSING_MODE=deferred`.
 4. Document processing: classification, OCR, MRZ (check digits and field consistency),
    barcode, issuing country, field validation and expiry. Fields are stored encrypted.
+   See [Document reading (OCR)](#document-reading-ocr) below.
    - **Accepted** → `kyc.document.accepted`, then `SELFIE_REQUIRED` (or `PROCESSING` for `DOCUMENT_ONLY`).
    - **Recapture** (wrong or unrecognized document, unreadable critical fields) → captures are
      cleared and the session goes back to `DOCUMENT_REQUIRED` (`kyc.recapture.required`).
+   - **Not processed** (no adapter for the type, OCR engine, capture storage or PII key not
+     configured, or an internal error) → the session stays in `DOCUMENT_PROCESSING` and the
+     reason is audited; `scripts/process_documents.py` retries it.
 
 The device polls `GET /v1/kyc/{session_id}` to see the current status.
+
+#### Document reading (OCR)
+
+`src/kyc/services/documents.py` runs these steps for each required side, then for the document:
+
+1. **Prepare** (`documents/preprocess.py`): locate the card, warp it to an upright rectangle of the
+   expected shape (ID-1 card or TD3 passport page), then grayscale, autocontrast and light sharpening.
+   Geometry and contrast only: the document's pixels are never edited.
+2. **Read text**: Tesseract 5 (`OCR_LANGUAGES`, default `khm,eng`; images go over stdin, never to disk).
+   Cambodian cards then re-read every number and date with only Khmer digits allowed
+   (`documents/refine.py`). If the two reads disagree the value keeps `OCR_PASSES_DISAGREED`, which
+   lowers its confidence.
+3. **Read the MRZ** (`mrz/reader.py`): the MRZ band is read four ways (ICAO alphabet only,
+   unconstrained, enlarged, column layout). The parser keeps the combination of lines whose check
+   digits validate. Repairs for common misreads (lost or misread `<` filler, `O` read for `0` in a
+   TD1 document number, one stray character in the data line) are used only when no reading as printed
+   validates, and only if the field check digits then agree (`MRZ_CHAR_CORRECTED`). The name line has
+   no check digit, so the reading most passes agree on wins.
+4. **Classify** each side against the claimed type (`documents/adapters/`). Sides uploaded the wrong
+   way round are swapped (`SIDES_SWAPPED`). A different or unrecognized document → recapture.
+5. **Extract** fields from the printed labels. The visual zone is canonical. The MRZ fills only
+   fields the visual zone lacks: a number or date needs its own valid check digit, and a name or sex
+   needs the MRZ's field check digits to be valid (`FROM_MRZ`).
+6. **Validate**: required fields, number format, date consistency, expiry, OCR confidence (below 0.80
+   → `REVIEW`), digit-script consistency, MRZ check digits, MRZ against visual fields, barcode, and
+   issuing country against the session country.
+   - A missing critical field (KH National ID: number, Khmer name, date of birth) → recapture.
+     On a KH National ID whose MRZ check digits validate, an unreadable Khmer name gives `REVIEW`
+     instead, so a genuine card does not loop through recaptures.
+   - Everything uncertain is flagged and carried into the risk engine as `REVIEW`, never guessed.
+
+Raw OCR text and field values are personal data: they are stored encrypted and never written to
+checks, logs or audit records.
 
 ### Step 5: Selfie (device, all levels except `DOCUMENT_ONLY`)
 

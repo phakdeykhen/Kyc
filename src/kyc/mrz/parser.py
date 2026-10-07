@@ -11,6 +11,7 @@ fields (document number, names, optional data) are never digit-substituted. Name
 padding noise may be removed with an explicit flag; original OCR lines are retained.
 """
 
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date
 import re
@@ -73,12 +74,15 @@ def _fit(line: str, width: int, name_line: bool = False) -> tuple[str, bool] | N
     """Fit a line to the format width. Lost trailing filler is restored; nothing else is shifted.
 
     Only a name line may have lost a long run of trailing filler; data lines must be within ±3.
+    A name line may also overrun by misread filler ("…<<<<K<K"): past a '<<<' run it is only padding.
     """
     if len(line) == width:
         return line, False
     if width - 3 <= len(line) < width or (name_line and len(line) < width and line.endswith("<")):
         return (line + "<" * width)[:width], True
     if width < len(line) <= width + 3 and set(line[width:]) <= {"<"}:
+        return line[:width], True
+    if name_line and width < len(line) <= width + 3 and (run := re.search(r"<{3,}", line)) and run.end() <= width:
         return line[:width], True
     return None
 
@@ -119,6 +123,20 @@ def _td1_tail_repair(line: str) -> str:
     return head + (body + "<" * 11)[:11] + composite
 
 
+def _td1_head_repairs(line: str) -> list[str]:
+    """TD1 line 1: keep header, document number and its check digit; the optional-data zone after them
+    is filler on most cards and gets the same treatment as line 2's tail. A number read with 'O' is also
+    tried with '0' (the only lookalike whose swap the check digit always detects). An extended number
+    (check digit '<') is left alone, and so is a zone holding digits: real optional data, or a line shifted
+    by an inserted character whose number could pass its check digit by chance (1 in 10).
+    Each repair is believed only if the check digits then validate."""
+    if len(line) < 15 or not line[14].isdigit() or re.search(r"[0-9]", line[15:]):
+        return []
+    tail = (re.sub(r"[A-Z]", "<", line[15:]) + "<" * 15)[:15]
+    numbers = dict.fromkeys((line[5:14], line[5:14].replace("O", "0")))
+    return [line[:5] + number + line[14] + tail for number in numbers]
+
+
 def assemble(candidates: list[str], today: date | None = None) -> tuple[str, tuple[str, ...], list[str]] | None:
     """Pick the best TD1/TD2/TD3 block from candidate lines (in reading order, possibly from several OCR passes).
 
@@ -141,6 +159,8 @@ def assemble(candidates: list[str], today: date | None = None) -> tuple[str, tup
                     variants += [(raw[:index] + raw[index + 1:], True) for index in range(min(len(raw), width))]
                 if name == "TD1" and position == 1 and 18 <= len(raw) <= width + 6:
                     variants.append((_td1_tail_repair(raw), True))
+                if name == "TD1" and position == 0 and len(raw) <= width + 6:
+                    variants += [(repair, True) for repair in _td1_head_repairs(raw) if repair != raw]
                 for line, repaired in variants:
                     fit = _fit(line, width, position == name_position)
                     if fit is None:
@@ -166,17 +186,24 @@ def assemble(candidates: list[str], today: date | None = None) -> tuple[str, tup
         if any(not pool for pool in pools):
             continue
 
+        def cleaned_name(fit):
+            return _filler_noise(fit[0] if name == "TD1" else fit[0][5:])[0].rstrip("<")
+
+        # Names carry no check digit: the reading most OCR passes agree on (after filler cleanup) is
+        # the best evidence, e.g. two passes "SOK<<SOPHEA" outvote one "SOK<<SOPHEA<K".
+        votes = Counter(cleaned_name(fit) for fit in pools[name_position])
+
         def name_quality(fit):
             name_field = fit[0] if name == "TD1" else fit[0][5:]
             run = re.search(r"<{3,}", name_field)
             noise = len(re.findall(r"[A-Z0-9]", name_field[run.end():])) if run else 0
-            cleaned, _ = _filler_noise(name_field)
+            cleaned = cleaned_name(fit)
             syntax_valid = bool(re.fullmatch(r"[A-Z<]+", cleaned) and cleaned.strip("<"))
             if name != "TD1":
                 syntax_valid = syntax_valid and bool(fit[0][2:5].strip("<"))
             # A reading with fewer noisy trailing characters beats one filled with misread noise;
             # check the name separator in the unpadded name rather than against trailing '<' padding.
-            return (syntax_valid, "<<" in cleaned.rstrip("<"), -noise, -fit[1])
+            return (syntax_valid, "<<" in cleaned, votes[cleaned], -noise, -fit[1])
 
         chosen_name = max(pools[name_position], key=name_quality)
         # TD2/TD3 checks depend only on line 2; TD1 checks depend on lines 1 and 2.
@@ -205,7 +232,7 @@ def _best_block(name, count, first_pool, second_pool, chosen_name, name_quality,
                     continue  # a repair is only believed when the field check digits then agree
                 valid = sum(item["valid"] for item in result.check_digits.values())
                 adjusted = sum(fit[1] for fit in combo)
-                noise = -name_quality(chosen_name)[2]
+                noise = -name_quality(chosen_name)[3]
                 score = (result.mrz_valid, valid, result.data_valid, -noise, -repaired, -adjusted, -result.substitutions)
                 if best is None or score > best[0]:
                     flags = (["MRZ_LINE_LENGTH_ADJUSTED"] if adjusted else []) + (["MRZ_CHAR_CORRECTED"] if repaired else [])

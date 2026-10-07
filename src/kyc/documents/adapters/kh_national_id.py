@@ -46,4 +46,4 @@ LAYOUT = CardLayout(
 
 class CambodiaNationalIDAdapter(KhmerLabelAdapter):
     layout = LAYOUT
-    policy = AdapterPolicy(version="KH-NID-ADAPTER-2026.10.3", typical_validity_years=(9, 11))
+    policy = AdapterPolicy(version="KH-NID-ADAPTER-2026.10.4", typical_validity_years=(9, 11))
