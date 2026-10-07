@@ -406,7 +406,8 @@ Expected refusals:
 - a suspended organization or a missing scope: 403;
 - a client token on `/result`, `/verify` or another route: 403;
 - a client token on another session: 401;
-- too many requests: 429 with `Retry-After`.
+- too many requests: 429 with `Retry-After`. Every authenticated response carries
+  `X-RateLimit-Limit` and `X-RateLimit-Remaining` for the credential's current window.
 
 ### Webhooks (Phase 16)
 
