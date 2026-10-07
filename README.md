@@ -39,6 +39,11 @@ and the person must stay the same throughout. Frames are never stored. The uncal
 geometry heuristic returns REVIEW at best, including uncertain flat-face findings;
 identical-image replay remains a FAIL. See [Phase 10](docs/architecture-phase10.md).
 
+The [face liveness detector source](realtime-face-liveness-detector/README.md)
+is vendored as ordinary files in this KYC repository. Its KYC notes identify the
+application's liveness entry points and preserve the upstream documentation and
+license.
+
 Phases 8–9 add CPU face detection, selfie quality recapture, aligned face embeddings,
 and 1:1 comparison against the accepted document portrait. Selfie submission requires
 explicit biometric consent. Face photos and templates are encrypted with separate
