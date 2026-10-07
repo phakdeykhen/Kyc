@@ -20,9 +20,10 @@ def multipart(fields=None, files=None):
 async def call(app, path, method="GET", body=None, headers=None, raw=None, content_type="application/json"):
     payload = raw if raw is not None else json.dumps(body).encode() if body is not None else b""
     incoming_headers = {"host": "test", "content-type": content_type, "content-length": str(len(payload)), **(headers or {})}
+    path, _, query = path.partition("?")
     scope = {"type": "http", "asgi": {"version": "3.0", "spec_version": "2.4"},
              "http_version": "1.1", "method": method, "scheme": "http", "path": path,
-             "raw_path": path.encode(), "query_string": b"", "root_path": "",
+             "raw_path": path.encode(), "query_string": query.encode(), "root_path": "",
              "headers": [(name.lower().encode(), value.encode()) for name, value in incoming_headers.items()],
              "client": ("127.0.0.1", 1234), "server": ("test", 80)}
     sent = []

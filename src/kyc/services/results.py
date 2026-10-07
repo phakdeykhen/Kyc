@@ -30,6 +30,17 @@ def mask(value: str | None) -> str | None:
     return "*" * max(0, len(value) - 4) + value[-4:]
 
 
+def mask_name(value: str | None) -> str | None:
+    """Keep the first character of each word: enough to confirm a match, not to read the name."""
+    if not value:
+        return None
+    return " ".join(word[0] + "*" * (len(word) - 1) for word in value.split())
+
+
+def mask_date(value: str | None) -> str | None:
+    return None if not value else value[:4] + "-**-**"
+
+
 @dataclass
 class Evidence:
     """Everything the result shows and the risk engine decides on: one source, so they never disagree."""
@@ -153,14 +164,17 @@ def latest_review(db: Session, record: KYCSession) -> ResultReview | None:
                                                  decided_at=row.created_at)
 
 
-def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) -> SessionResult:
+def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None, reveal_identity: bool = True) -> SessionResult:
+    """`reveal_identity` is False for credentials without the results:identity scope (spec §25)."""
     evidence = collect_evidence(db, record)
     checks, flags, summary, signals, document = (evidence.checks, evidence.flags, evidence.face_comparison,
                                                  evidence.signals, evidence.document)
     decision, review = latest_decision(db, record), latest_review(db, record)
+    erased_at = record.erased_at.replace(tzinfo=record.erased_at.tzinfo or timezone.utc) if record.erased_at else None
     if document is None or cipher is None:
         return SessionResult(session_id=record.id, status=record.status, checks=checks, fraud_signals=signals,
-                             face_comparison=summary, review_flags=sorted(set(flags)), decision=decision, review=review)
+                             face_comparison=summary, review_flags=sorted(set(flags)), decision=decision, review=review,
+                             erased_at=erased_at)
 
     values: dict[str, str] = {}
     for field in db.scalars(sa.select(DocumentField).where(DocumentField.organization_id == record.organization_id,
@@ -181,6 +195,10 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None) ->
                                 document_number_masked=mask(values.get("document_number")), expiry_status=expiry_status),
         identity=ResultIdentity(full_name=values.get("full_name"), full_name_local=values.get("full_name_local"),
                                 date_of_birth=values.get("date_of_birth"), sex=values.get("sex"),
-                                nationality=values.get("nationality")),
+                                nationality=values.get("nationality")) if reveal_identity else
+        ResultIdentity(full_name=mask_name(values.get("full_name")), full_name_local=mask_name(values.get("full_name_local")),
+                       date_of_birth=mask_date(values.get("date_of_birth")), sex=values.get("sex"),
+                       nationality=values.get("nationality")),
+        identity_masked=not reveal_identity,
         mrz=ResultMRZ(format=mrz.format, mrz_valid=mrz.mrz_valid, check_digit_results=mrz.check_digit_results,
                       field_consistency=mrz.field_consistency) if mrz else None)

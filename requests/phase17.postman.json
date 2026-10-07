@@ -1,0 +1,388 @@
+{
+  "info": {
+    "name": "Phase 17 \u2014 security/privacy hardening",
+    "description": "Use synthetic data. Populate credentials only in a private Postman environment. api_key needs sessions:write,sessions:read,keys:manage; erasure_key needs data:erase; limited_api_key must lack data:erase. The creator's network and expiry must permit step5. This workflow intentionally erases its synthetic session. Never export an environment containing real credentials.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Create synthetic passport session",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/v1/kyc/sessions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": \"phase17-postman-synthetic\",\n  \"country\": \"KH\",\n  \"expected_document_type\": \"KH_PASSPORT\",\n  \"verification_level\": \"DOCUMENT_ONLY\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected status', () => pm.expect([201]).to.include(pm.response.code));",
+              "pm.test('Private response', () => pm.expect(pm.response.headers.get('Cache-Control')).to.equal('no-store'));",
+              "pm.environment.set('session_id', pm.response.json().session_id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Issue device token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/v1/kyc/{{session_id}}/client-token",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected status', () => pm.expect([200, 201]).to.include(pm.response.code));",
+              "pm.test('Private response', () => pm.expect(pm.response.headers.get('Cache-Control')).to.equal('no-store'));",
+              "pm.environment.set('client_token', pm.response.json().client_token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Explicit document consent (only after agreement)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{client_token}}"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/v1/kyc/{{session_id}}/consent",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"scope\": \"DOCUMENT_PROCESSING\",\n  \"granted\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected status', () => pm.expect([200, 201]).to.include(pm.response.code));",
+              "pm.test('Private response', () => pm.expect(pm.response.headers.get('Cache-Control')).to.equal('no-store'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Reject false consent",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{client_token}}"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/v1/kyc/{{session_id}}/consent",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"scope\": \"DOCUMENT_PROCESSING\",\n  \"granted\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected status', () => pm.expect([422]).to.include(pm.response.code));",
+              "pm.test('Private response', () => pm.expect(pm.response.headers.get('Cache-Control')).to.equal('no-store'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Create network-restricted reporting key",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/v1/api-keys",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Phase17 loopback reporting\",\n  \"scopes\": [\n    \"sessions:read\"\n  ],\n  \"expires_in_days\": 1,\n  \"allowed_cidrs\": [\n    \"127.0.0.1/32\"\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected status', () => pm.expect([201]).to.include(pm.response.code));",
+              "pm.test('Private response', () => pm.expect(pm.response.headers.get('Cache-Control')).to.equal('no-store'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Erasure without data:erase scope is refused",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{limited_api_key}}"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/v1/kyc/{{session_id}}/erase",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected status', () => pm.expect([403]).to.include(pm.response.code));",
+              "pm.test('Private response', () => pm.expect(pm.response.headers.get('Cache-Control')).to.equal('no-store'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Erase personal data",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{erasure_key}}"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/v1/kyc/{{session_id}}/erase",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected status', () => pm.expect([200]).to.include(pm.response.code));",
+              "pm.test('Private response', () => pm.expect(pm.response.headers.get('Cache-Control')).to.equal('no-store'));",
+              "pm.test('Marked erased', () => pm.expect(pm.response.json().erased_at).to.be.a('string')); "
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Repeated erasure is harmless",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{erasure_key}}"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/v1/kyc/{{session_id}}/erase",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected status', () => pm.expect([200]).to.include(pm.response.code));",
+              "pm.test('Private response', () => pm.expect(pm.response.headers.get('Cache-Control')).to.equal('no-store'));",
+              "pm.test('Idempotent', () => pm.expect(pm.response.json().already_erased).to.equal(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Erasure revokes device token",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{client_token}}"
+          },
+          {
+            "key": "X-Organization-ID",
+            "value": "{{organization_id}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/v1/kyc/{{session_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected status', () => pm.expect([401]).to.include(pm.response.code));",
+              "pm.test('Private response', () => pm.expect(pm.response.headers.get('Cache-Control')).to.equal('no-store'));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

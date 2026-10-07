@@ -28,7 +28,7 @@ from kyc.documents.refine import refine_numeric_words
 from kyc.documents.requirements import requirement_for
 from kyc.domain.enums import CheckResult, SessionStatus
 from kyc.domain.identity import OCRLine
-from kyc.domain.state_machine import Event, TERMINAL_STATUSES
+from kyc.domain.state_machine import Event
 from kyc.engines.capture_quality import HeuristicDocumentQualityEngine, decode_capture
 from kyc.engines.contracts import CheckEvidence
 from kyc.mrz.reader import read_mrz_lines
@@ -37,7 +37,7 @@ from kyc.barcode.evaluate import assess as assess_barcodes
 from kyc.barcode.signatures import TrustStore
 from kyc.mrz import parser as mrz_parser
 from kyc.documents.iso3166 import ICAO_NON_STATE, to_alpha2
-from kyc.services.sessions import apply_event, aware
+from kyc.services.sessions import apply_event, is_expired
 from kyc.storage.captures import CaptureStore
 
 log = logging.getLogger(__name__)
@@ -72,12 +72,14 @@ class DocumentProcessor:
         return None
 
     # Entry point ------------------------------------------------------------------
-    def process(self, organization_id: UUID, session_id: UUID, request_id: UUID, today: date | None = None) -> ProcessingOutcome:
+    def process(self, organization_id: UUID, session_id: UUID, request_id: UUID, today: date | None = None,
+                wait: bool = True) -> ProcessingOutcome:
+        """wait=False (document workers, Phase 18): return BUSY at once when another worker holds the session."""
         tenant = TenantContext(organization_id, actor_id=SYSTEM_ACTOR)
         try:
             with self.factory() as db, db.begin():
                 set_tenant(db, organization_id)
-                return self._process(db, tenant, session_id, request_id, today or date.today())
+                return self._process(db, tenant, session_id, request_id, today or date.today(), wait)
         except Exception as error:  # noqa: BLE001 - recorded, session left for retry
             log.warning("Document processing failed for a session: %s", type(error).__name__)
             with self.factory() as db, db.begin():
@@ -96,12 +98,14 @@ class DocumentProcessor:
                             action=action, request_id=request_id, from_status=record.status.value,
                             to_status=record.status.value, reason_codes=[action], event_metadata={"version": record.version}))
 
-    def _process(self, db: Session, tenant: TenantContext, session_id: UUID, request_id: UUID, today: date) -> ProcessingOutcome:
-        record = db.scalar(sa.select(KYCSession).where(KYCSession.id == session_id,
-                           KYCSession.organization_id == tenant.organization_id).with_for_update())
+    def _process(self, db: Session, tenant: TenantContext, session_id: UUID, request_id: UUID, today: date,
+                 wait: bool = True) -> ProcessingOutcome:
+        query = sa.select(KYCSession).where(KYCSession.id == session_id, KYCSession.organization_id == tenant.organization_id)
+        record = db.scalar(query.with_for_update(skip_locked=not wait))
         if record is None:
-            return ProcessingOutcome("NOT_FOUND")
-        if record.status not in TERMINAL_STATUSES and aware(record.expires_at) <= datetime.now(timezone.utc):
+            # Without waiting, a locked row reads as absent: tell the two cases apart.
+            return ProcessingOutcome("BUSY" if not wait and db.scalar(sa.select(query.exists())) else "NOT_FOUND")
+        if is_expired(record):
             apply_event(db, record, tenant, Event.EXPIRE, request_id)
             return ProcessingOutcome("EXPIRED")
         if record.status != SessionStatus.DOCUMENT_PROCESSING:
@@ -145,6 +149,9 @@ class DocumentProcessor:
             if refinement and set(refinement.languages) <= self.ocr.available_languages():
                 read = refine_numeric_words(self.ocr, prepared, read, refinement)
             region = layout.mrz_regions.get(side) if layout else None
+            if layout and getattr(layout, "mrz_on_front", False):
+                # Either upload may be the MRZ side, so both get the MRZ pass (Phase 18 real-card test).
+                region = layout.mrz_regions.get("FRONT")
             if region and hasattr(self.ocr, "read_region"):
                 # Dedicated MRZ pass: ICAO alphabet only, so '<' fillers survive.
                 read = read + read_mrz_lines(self.ocr, prepared, region)
@@ -153,8 +160,11 @@ class DocumentProcessor:
         capture_sides = {side: side for side in sides}
         classifications = {side: adapter.classify(lines[side], side) for side in sides}
         notes: list[str] = []
-        if "FRONT" in classifications and "BACK" in classifications and \
-                classifications["FRONT"].document_side == "BACK" and classifications["BACK"].document_side == "FRONT":
+        front_class, back_class = classifications.get("FRONT"), classifications.get("BACK")
+        if front_class and back_class and back_class.document_side == "FRONT" and (
+                front_class.document_side != "FRONT" or back_class.confidence > front_class.confidence):
+            # The sides were uploaded the wrong way round. Also covers a nearly blank back (UNKNOWN) uploaded
+            # as the front, and two "front"-like images where the uploaded back is clearly the stronger front.
             # The person uploaded the sides the wrong way round; use them as they really are.
             lines["FRONT"], lines["BACK"] = lines["BACK"], lines["FRONT"]
             classifications["FRONT"], classifications["BACK"] = classifications["BACK"], classifications["FRONT"]
@@ -298,8 +308,13 @@ class DocumentProcessor:
         return ProcessingOutcome("RECAPTURE", reasons)
 
 
-def pending_sessions(factory: sessionmaker, organization_id: UUID) -> list[UUID]:
+def pending_sessions(factory: sessionmaker, organization_id: UUID, unclaimed: bool = False,
+                     limit: int | None = None) -> list[UUID]:
+    """Sessions waiting for document processing, oldest first. unclaimed=True skips sessions another
+    worker is processing right now (their rows are locked), so parallel workers never queue on one."""
     with factory() as db, db.begin():
         set_tenant(db, organization_id)
-        return list(db.scalars(sa.select(KYCSession.id).where(KYCSession.organization_id == organization_id,
-                                                              KYCSession.status == SessionStatus.DOCUMENT_PROCESSING)))
+        query = (sa.select(KYCSession.id).where(KYCSession.organization_id == organization_id,
+                                                KYCSession.status == SessionStatus.DOCUMENT_PROCESSING)
+                 .order_by(KYCSession.updated_at).limit(limit))
+        return list(db.scalars(query.with_for_update(skip_locked=True) if unclaimed else query))

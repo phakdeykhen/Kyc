@@ -1,482 +1,198 @@
 {
   "phase": 15,
-  "server": "uvicorn as restricted role kyc_app (NOBYPASSRLS) on PostgreSQL 16",
-  "same_session_on_retry": true,
-  "all_expected": true,
-  "steps": [
+  "date": "2026-10-06",
+  "api": "http://127.0.0.1:8015",
+  "database_role": "kyc_app",
+  "organizations": {
+    "A": "37129cef-07ad-4353-aa45-999b7212e0ac",
+    "B": "6591a3b1-50b9-43ec-a707-e41c45d0e80e"
+  },
+  "checks": [
     {
-      "step": "caller identity",
-      "request": "GET /v1/me",
-      "status": 200,
+      "check": "readiness at schema 0009_phase15",
       "expected": 200,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "59"
-      },
-      "response": {
-        "organization_id": "46232800-9916-400b-9bd9-ed2a25613fda",
-        "organization_name": "Acme Bank",
-        "api_key_id": "bf5c7111-7a76-46d3-ba78-b95f864a5f20",
-        "actor_id": "api_key:bf5c7111-7a76-46d3-ba78-b95f864a5f20",
-        "scopes": [
-          "captures:write",
-          "keys:manage",
-          "results:read",
-          "sessions:create",
-          "sessions:read",
-          "sessions:verify"
-        ],
-        "rate_limit_per_minute": 60
-      }
+      "actual": 200,
+      "pass": true
     },
     {
-      "step": "create session with Idempotency-Key",
-      "request": "POST /v1/kyc/sessions",
-      "status": 201,
+      "check": "org A key creates a session",
       "expected": 201,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "58"
-      },
-      "response": {
-        "session_id": "b0b5ad62-4873-4dbf-a38e-23cb5d49bcc6",
-        "organization_id": "46232800-9916-400b-9bd9-ed2a25613fda",
-        "user_id": "acme-customer-1",
-        "country": "KH",
-        "expected_document_type": "KH_NATIONAL_ID",
-        "verification_level": "DOCUMENT_ONLY",
-        "status": "CREATED",
-        "created_at": "2026-10-06T02:33:03.769836Z",
-        "updated_at": "2026-10-06T02:33:03.769836Z",
-        "expires_at": "2026-10-06T02:48:03.769836Z",
-        "version": 1
-      }
+      "actual": 201,
+      "pass": true
     },
     {
-      "step": "retry same key + body -> same session",
-      "request": "POST /v1/kyc/sessions",
-      "status": 201,
-      "expected": 201,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "57",
-        "Idempotent-Replayed": "true"
-      },
-      "response": {
-        "session_id": "b0b5ad62-4873-4dbf-a38e-23cb5d49bcc6",
-        "organization_id": "46232800-9916-400b-9bd9-ed2a25613fda",
-        "user_id": "acme-customer-1",
-        "country": "KH",
-        "expected_document_type": "KH_NATIONAL_ID",
-        "verification_level": "DOCUMENT_ONLY",
-        "status": "CREATED",
-        "created_at": "2026-10-06T02:33:03.769836Z",
-        "updated_at": "2026-10-06T02:33:03.769836Z",
-        "expires_at": "2026-10-06T02:48:03.769836Z",
-        "version": 1
-      }
+      "check": "idempotent retry returns the same session",
+      "expected": [
+        200,
+        "d1c73af6-d0a9-48a0-ae3b-719bac0a969e",
+        "true"
+      ],
+      "actual": [
+        200,
+        "d1c73af6-d0a9-48a0-ae3b-719bac0a969e",
+        "true"
+      ],
+      "pass": true
     },
     {
-      "step": "same key, different body",
-      "request": "POST /v1/kyc/sessions",
-      "status": 422,
-      "expected": 422,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "56"
-      },
-      "response": {
-        "detail": "This Idempotency-Key was already used with a different request body."
-      }
+      "check": "same Idempotency-Key with a different body",
+      "expected": 409,
+      "actual": 409,
+      "pass": true
     },
     {
-      "step": "Acme key used with Fintech organization header",
-      "request": "POST /v1/kyc/sessions",
-      "status": 401,
+      "check": "org A key with org B header",
       "expected": 401,
-      "ok": true,
-      "headers": {},
-      "response": {
-        "detail": "Valid credentials are required."
-      }
+      "actual": 401,
+      "pass": true
     },
     {
-      "step": "Fintech key reads Acme session",
-      "request": "GET /v1/kyc/b0b5ad62-4873-4dbf-a38e-23cb5d49bcc6",
-      "status": 404,
+      "check": "org B key cannot see org A session",
       "expected": 404,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "59"
-      },
-      "response": {
-        "detail": "Session not found."
-      }
+      "actual": 404,
+      "pass": true
     },
     {
-      "step": "Fintech key cannot list keys (no keys:manage)",
-      "request": "GET /v1/api-keys",
-      "status": 403,
+      "check": "read-only key cannot create",
       "expected": 403,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "58"
-      },
-      "response": {
-        "detail": "This API key does not have the keys:manage scope."
-      }
+      "actual": 403,
+      "pass": true
     },
     {
-      "step": "Acme admin issues a capture-only key",
-      "request": "POST /v1/api-keys",
-      "status": 201,
-      "expected": 201,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "55"
-      },
-      "response": {
-        "id": "3bc54222-53f6-47a6-9830-481f24935f45",
-        "name": "Mobile capture",
-        "key_prefix": "kyc_ecc3d1f125949f21",
-        "scopes": [
-          "captures:write",
-          "sessions:read"
-        ],
-        "created_at": "2026-10-06T02:33:03.827065Z",
-        "created_by": "api_key:bf5c7111-7a76-46d3-ba78-b95f864a5f20",
-        "expires_at": "2026-11-05T02:33:03.825471Z",
-        "revoked_at": null,
-        "last_used_at": null,
-        "active": true,
-        "key": "kyc_ecc3d1f125949f21_<redacted>"
-      }
+      "check": "read-only key reads result (identity masked flag present)",
+      "expected": [
+        200,
+        true
+      ],
+      "actual": [
+        200,
+        true
+      ],
+      "pass": true
     },
     {
-      "step": "capture key reads session status",
-      "request": "GET /v1/kyc/b0b5ad62-4873-4dbf-a38e-23cb5d49bcc6",
-      "status": 200,
-      "expected": 200,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "59"
-      },
-      "response": {
-        "session_id": "b0b5ad62-4873-4dbf-a38e-23cb5d49bcc6",
-        "organization_id": "46232800-9916-400b-9bd9-ed2a25613fda",
-        "user_id": "acme-customer-1",
-        "country": "KH",
-        "expected_document_type": "KH_NATIONAL_ID",
-        "verification_level": "DOCUMENT_ONLY",
-        "status": "CREATED",
-        "created_at": "2026-10-06T02:33:03.769836Z",
-        "updated_at": "2026-10-06T02:33:03.769836Z",
-        "expires_at": "2026-10-06T02:48:03.769836Z",
-        "version": 1
-      }
-    },
-    {
-      "step": "capture key cannot read identity result",
-      "request": "GET /v1/kyc/b0b5ad62-4873-4dbf-a38e-23cb5d49bcc6/result",
-      "status": 403,
+      "check": "key without keys:manage cannot list keys",
       "expected": 403,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "58"
-      },
-      "response": {
-        "detail": "This API key does not have the results:read scope."
-      }
+      "actual": 403,
+      "pass": true
     },
     {
-      "step": "capture key cannot create sessions",
-      "request": "POST /v1/kyc/sessions",
-      "status": 403,
+      "check": "client token issued",
+      "expected": [
+        201,
+        "session:capture"
+      ],
+      "actual": [
+        201,
+        "session:capture"
+      ],
+      "pass": true
+    },
+    {
+      "check": "client token reads its session status",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "client token cannot read the result",
       "expected": 403,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "57"
-      },
-      "response": {
-        "detail": "This API key does not have the sessions:create scope."
-      }
+      "actual": 403,
+      "pass": true
     },
     {
-      "step": "capture key cannot mint keys",
-      "request": "POST /v1/api-keys",
-      "status": 403,
-      "expected": 403,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "56"
-      },
-      "response": {
-        "detail": "This API key does not have the keys:manage scope."
-      }
-    },
-    {
-      "step": "admin cannot grant unknown scope",
-      "request": "POST /v1/api-keys",
-      "status": 422,
-      "expected": 422,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "54"
-      },
-      "response": {
-        "detail": "Unknown or empty scopes: root."
-      }
-    },
-    {
-      "step": "rotate capture key with 1 h grace",
-      "request": "POST /v1/api-keys/3bc54222-53f6-47a6-9830-481f24935f45/rotate",
-      "status": 201,
-      "expected": 201,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "53"
-      },
-      "response": {
-        "id": "74314ae5-8f18-41d5-9d96-93a6e27341c2",
-        "name": "Mobile capture",
-        "key_prefix": "kyc_1bdc26094d08e587",
-        "scopes": [
-          "captures:write",
-          "sessions:read"
-        ],
-        "created_at": "2026-10-06T02:33:03.869772Z",
-        "created_by": "api_key:bf5c7111-7a76-46d3-ba78-b95f864a5f20",
-        "expires_at": "2026-11-05T02:33:03.825471Z",
-        "revoked_at": null,
-        "last_used_at": null,
-        "active": true,
-        "key": "kyc_1bdc26094d08e587_<redacted>"
-      }
-    },
-    {
-      "step": "old capture key still works during grace",
-      "request": "GET /v1/me",
-      "status": 200,
-      "expected": 200,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "55"
-      },
-      "response": {
-        "organization_id": "46232800-9916-400b-9bd9-ed2a25613fda",
-        "organization_name": "Acme Bank",
-        "api_key_id": "3bc54222-53f6-47a6-9830-481f24935f45",
-        "actor_id": "api_key:3bc54222-53f6-47a6-9830-481f24935f45",
-        "scopes": [
-          "captures:write",
-          "sessions:read"
-        ],
-        "rate_limit_per_minute": 60
-      }
-    },
-    {
-      "step": "new capture key works",
-      "request": "GET /v1/me",
-      "status": 200,
-      "expected": 200,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "59"
-      },
-      "response": {
-        "organization_id": "46232800-9916-400b-9bd9-ed2a25613fda",
-        "organization_name": "Acme Bank",
-        "api_key_id": "74314ae5-8f18-41d5-9d96-93a6e27341c2",
-        "actor_id": "api_key:74314ae5-8f18-41d5-9d96-93a6e27341c2",
-        "scopes": [
-          "captures:write",
-          "sessions:read"
-        ],
-        "rate_limit_per_minute": 60
-      }
-    },
-    {
-      "step": "revoke the new capture key",
-      "request": "DELETE /v1/api-keys/74314ae5-8f18-41d5-9d96-93a6e27341c2",
-      "status": 200,
-      "expected": 200,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "52"
-      },
-      "response": {
-        "id": "74314ae5-8f18-41d5-9d96-93a6e27341c2",
-        "name": "Mobile capture",
-        "key_prefix": "kyc_1bdc26094d08e587",
-        "scopes": [
-          "captures:write",
-          "sessions:read"
-        ],
-        "created_at": "2026-10-06T02:33:03.869772Z",
-        "created_by": "api_key:bf5c7111-7a76-46d3-ba78-b95f864a5f20",
-        "expires_at": "2026-11-05T02:33:03.825471Z",
-        "revoked_at": "2026-10-06T02:33:03.895306Z",
-        "last_used_at": "2026-10-06T02:33:03.885061Z",
-        "active": false
-      }
-    },
-    {
-      "step": "revoked key refused",
-      "request": "GET /v1/me",
-      "status": 401,
+      "check": "client token cannot reach another session",
       "expected": 401,
-      "ok": true,
-      "headers": {},
-      "response": {
-        "detail": "Valid credentials are required."
-      }
+      "actual": 401,
+      "pass": true
     },
     {
-      "step": "list active keys (no secrets)",
-      "request": "GET /v1/api-keys",
-      "status": 200,
+      "check": "client token is authorized to upload (unreadable image refused by the gate)",
+      "expected": 422,
+      "actual": 422,
+      "pass": true
+    },
+    {
+      "check": "self-service key created",
+      "expected": [
+        201,
+        "ACTIVE",
+        "kyc_"
+      ],
+      "actual": [
+        201,
+        "ACTIVE",
+        "kyc_"
+      ],
+      "pass": true
+    },
+    {
+      "check": "new key works",
       "expected": 200,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "60",
-        "X-RateLimit-Remaining": "51"
-      },
-      "response": [
-        {
-          "id": "3bc54222-53f6-47a6-9830-481f24935f45",
-          "name": "Mobile capture",
-          "key_prefix": "kyc_ecc3d1f125949f21",
-          "scopes": [
-            "captures:write",
-            "sessions:read"
-          ],
-          "created_at": "2026-10-06T02:33:03.827065Z",
-          "created_by": "api_key:bf5c7111-7a76-46d3-ba78-b95f864a5f20",
-          "expires_at": "2026-10-06T03:33:03.870933Z",
-          "revoked_at": null,
-          "last_used_at": "2026-10-06T02:33:03.834384Z",
-          "active": true
-        },
-        {
-          "id": "bf5c7111-7a76-46d3-ba78-b95f864a5f20",
-          "name": "Acme admin",
-          "key_prefix": "kyc_79d6f118b814c25d",
-          "scopes": [
-            "captures:write",
-            "keys:manage",
-            "results:read",
-            "sessions:create",
-            "sessions:read",
-            "sessions:verify"
-          ],
-          "created_at": "2026-10-06T02:31:49.651062Z",
-          "created_by": "administrator",
-          "expires_at": null,
-          "revoked_at": null,
-          "last_used_at": "2026-10-06T02:32:20.549667Z",
-          "active": true
-        }
-      ]
+      "actual": 200,
+      "pass": true
     },
     {
-      "step": "Fintech request 3 within 4/min (2 earlier this minute)",
-      "request": "GET /v1/me",
-      "status": 200,
-      "expected": 200,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "4",
-        "X-RateLimit-Remaining": "1"
-      },
-      "response": {
-        "organization_id": "681344bd-69d5-4f4a-b90d-353c650b1b59",
-        "organization_name": "Fintech B",
-        "api_key_id": "c7ee104d-bcdf-4ea5-b3d6-dc212e678c2e",
-        "actor_id": "api_key:c7ee104d-bcdf-4ea5-b3d6-dc212e678c2e",
-        "scopes": [
-          "captures:write",
-          "results:read",
-          "sessions:create",
-          "sessions:read",
-          "sessions:verify"
-        ],
-        "rate_limit_per_minute": 4
-      }
-    },
-    {
-      "step": "Fintech request 4 within 4/min (2 earlier this minute)",
-      "request": "GET /v1/me",
-      "status": 200,
-      "expected": 200,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "4",
-        "X-RateLimit-Remaining": "0"
-      },
-      "response": {
-        "organization_id": "681344bd-69d5-4f4a-b90d-353c650b1b59",
-        "organization_name": "Fintech B",
-        "api_key_id": "c7ee104d-bcdf-4ea5-b3d6-dc212e678c2e",
-        "actor_id": "api_key:c7ee104d-bcdf-4ea5-b3d6-dc212e678c2e",
-        "scopes": [
-          "captures:write",
-          "results:read",
-          "sessions:create",
-          "sessions:read",
-          "sessions:verify"
-        ],
-        "rate_limit_per_minute": 4
-      }
-    },
-    {
-      "step": "Fintech 5th request rate-limited",
-      "request": "GET /v1/me",
-      "status": 429,
-      "expected": 429,
-      "ok": true,
-      "headers": {
-        "X-RateLimit-Limit": "4",
-        "X-RateLimit-Remaining": "0",
-        "Retry-After": "60"
-      },
-      "response": {
-        "detail": "Rate limit exceeded for this API key."
-      }
-    },
-    {
-      "step": "suspended organization refused",
-      "request": "GET /v1/me",
-      "status": 403,
+      "check": "escalation refused",
       "expected": 403,
-      "ok": true,
-      "headers": {},
-      "response": {
-        "detail": "This organization is suspended."
-      }
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "check": "self-service key revoked",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "revoked key refused",
+      "expected": 401,
+      "actual": 401,
+      "pass": true
+    },
+    {
+      "check": "kyc_app under org B cannot see org A's key",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "check": "kyc_app cannot rewrite a key's scopes",
+      "expected": "permission denied",
+      "actual": "permission denied",
+      "pass": true
+    },
+    {
+      "check": "kyc_app cannot change an organization",
+      "expected": "permission denied",
+      "actual": "permission denied",
+      "pass": true
+    },
+    {
+      "check": "session records its creating key and only a token hash",
+      "expected": [
+        true,
+        64
+      ],
+      "actual": [
+        true,
+        64
+      ],
+      "pass": true
+    },
+    {
+      "check": "suspended organization refused",
+      "expected": 403,
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "check": "reactivated organization works",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
     }
   ],
-  "database_checks": {
-    "kyc_app_can_delete_api_keys": "f",
-    "api_keys_rows_visible_without_tenant_context_as_kyc_app": "0",
-    "sessions_created_in_acme": "1",
-    "stored_secret_columns": "created_at,revoked_at,last_used_at,id,organization_id,scopes,expires_at,name,key_prefix,secret_sha256,created_by",
-    "plaintext_keys_found_in_database": "0",
-    "audit_actions": "API_KEY_CREATED:4, API_KEY_REVOKED:1, API_KEY_ROTATED:1, ORGANIZATION_CREATED:2"
-  }
+  "passed": 25,
+  "failed": []
 }

@@ -61,8 +61,12 @@ def read(args) -> None:
     pki = load(args.pki_dir)
     portrait = Image.open(args.portrait).convert("RGB") if args.portrait else None
     chip = fx.make_chip(pki=pki, portrait=portrait)
-    headers = {"X-API-Key": os.environ.get("KYC_API_KEY") or os.environ["DEVELOPMENT_API_KEY"],
-               "X-Organization-ID": os.environ.get("KYC_ORGANIZATION_ID") or os.environ["DEVELOPMENT_ORGANIZATION_ID"]}
+    # A session client token (what a phone would hold) or an API key with sessions:write.
+    organization = os.environ.get("KYC_ORGANIZATION_ID") or os.environ["DEVELOPMENT_ORGANIZATION_ID"]
+    if os.environ.get("KYC_CLIENT_TOKEN"):
+        headers = {"Authorization": f"Bearer {os.environ['KYC_CLIENT_TOKEN']}", "X-Organization-ID": organization}
+    else:
+        headers = {"X-API-Key": os.environ.get("KYC_API_KEY") or os.environ["DEVELOPMENT_API_KEY"], "X-Organization-ID": organization}
     base = f"{args.base_url}/v1/kyc/{args.session}"
     code, challenge = request(f"{base}/nfc/challenge", headers, b"{}", "application/json")
     if code != 200:

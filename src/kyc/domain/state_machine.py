@@ -6,6 +6,13 @@ from enum import StrEnum
 from .enums import SessionStatus as S, VerificationLevel as L
 
 TERMINAL_STATUSES = frozenset({S.VERIFIED, S.REJECTED, S.EXPIRED})
+# A case waiting for a reviewer is out of the person's hands, so the session lifetime
+# no longer applies; a REQUEST_RECAPTURE decision starts a fresh one.
+NO_EXPIRY_STATUSES = frozenset({S.MANUAL_REVIEW})
+
+
+def can_expire(status: S) -> bool:
+    return status not in TERMINAL_STATUSES and status not in NO_EXPIRY_STATUSES
 
 
 class Event(StrEnum):

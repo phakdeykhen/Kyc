@@ -1,56 +1,250 @@
 # Build progress — Universal Identity Platform
 
 Updated: 6 October 2026. The full requirements in `Document.md` control the build.
-Phases 1–15 are implemented. Work is paused at the Phase 15 approval gate; Phase 16
-(webhooks and SDK) has not started.
+Phases 1–18 are implemented. The user authorized Phases 17 and 18 on 6 October 2026.
+Load/performance testing is complete; subsequent phone-test corrections passed
+with no skips. Work is paused at the Phase 18 approval gate; Phase 19 (GCP production
+deployment) has not started.
+
+## Phone-test Khmer ID extraction & MRZ matching correction (6 October 2026)
+
+Following real card test observations from `var/real-id-debug.json`:
+1. **MRZ candidate extraction.** `MRZ_LINE` regex minimum length changed from 25 to 20, matching the TD1 assembler minimum width and preventing truncated name lines (`KHEN<<PHAKDEY<<<<<<<<<<<`) from being discarded before assembly.
+2. **Name selection.** In `mrz/parser.py`, `name_quality` checks for `<<` within `cleaned.rstrip("<")` (distinguishing the name separator from trailing `<` filler) and prioritizes low noise (`-noise`) over unpadded line length (`-fit[1]`), selecting clean lines over lines with trailing OCR filler noise (`CCCCCCEECEEEEE`).
+3. **Number extraction.** In `KhmerLabelAdapter._number`, lines matching MRZ patterns (`clean_mrz.count("<") >= 2`, `MRZ_PASS`, `back_marker`) are excluded from visual number extraction so that raw MRZ lines (`IDKHMO...`) are not falsely extracted as visual document numbers (`405477038`).
+4. **MRZ field fallback.** In `KhmerLabelAdapter._fill_from_mrz`, `sex` and `full_name` are populated when `_fields_verified(parsed)` is true (document number, birth date, and expiry date check digits pass), even if optional data composite check digit is unverified due to trailing noise.
+5. **Cambodian ID layout & comparison.** `CambodiaNationalIDAdapter` updated to policy `KH-NID-ADAPTER-2026.10.3` supporting 9-10 digit numbers (`\d{9,10}`) and additional label variations. MRZ comparison allows 10-digit visual numbers to match 9-digit TD1 MRZ numbers when prefixed by them.
+
+## Phone-test liveness correction (6 October 2026)
+
+The reported Khmer ID session was rejected solely for `LIVENESS_FAILED`, from an
+uncalibrated `FLAT_FACE_PRESENTATION` finding. The current document photos and expiry
+passed; OCR/MRZ and face comparison remained review findings. The landmark heuristic
+can also flag a live 3D head with expression/estimation displacement.
+
+Policy `ACTIVE-GEOMETRY-2026.10.2` routes uncertain flat geometry to manual review,
+without automatically verifying it. Identical-image replay and calibrated flat-geometry
+failures remain failures. Existing recorded decisions are preserved. Capture wording
+now distinguishes photo quality acceptance from identity verification.
+
+Targeted liveness/risk regressions: **35/35 passed**, including a synthetic live-head
+false-rejection reproduction, manual-review handoff and replay rejection. Capture-client
+smoke passed. The full suite passed **452/452 tests with no skips** in 216.370 seconds,
+including live PostgreSQL and native face inference. The local HTTPS phone-test server
+on port 8443 was restarted; liveness policy `.2`, health/live, health/ready and updated
+capture wording were verified. Refresh the capture page and create a new session;
+[validation summary](artifacts/liveness-false-rejection-validation.json).
+
+## Phase 18 implementation (6 October 2026)
+
+The user's request ("continue do 17 … 18") authorized Phases 17 and 18. Phase 17 was finished
+and validated first (440/440); Phase 18 followed. Design and full numbers:
+[architecture-phase18.md](docs/architecture-phase18.md).
+
+- **Load tools.** `scripts/load_test.py` (closed-loop HTTP, stdlib only; health, status poll,
+  result, create, upload and mixed scenarios) and `scripts/benchmark_stages.py` (per-engine CPU
+  cost; live end-to-end document pipeline).
+- **Defect found and fixed: stall above 40 in-flight requests.** Requests holding a pooled DB
+  connection waited for one of Starlette's 40 threads while every thread waited for a
+  connection. At 64 users throughput fell from about 119 to 4–6 rps, with 10 s latency and 503s.
+  Per-process admission control (`kyc/core/admission.py`, `MAX_CONCURRENT_REQUESTS`,
+  `REQUEST_QUEUE_TIMEOUT_SECONDS`) now queues excess requests and sheds them with
+  503 + `Retry-After` only after 5 s. At 64 and 128 users the API keeps serving.
+- **Status polls no longer wait for OCR.** `GET /v1/kyc/{id}` reads without the row lock that
+  document processing holds for its whole ~5–6 s OCR run; the lock is taken only to record expiry.
+- **Scale-out measured.** Four uvicorn workers (`WEB_CONCURRENCY`) roughly doubled to tripled
+  peak throughput (status 119 → 319 rps, mixed 87 → 207 rps), with zero errors at 128 users.
+- **OCR is the capacity limit.** Full-page Khmer+English Tesseract takes 1.85 s; a passport spends
+  5.4–6.2 s in processing. Deferred processing raised upload intake from 1.1/s to 16.7/s. The
+  document worker now runs `--parallel N --loop S`, claims work with `SKIP LOCKED`
+  (`process(wait=False)` → `BUSY`) and refills slots continuously: 16 → 24 documents/min on this
+  machine. Production configuration now uses deferred processing.
+
+### Phase 18 validation evidence
+
+- **445 tests: 445 passed, 0 skipped, 0 failures** with live PostgreSQL and the native face
+  models ([artifacts/phase18-tests.txt](artifacts/phase18-tests.txt)); 5 new tests in
+  `tests/test_performance.py`. TypeScript SDK and capture-client smoke tests re-run.
+- Load and stage results: [baseline](artifacts/phase18-load-baseline.json),
+  [after the fixes](artifacts/phase18-load-tuned.json), [stages and pipeline](artifacts/phase18-stages.json).
+
+### Phase 18 limits
+
+The measurements come from a shared 12-core laptop (load average up to 52) with the client,
+API, database and OCR on one host. They compare configurations; they are not production
+capacity, and Phase 19 must re-measure on the target sizes. There was no soak test. Face,
+liveness, NFC, webhook and review endpoints were not load-tested over HTTP. Document processing
+still holds one transaction for its OCR run. Admission control and rate limits are per process.
+
+## Phase 17 implementation (6 October 2026)
+
+Implemented application security and privacy controls:
+
+- **Production gate.** Requires the restricted `kyc_app` role, encrypted DB transport,
+  independent capture/PII/biometric/webhook/HMAC keys, Host restrictions and document
+  consent. Development credentials and the development capture page are refused.
+- **HTTP and logs.** Security headers, production HSTS, generic errors with request IDs,
+  refusal events that log route templates and credential types, and sanitized exception
+  summaries. Alembic preserves existing security loggers. Bounded multipart uploads remain
+  in memory, including the largest permitted liveness request.
+- **Credentials.** IPv4/IPv6 CIDR allow-lists; child keys cannot widen scopes, networks,
+  rate limits or expiry. Reviewer tokens expire and can be rotated or deactivated.
+- **Consent.** Explicit current-policy document consent precedes production uploads/OCR;
+  stale grants require renewal. Biometric consent remains separate.
+- **Erasure.** A separate `data:erase` scope removes personal/biometric artifacts,
+  identifiers and reviewer notes, revokes device tokens and consents, and preserves
+  coded decisions and audit history. DB commit precedes storage deletion; interrupted
+  cleanup is recoverable through the retention sweep.
+- **Rotation.** Independent webhook keyring, legacy-secret resealing, data-class key
+  inventory and resealing. Capture envelopes are authenticated; orphan namespaces and
+  interrupted file/DB updates are included. Unverified or old-key data blocks retirement.
+- **Database privileges.** Effective PUBLIC/inherited grants, column privileges, grant
+  options, ownership, exact forced-RLS policies and privileged functions are checked.
+  Audit/decision records remain append-only; one tenant-scoped function can erase notes
+  only after session erasure.
+- **SDKs and dependencies.** HTTPS for remote APIs, redirect refusal, consent/erasure
+  methods and network-restricted key creation. Patched runtime dependencies, updated
+  lock, version `0.17.0` and an OpenAPI contract with route-specific credential types.
+
+Migration `0011_phase17` adds CIDRs, reviewer expiration and session erasure markers.
+The already-applied revision is preserved; `0012_phase17_finalize` adds the scoped
+note-erasure function and nullable erased notes. Both are applied locally.
+Design, directory tree, configuration, curl/Postman examples and operating procedures:
+[architecture-phase17.md](docs/architecture-phase17.md).
+
+### Phase 17 validation evidence
+
+Final validation passed:
+
+- **440/440 Python tests, zero failures, errors or skips** in 235.831 seconds, including
+  live isolated PostgreSQL schemas and native face inference
+  ([transcript](artifacts/phase17-tests.txt), [summary](artifacts/phase17-validation.json)).
+- **24/24 live database security checks**, with 25 forced-RLS tenant tables and the real
+  restricted API role ([report](artifacts/phase17-security-check.json)).
+- Migrated isolated PostgreSQL regression verifies tenant-scoped erasure, immutable coded
+  history, default deny, PUBLIC/inherited privilege detection and privilege reset
+  ([targeted transcript](artifacts/phase17-postgres-tests.txt)).
+- **31 pinned runtime packages, no known vulnerabilities** after replacing the five
+  vulnerable packages identified by the initial audit
+  ([final audit](artifacts/phase17-dependencies.json)).
+- **6/6 TypeScript SDK tests**, strict TypeScript 5.9.3 compilation, Python SDK real
+  redirect refusal and capture-client simulation. OpenAPI has 34 paths.
+- Targeted checks cover failed-commit rollback/no deletion, failed-storage cleanup/retry,
+  current-policy consent, actual old capture envelopes/orphans, active security logging
+  after migrations, and a real 26 MiB multipart parse without plaintext disk rollover.
+
+### Phase 17 limits
+
+The local database connection is loopback development traffic; production requires TLS
+or a non-overridden Unix socket. GCP deployment, IAM/CMEK/KMS and managed secret injection
+remain Phase 19 work. Docker configuration is updated but cannot be executed here because
+Docker is not installed. mTLS/request signing and SSO/MFA are not implemented; rate limits
+are per process. Backup and partner-payload deletion require their own lifecycle controls.
+Face/liveness calibration and physical NFC validation remain unverified. Phase 18 requires
+separate authorization under `Document.md` §31.
+
+## Phase 16 implementation (6 October 2026)
+
+Implemented signed webhooks and the SDKs:
+- **Transactional outbox.** `apply_event` records each state change. Just before the
+  transaction commits, the changes become `webhook_deliveries` rows (one per subscribed
+  endpoint), so a rolled-back transition sends nothing and a committed one is never lost.
+- **Events.** The spec's six events plus `kyc.recapture.required` and `kyc.expired`.
+  Payloads carry IDs, status, `session_version`, and the decision and review codes, never
+  identity data.
+- **Signing.** `KYC-Signature: t=…,v1=HMAC-SHA256(secret, "t.body")` with a five-minute
+  tolerance. `KYC-Event-ID` is stable across retries for deduplication. Secrets are
+  `whsec_…`, shown once and sealed with the PII keyring. Rotation keeps the old secret
+  signing for 24 h.
+- **Delivery.** API background threads send right after commit, and
+  `scripts/deliver_webhooks.py` sends retries. Claims use `SKIP LOCKED` plus a lease.
+  Backoff runs 30 s → 6 h; a delivery is abandoned after 8 attempts and can be redelivered.
+- **SSRF.** https only. At creation and at every delivery, all resolved addresses must be
+  public; the connection goes to the checked IP; redirects are not followed.
+- **API.** `/v1/webhooks` (CRUD, event types, rotate-secret, test, deliveries, redeliver),
+  scope `webhooks:manage`.
+- **SDKs.** `sdk/python` (stdlib only) and `sdk/typescript` (fetch + Web Crypto) provide
+  server and device clients and webhook verification. `sdk/openapi.json` is the contract
+  for the mobile SDKs, which are specified but not built.
+
+Migration `0010_phase16` adds `webhook_endpoints` and `webhook_deliveries`, both with forced
+RLS. Design: [architecture-phase16.md](docs/architecture-phase16.md).
+
+### Phase 16 validation evidence
+
+- **383 tests: 383 passed, 0 skipped, 0 failures** with live PostgreSQL 18.6 (25 forced-RLS
+  tables) and native face models ([artifacts/phase16-tests.txt](artifacts/phase16-tests.txt)).
+  New tests: 18 in `tests/test_webhooks.py` and 3 in `tests/test_sdk.py`.
+- TypeScript SDK: 4/4 `node --test` and a strict `tsc` 5.9.3 type-check. The test vector
+  signed by the Python server verifies in TypeScript.
+- Live HTTP as `kyc_app` ([artifacts/phase16-live-e2e.json](artifacts/phase16-live-e2e.json)):
+  **21/21 checks passed**. The run covered:
+  - A device token uploaded a rendered specimen passport. Real OCR and the risk engine
+    sent it to manual review, and a reviewer approved it.
+  - The receiver got `document.accepted`, `processing`, `review.required` and `verified`.
+    All of them verified with the SDK, and none contained identity data.
+  - A 500 response was retried. A worker with default settings refused the local
+    (private) receiver at delivery time. Redelivery worked, with the same event ID
+    across attempts.
+  - During rotation, the header carried two signatures and both secrets verified.
+  - The TypeScript SDK ran against the live API and verified a live delivery.
+  - Organization B could not see the webhook rows; secrets were encrypted; `kyc_app`
+    could not hard-delete an endpoint.
+
+### Phase 16 limits
+
+Events may arrive out of order (use `session_version`); background sends are per
+instance, so the worker must run; there is no endpoint auto-disable; secrets use the PII
+keyring until Phase 17 KMS; the SDKs are unpublished; mobile SDKs are not built; Docker
+is configured but not executed (Docker is not installed here).
 
 ## Phase 15 implementation (6 October 2026)
 
-Implemented per-organization API keys. Each client application now gets its own key
-instead of the single shared development key:
-- Keys are `kyc_<public prefix>_<secret>`. Only a SHA-256 is stored and the key is shown once.
-- Each key has scopes (`sessions:create`, `sessions:read`, `captures:write`,
-  `sessions:verify`, `results:read`, `keys:manage`), an optional expiry, revocation and
-  rotation with a grace period.
-- Keys are looked up inside the organization's row-level-security context, so a key
-  only works with its own `X-Organization-ID`.
-- Organizations can be suspended. Each key has a per-minute rate limit (with
-  `X-RateLimit-*` and `Retry-After` headers).
-- `POST /v1/kyc/sessions` accepts `Idempotency-Key`.
-- `GET /v1/me` describes the caller. A `keys:manage` key can list, issue, rotate and
-  revoke its organization's keys, but cannot grant scopes it lacks.
-- Operators use `scripts/manage_tenants.py`. Requests are audited as `api_key:<id>`.
-- The development key is now optional and works outside production only.
+Implemented the multi-tenant API:
+- **API keys.** Organizations are provisioned with `scripts/manage_tenants.py`. Each gets
+  scoped, expiring, revocable keys (`kyc_…`), stored only as a SHA-256. A key is looked up
+  inside its own organization's RLS context, so with any other `X-Organization-ID` it
+  simply isn't found.
+- **Scopes** (`sessions:write`, `sessions:read`, `results:identity`, `webhooks:manage`,
+  `keys:manage`) are enforced per route. Results mask identity (first letters, birth
+  year) unless the key holds `results:identity`.
+- **Self-service keys.** `GET/POST /v1/api-keys` and `DELETE /v1/api-keys/{id}`; a key
+  cannot grant more scope or rate limit than its creator holds. `GET /v1/organization`.
+- **Session client tokens** (`kst_…`, `POST /v1/kyc/{id}/client-token`) let a device
+  capture evidence for, and poll the status of, one session without an API key. A new
+  token revokes the old one; it expires with the session.
+- **Idempotency-Key** on session creation: replay → 200 with the same session;
+  different body → 409; unique per organization in the database.
+- **Per-credential rate limits** → 429 with `Retry-After`.
+- **Suspension.** A suspended organization loses API keys, client tokens and reviewers
+  at once (403).
+- The development key is now optional.
 
-Migration `0009_phase15` adds `api_keys` and `idempotency_keys` (both forced RLS, 24
-policies in total) and `organizations.active` / `api_rate_limit_per_minute`.
+Migration `0009_phase15` adds `api_keys` (forced RLS; `kyc_app` may only update
+`last_used_at`/`revoked_at`), `organizations.active` and the session columns.
 Design: [architecture-phase15.md](docs/architecture-phase15.md).
 
 ### Phase 15 validation evidence
 
-- **361 tests: 353 passed, 8 skipped, 0 failures**, including the live PostgreSQL 16 RLS
-  test, which now covers `api_keys` and `idempotency_keys`
-  ([artifacts/phase15-tests.txt](artifacts/phase15-tests.txt)). The skipped tests need
-  Tesseract Khmer fonts and native face models, which this runner did not have.
-- Live HTTP as restricted `kyc_app`, with keys from `manage_tenants.py`: 23 of 23 steps
-  matched ([artifacts/phase15-live-e2e.json](artifacts/phase15-live-e2e.json), secrets redacted):
-  - idempotent retry and a conflicting body
-  - wrong-organization key and a foreign session
-  - capture-only key limits
-  - rotation grace and revocation
-  - 429 rate limit and suspension
-  - no DELETE grant and no plaintext keys
-- The live run found and fixed a bug: a `FOR UPDATE` lock needed a privilege `kyc_app`
-  lacks, and it was removed.
+- **362 tests: 362 passed, 0 skipped, 0 failures** with live PostgreSQL 18 (`api_keys`
+  RLS; 23 forced-RLS tables) and the native face models
+  ([artifacts/phase15-tests.txt](artifacts/phase15-tests.txt)). 18 new tests in
+  `tests/test_tenancy.py`.
+- Live HTTP as `kyc_app`, with two organizations and keys made by the real admin script:
+  **25/25 checks passed** ([artifacts/phase15-live-e2e.json](artifacts/phase15-live-e2e.json)). They covered:
+  - cross-organization 401/404;
+  - scope 403s;
+  - idempotent replay and conflict;
+  - client token limits;
+  - self-service create/escalation/revoke;
+  - suspension and reactivation;
+  - `kyc_app` unable to rewrite key scopes or organizations.
 
 ### Phase 15 limits
 
-- Rate limits are counted per process.
-- Failed authentication is not audited.
-- Organizations are provisioned from the CLI only; there is no operator console, SSO or MFA.
-- Key hashes are not peppered.
-
-These belong to Phases 17–19.
+Rate limits are per process (Memorystore in Phase 19); no IP allow-lists, mTLS or
+request signing (Phase 17); `org list` needs a role that bypasses RLS; organizations
+and retention are changed only by the admin script.
 
 ## Phase 14 implementation (6 October 2026)
 
@@ -215,8 +409,9 @@ Implemented active liveness. The server issues a single-use, random head-movemen
 challenge (frontal baseline + three distinct moves, 24 sequences, 256-bit nonce stored
 only as a hash, 120 s TTL). The client returns 4–12 raw frames tagged with step indices.
 Each move is verified with an affine-invariant 3D test on YuNet landmarks: flat faces
-keep the nose's eye/mouth-frame coordinates; real heads move them. Flat-face presentations
-and single-image replays FAIL. Every frame must still be the selfie's person (SFace
+keep the nose's eye/mouth-frame coordinates; real heads move them. Single-image replays
+FAIL; uncertain flat geometry requires REVIEW under the uncalibrated policy following
+the 6 October phone-test correction. Every frame must still be the selfie's person (SFace
 continuity). Incomplete challenges are retryable within an attempt limit. Frames are
 never stored; `liveness_checks` keeps outcomes, metrics, coverage and the nonce hash.
 The policy is uncalibrated, so the best result is REVIEW. The capture page gained the
@@ -648,18 +843,18 @@ does not claim production readiness or functioning verification engines.
 | 12 | Cross-checks and fraud signals | Complete; 318/318 tests; 7 detectors + cross-check matrix; live PostgreSQL E2E passed; forensics models not included |
 | 13 | Deterministic risk engine | Complete; 333/333 tests; tighten-only policy; live PostgreSQL E2E passed; uncalibrated biometrics → MANUAL_REVIEW |
 | 14 | Authorized manual review dashboard | Complete; 344/344 tests; role-based views, guarded decisions, audited; live + browser E2E passed |
-| 15 | Multi-tenant API and credential provisioning | Waiting for approval |
-| 16 | Signed webhooks and SDKs | Not started |
-| 17 | Security/privacy hardening | Not started |
-| 18 | Load/performance testing | Not started |
+| 15 | Multi-tenant API and credential provisioning | Complete; 362/362 tests; scoped hashed keys, RLS key lookup, client tokens, idempotency, rate limits; live E2E 25/25 |
+| 16 | Signed webhooks and SDKs | Complete; 383/383 tests; outbox webhooks, HMAC signing, retries, SSRF-safe delivery; Python + TypeScript SDKs; live E2E 21/21; mobile SDKs not built |
+| 17 | Security/privacy hardening | Complete; 440/440 tests, 24/24 DB security checks, 31 audited runtime packages with no known vulnerabilities |
+| 18 | Load/performance testing | Complete; 445/445 tests; admission control fixed a >40-request stall; 4 workers ≈ 2–3× peak; OCR tier is the limit (deferred + claiming worker) |
 | 19 | GCP production deployment | Not started |
 | 20 | Additional country/document adapters | Not started |
 
 ## Approval requirement
 
 `Document.md`, section 31, states: **“Stop and wait for approval before next
-phase.”** The user's request authorized Phases 8 and 9 together, then Phases 10–11, then Phases 12, 13 and 14 in turn.
-Phase 15 requires separate approval.
+phase.”** The user's request authorized Phases 8 and 9 together, then Phases 10–11, then Phases 12, 13 and 14 in turn, then Phases 15 and 16 together.
+The user authorized Phases 17 and 18 on 6 October 2026. Phase 19 requires separate approval.
 
 ## Earlier reference work
 

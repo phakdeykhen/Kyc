@@ -7,6 +7,7 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from kyc.core.crypto import decode_key, parse_keyring
+from kyc.core.hardening import production_problems, shared_keys
 
 
 class Settings(BaseSettings):
@@ -14,13 +15,28 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     database_url: SecretStr
     migration_database_url: SecretStr | None = None
-    # Phase 15: clients use per-organization API keys (scripts/manage_tenants.py). This shared key is an
-    # optional development fallback for the development organization; leave it unset to disable it.
+    # Optional local credential with every scope, bound to one organization. Provisioned
+    # API keys (scripts/manage_tenants.py) are the tenant credentials from Phase 15 on.
     development_api_key: SecretStr | None = None
-    development_organization_id: UUID
+    development_organization_id: UUID | None = None
+    # Phase 15 per-credential limits (requests per minute, per API instance).
+    api_rate_limit_per_minute: int = Field(default=600, ge=1, le=100_000)
+    client_token_rate_limit_per_minute: int = Field(default=120, ge=1, le=10_000)
+    # Phase 16 webhooks. "background": the API sends right after commit and the worker sends
+    # retries; "worker": only scripts/deliver_webhooks.py sends. Private targets are for local receivers only.
+    webhook_delivery_mode: Literal["background", "worker"] = "background"
+    webhook_allow_private_targets: bool = False
+    webhook_timeout_seconds: float = Field(default=10.0, ge=1, le=30)
+    webhook_max_attempts: int = Field(default=8, ge=1, le=20)
+    webhook_secret_overlap_hours: int = Field(default=24, ge=0, le=168)
+    webhook_delivery_retention_days: int = Field(default=30, ge=1, le=365)
     session_ttl_seconds: int = Field(default=900, ge=60, le=3600)
     db_pool_size: int = Field(default=5, ge=1, le=20)
     db_max_overflow: int = Field(default=5, ge=0, le=20)
+    # Phase 18 admission control: API requests in flight per process (0: pool capacity minus a
+    # reserve), and how long an excess request may wait for a slot before 503 + Retry-After.
+    max_concurrent_requests: int = Field(default=0, ge=0, le=200)
+    request_queue_timeout_seconds: float = Field(default=5.0, ge=0.1, le=60)
     # Phase 2 capture pipeline. Keys: "version:base64(32 bytes)[,older...]"; first entry encrypts.
     capture_encryption_keys: SecretStr | None = None
     capture_storage_dir: Path = Path("var/captures")
@@ -46,7 +62,7 @@ class Settings(BaseSettings):
     liveness_challenge_ttl_seconds: int = Field(default=120, ge=30, le=600)
     max_liveness_attempts: int = Field(default=5, ge=1, le=20)
     max_liveness_bytes: int = Field(default=16 * 1024 * 1024, ge=500_000, le=64 * 1024 * 1024)
-    liveness_policy_version: str = Field(default="ACTIVE-GEOMETRY-2026.10.1", min_length=1, max_length=80)
+    liveness_policy_version: str = Field(default="ACTIVE-GEOMETRY-2026.10.2", min_length=1, max_length=80)
     liveness_calibrated: bool = False
     # Phase 11 ePassport chip. Directory of trusted CSCA certificates (PEM/DER), e.g. from the ICAO PKD.
     nfc_csca_trust_store: Path | None = None
@@ -64,6 +80,16 @@ class Settings(BaseSettings):
     face_match_calibration_reference: str | None = Field(default=None, min_length=1, max_length=200)
     face_match_pass_threshold: float = Field(default=0.363, ge=-1, le=1, allow_inf_nan=False)
     face_match_fail_threshold: float = Field(default=0.20, ge=-1, le=1, allow_inf_nan=False)
+    # Phase 17 hardening. Webhook signing secrets get their own keyring (the PII keyring still
+    # opens secrets sealed before it existed). Production refuses to start without these controls.
+    webhook_secret_keys: SecretStr | None = None
+    allowed_hosts: str = Field(default="*", max_length=2000, description="Comma-separated Host header values")
+    expose_api_docs: bool | None = None       # default: on outside production
+    enable_capture_client: bool | None = None  # default: on outside production; refused in production
+    require_document_consent: bool = False
+    document_consent_policy_version: str = Field(default="DOCUMENT-CONSENT-2026.10.1", min_length=1, max_length=80)
+    reviewer_token_max_days: int = Field(default=90, ge=1, le=365)
+    log_format: Literal["text", "json"] | None = None  # default: json in production
     # Deployment interfaces reserved for later approved phases.
     redis_url: SecretStr | None = None
     gcp_project_id: str | None = None
@@ -71,23 +97,32 @@ class Settings(BaseSettings):
     gcs_biometric_bucket: str | None = None
     pubsub_topic: str | None = None
 
-    @field_validator("development_api_key", mode="before")
-    @classmethod
-    def empty_development_key_disables_it(cls, value):
-        # compose passes an unset variable through as an empty string.
-        return None if isinstance(value, str) and not value.strip() else value
-
     @field_validator("face_match_calibration_reference", mode="before")
     @classmethod
     def normalize_calibration_reference(cls, value):
         return (value.strip() or None) if isinstance(value, str) else value
 
     @model_validator(mode="after")
-    def enforce_phase_one_boundary(self):
-        if self.environment == "production":
-            raise ValueError("Production mode is disabled until the security hardening phase (17) is completed.")
-        if self.development_api_key is not None and len(self.development_api_key.get_secret_value()) < 32:
-            raise ValueError("DEVELOPMENT_API_KEY must contain at least 32 characters.")
+    def enforce_boundaries(self):
+        production = self.environment == "production"
+        if self.expose_api_docs is None:
+            self.expose_api_docs = not production
+        if self.enable_capture_client is None:
+            self.enable_capture_client = not production
+        if self.log_format is None:
+            self.log_format = "json" if production else "text"
+        if production:
+            problems = production_problems(self)
+            if problems:
+                raise ValueError("Production mode refused: " + " ".join(problems))
+        if self.development_api_key is not None:
+            key = self.development_api_key.get_secret_value()
+            if len(key) < 32:
+                raise ValueError("DEVELOPMENT_API_KEY must contain at least 32 characters.")
+            if key.startswith(("kyc_", "kst_")):
+                raise ValueError("DEVELOPMENT_API_KEY must not use a provisioned credential prefix.")
+            if self.development_organization_id is None:
+                raise ValueError("DEVELOPMENT_ORGANIZATION_ID is required with DEVELOPMENT_API_KEY.")
         url = self.database_url.get_secret_value()
         if not url.startswith("postgresql+psycopg2://") and not (self.environment == "test" and url.startswith("sqlite")):
             raise ValueError("PostgreSQL with psycopg2 is required; SQLite is permitted only in tests.")
@@ -99,12 +134,14 @@ class Settings(BaseSettings):
             parse_keyring(self.pii_encryption_keys.get_secret_value())
             decode_key(self.pii_hmac_key.get_secret_value())
         if self.biometric_encryption_keys is not None:
-            _, biometric_keys = parse_keyring(self.biometric_encryption_keys.get_secret_value())
-            for other in (self.capture_encryption_keys, self.pii_encryption_keys):
-                if other is not None:
-                    _, existing_keys = parse_keyring(other.get_secret_value())
-                    if set(biometric_keys.values()) & set(existing_keys.values()):
-                        raise ValueError("Biometric keys must be separate from capture and PII keys.")
+            parse_keyring(self.biometric_encryption_keys.get_secret_value())
+        if self.webhook_secret_keys is not None:
+            parse_keyring(self.webhook_secret_keys.get_secret_value())
+        shared = shared_keys(self)
+        if any("biometric" in pair for pair in shared):
+            raise ValueError("Biometric keys must be separate from capture and PII keys.")
+        if shared:
+            raise ValueError("Each keyring needs its own keys; shared key material: " + "; ".join(shared) + ".")
         if self.face_match_fail_threshold >= self.face_match_pass_threshold:
             raise ValueError("Face match fail threshold must be lower than the pass threshold.")
         if self.face_match_calibrated and (not self.face_match_calibration_reference

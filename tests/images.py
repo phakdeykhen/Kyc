@@ -170,19 +170,24 @@ def kh_id_front(width=1600, **overrides):
     draw.text((width // 2, 30), "ព្រះរាជាណាចក្រកម្ពុជា", font=km(46), fill=(20, 30, 60), anchor="mt")
     draw.text((width // 2, 105), "អត្តសញ្ញាណប័ណ្ណ", font=km(40), fill=(20, 30, 60), anchor="mt")
     draw.text((width - 60, 170), data["number"], font=km(46), fill=(160, 20, 20), anchor="rt")
-    x, size = 440, 38
+    x, size = 440, 34
     rows = [f"គោត្តនាម និងនាម: {data['name_km']}", None,
             f"ថ្ងៃខែឆ្នាំកំណើត: {data['dob']} ភេទ: {data['sex']} កម្ពស់: {data['height']}",
             f"ទីកន្លែងកំណើត: {data['pob']}", f"អាសយដ្ឋាន: {data['address']}",
             f"សុពលភាព: {data['issue']} ដល់ថ្ងៃ {data['expiry']}", "ភិនភាគ: ប្រជ្រុយ"]
-    y = 250
+    y = 225
     for row in rows:
         if row is None:
-            draw.text((x, y), data["name_latin"], font=latin(40), fill=(10, 10, 10))
+            draw.text((x, y), data["name_latin"], font=latin(36), fill=(10, 10, 10))
         else:
             draw.text((x, y), row, font=km(size), fill=(10, 10, 10))
-        y += 85
-    draw.text((60, height - 60), "SPECIMEN", font=latin(28), fill=(180, 60, 60))
+        y += 62
+    # As on real cards (6 Oct 2026 phone test): the TD1 MRZ runs along the bottom of the portrait side.
+    mono = ImageFont.truetype("/System/Library/Fonts/Supplemental/Courier New Bold.ttf", 50)
+    from tests.mrz_build import td1
+    for index, mrz_line in enumerate(td1()):
+        draw.text((60, height - 250 + index * 72), mrz_line, font=mono, fill=(10, 10, 10))
+    draw.text((width - 300, height - 320), "SPECIMEN", font=latin(28), fill=(180, 60, 60))
     return image
 
 
@@ -191,11 +196,10 @@ def kh_id_back(width=1600):
     height = round(width / CARD_RATIO)
     image = Image.new("RGB", (width, height), (232, 236, 230))
     draw = ImageDraw.Draw(image)
+    # The back of a real card is a fingerprint and seal area with no identity text.
     draw.rectangle((60, 60, 420, 460), outline=(120, 120, 120), width=3)  # fingerprint box
-    mono = ImageFont.truetype("/System/Library/Fonts/Supplemental/Courier New Bold.ttf", 56)
-    from tests.mrz_build import td1
-    for index, line in enumerate(td1()):
-        draw.text((60, height - 300 + index * 85), line, font=mono, fill=(10, 10, 10))
+    draw.ellipse((900, 200, 1300, 600), outline=(160, 60, 60), width=6)    # seal
+    draw.text((width // 2, height - 80), "SPECIMEN", font=ImageFont.truetype(LATIN_FONT, 28), fill=(180, 60, 60), anchor="mt")
     return image
 
 

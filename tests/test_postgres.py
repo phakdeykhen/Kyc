@@ -178,26 +178,36 @@ class PostgreSQLIsolationTests(unittest.TestCase):
                 self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM reviewers")).scalar_one(), 0)
                 connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_a)})
 
-                # Phase 15: API keys and idempotency records are organization data like any other.
-                key_insert = sa.text("""INSERT INTO api_keys (id, organization_id, name, key_prefix, secret_sha256, scopes, created_by)
-                  VALUES (:id, :org, 'Backend', :prefix, :sha, '["sessions:read"]', 'postgres-test')""")
-                connection.execute(key_insert, {"id": uuid4(), "org": org_a, "prefix": "kyc_" + "a" * 16, "sha": "a" * 64})
-                self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM api_keys")).scalar_one(), 1)
+                # Phase 15: API keys are found only inside their own organization's context.
+                key_insert = sa.text("""INSERT INTO api_keys (id, organization_id, name, key_prefix, key_sha256, scopes, created_by)
+                  VALUES (:id, :org, 'Key', 'kyc_test', :sha, '["sessions:read"]', 'test')""")
+                connection.execute(key_insert, {"id": uuid4(), "org": org_a, "sha": "c" * 64})
                 with self.assertRaises(sa.exc.ProgrammingError), connection.begin_nested():
-                    connection.execute(key_insert, {"id": uuid4(), "org": org_b, "prefix": "kyc_" + "b" * 16, "sha": "b" * 64})
-                idempotency_insert = sa.text("""INSERT INTO idempotency_keys (id, organization_id, idempotency_key, request_sha256, session_id)
-                  VALUES (:id, :org, 'retry-1', :sha, :session)""")
-                connection.execute(idempotency_insert, {"id": uuid4(), "org": org_a, "sha": "0" * 64, "session": sessions[org_a]})
-                with self.assertRaises(sa.exc.IntegrityError), connection.begin_nested():
-                    connection.execute(idempotency_insert, {"id": uuid4(), "org": org_a, "sha": "0" * 64,
-                                                                         "session": sessions[org_b]})
+                    connection.execute(key_insert, {"id": uuid4(), "org": org_b, "sha": "d" * 64})
                 connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_b)})
-                for table in ("api_keys", "idempotency_keys"):
-                    self.assertEqual(connection.execute(sa.text(f"SELECT count(*) FROM {table}")).scalar_one(), 0, table)
-                connection.execute(sa.text("SELECT set_config('app.organization_id', '', true)"))
-                for table in ("api_keys", "idempotency_keys"):
-                    self.assertEqual(connection.execute(sa.text(f"SELECT count(*) FROM {table}")).scalar_one(), 0, table)
+                self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM api_keys WHERE key_sha256 = :sha"),
+                                                    {"sha": "c" * 64}).scalar_one(), 0)
                 connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_a)})
+                self.assertEqual(connection.execute(sa.text("SELECT count(*) FROM api_keys")).scalar_one(), 1)
+
+                # Phase 16: webhook endpoints and their deliveries are tenant rows too.
+                endpoint_a = uuid4()
+                endpoint_insert = sa.text("""INSERT INTO webhook_endpoints (id, organization_id, url, event_types,
+                  secret_ciphertext, key_version, created_by) VALUES (:id, :org, 'https://1.1.1.1/', '[]', '\\x00', 'v1', 'test')""")
+                connection.execute(endpoint_insert, {"id": endpoint_a, "org": org_a})
+                delivery_insert = sa.text("""INSERT INTO webhook_deliveries (id, organization_id, endpoint_id, event_id, event_type,
+                  payload, next_attempt_at) VALUES (:id, :org, :endpoint, :event, 'kyc.verified', '{}', now())""")
+                connection.execute(delivery_insert, {"id": uuid4(), "org": org_a, "endpoint": endpoint_a, "event": uuid4()})
+                with self.assertRaises(sa.exc.ProgrammingError), connection.begin_nested():
+                    connection.execute(endpoint_insert, {"id": uuid4(), "org": org_b})
+                with self.assertRaises(sa.exc.ProgrammingError), connection.begin_nested():
+                    connection.execute(delivery_insert, {"id": uuid4(), "org": org_b, "endpoint": endpoint_a, "event": uuid4()})
+                connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_b)})
+                for table in ("webhook_endpoints", "webhook_deliveries"):
+                    self.assertEqual(connection.execute(sa.text(f"SELECT count(*) FROM {table}")).scalar_one(), 0)
+                connection.execute(sa.text("SELECT set_config('app.organization_id', :org, true)"), {"org": str(org_a)})
+                for table in ("webhook_endpoints", "webhook_deliveries"):
+                    self.assertEqual(connection.execute(sa.text(f"SELECT count(*) FROM {table}")).scalar_one(), 1)
 
                 secondary_session, secondary_document, secondary_template = uuid4(), uuid4(), uuid4()
                 now = datetime.now(timezone.utc)

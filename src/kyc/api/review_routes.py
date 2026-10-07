@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
+from kyc.domain.enums import SessionStatus
 from kyc.review.access import Review
 from kyc.services import review as service
 
@@ -29,9 +30,18 @@ def me(review: Review):
 
 @router.get("/queue")
 def review_queue(review: Review, limit: Annotated[int, Query(ge=1, le=100)] = 25,
-                 offset: Annotated[int, Query(ge=0, le=100_000)] = 0):
-    """Cases waiting in MANUAL_REVIEW, longest-waiting first."""
-    return service.queue(review.db, review.reviewer, limit, offset)
+                 offset: Annotated[int, Query(ge=0, le=100_000)] = 0,
+                 order: Literal["oldest", "newest"] = "oldest"):
+    """Cases waiting in MANUAL_REVIEW."""
+    return service.queue(review.db, review.reviewer, limit, offset, order=order)
+
+
+@router.get("/sessions")
+def all_sessions(review: Review, limit: Annotated[int, Query(ge=1, le=100)] = 50,
+                 offset: Annotated[int, Query(ge=0, le=100_000)] = 0, status: SessionStatus | None = None,
+                 user_id: Annotated[str | None, Query(min_length=1, max_length=128)] = None):
+    """Every session of the organization, newest change first, by status and the client's user ID."""
+    return service.sessions(review.db, review.reviewer, limit, offset, status=status, user_id=user_id)
 
 
 @router.get("/{session_id}")
@@ -52,4 +62,5 @@ def review_decision(session_id: UUID, body: ReviewDecision, request: Request, re
     """APPROVE, REJECT or REQUEST_RECAPTURE, with a reason code and a note (audited)."""
     state = request.app.state
     return service.decide(review.db, review.reviewer, session_id, body.action, body.reason_code, body.note,
-                          body.expected_version, state.field_cipher, state.assessor.policy, request.state.request_id)
+                          body.expected_version, state.field_cipher, state.assessor.policy, request.state.request_id,
+                          state.settings.session_ttl_seconds)

@@ -1,282 +1,277 @@
-"""Phase 15: per-organization API keys, scopes, rotation, suspension, rate limits and idempotency."""
+"""Phase 15: provisioned API keys, scopes, masking, idempotency, session client tokens and rate limits."""
 
-from datetime import timedelta
-import json
+from datetime import datetime, timedelta, timezone
 import unittest
 from uuid import UUID, uuid4
 
+from pydantic import ValidationError
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from kyc.db.models import ApiKey, AuditLog, Base, IdempotencyKey, KYCSession, Organization
-from kyc.db.session import build_engine
-from kyc.main import create_app
-from kyc.tenancy import keys
+from kyc.core.config import Settings
+from kyc.db.models import ApiKey, AuditLog, KYCSession, Organization
+from kyc.services import tenancy
 from kyc.tenancy.ratelimit import RateLimiter
 from tests.helpers import call
-from tests.test_api import TEST_KEY, configuration
+from tests import test_api
+from tests.test_api import TEST_KEY
+from tests.test_review import ReviewCase
 
-PAYLOAD = {"user_id": "customer-42", "country": "KH", "expected_document_type": "KH_NATIONAL_ID",
-           "verification_level": "DOCUMENT_ONLY"}
 
+class TenantCase(unittest.IsolatedAsyncioTestCase):
+    """Two provisioned organizations; the development key stays bound to the first."""
 
-class TenancyCase(unittest.IsolatedAsyncioTestCase):
-    settings_overrides = {}
+    asyncSetUp = test_api.SessionAPITests.asyncSetUp
+    asyncTearDown = test_api.SessionAPITests.asyncTearDown
+    create = test_api.SessionAPITests.create
 
-    async def asyncSetUp(self):
-        self.org, self.other_org = uuid4(), uuid4()
-        self.settings = configuration(self.org, **self.settings_overrides)
-        self.engine = build_engine(self.settings)
-        Base.metadata.create_all(self.engine)
-        with Session(self.engine) as db, db.begin():
-            db.add_all([Organization(id=self.org, name="Bank A"), Organization(id=self.other_org, name="Fintech B")])
-        self.app = create_app(self.settings, self.engine)
-        self.lifespan = self.app.router.lifespan_context(self.app)
-        await self.lifespan.__aenter__()
-
-    async def asyncTearDown(self):
-        await self.lifespan.__aexit__(None, None, None)
-        self.engine.dispose()
-
-    def issue(self, organization=None, scopes=keys.DEFAULT_SCOPES, expires_at=None, name="Backend"):
+    def make_key(self, scopes=("sessions:write", "sessions:read"), organization=None, **options):
         organization = organization or self.org
         with Session(self.engine) as db, db.begin():
-            result = keys.issue_key(db, organization, name, scopes, "administrator", uuid4(), expires_at)
-            key_id = result.record.id
-        return {"X-API-Key": result.key, "X-Organization-ID": str(organization)}, key_id
+            row, token = tenancy.create_key(db, organization, "test key", list(scopes), "test", uuid4(), **options)
+            key_id = row.id
+        return {"X-API-Key": token, "X-Organization-ID": str(organization)}, key_id
 
-    async def create(self, headers, payload=PAYLOAD, extra=None):
-        return await call(self.app, "/v1/kyc/sessions", "POST", payload, headers | (extra or {}))
+    async def request(self, path, headers, method="GET", body=None, **extra):
+        return await call(self.app, path, method, body, headers, **extra)
 
 
-class ApiKeyAuthenticationTests(TenancyCase):
-    async def test_issued_key_creates_and_reads_sessions_in_its_own_organization_only(self):
-        headers, key_id = self.issue()
-        code, body, response_headers = await self.create(headers)
+class ApiKeyAuthenticationTests(TenantCase):
+    async def test_provisioned_key_works_only_in_its_own_organization(self):
+        headers, key_id = self.make_key()
+        code, body, _ = await self.request("/v1/kyc/sessions", headers, "POST", self.payload)
         self.assertEqual(code, 201, body)
         self.assertEqual(body["organization_id"], str(self.org))
-        self.assertEqual(response_headers["x-ratelimit-limit"], "120")
-        code, _, _ = await call(self.app, f"/v1/kyc/{body['session_id']}", headers=headers)
-        self.assertEqual(code, 200)
-        with Session(self.engine) as db:
-            actors = set(db.scalars(sa.select(AuditLog.actor_id).where(AuditLog.session_id == UUID(body["session_id"]))))
-            self.assertEqual(actors, {f"api_key:{key_id}"})
-        # Same key presented for another organization: the key is not found there.
-        code, _, _ = await self.create({**headers, "X-Organization-ID": str(self.other_org)})
+        # The same key presented for another organization is not found under that tenant's RLS context.
+        code, _, _ = await self.request("/v1/kyc/sessions", {**headers, "X-Organization-ID": str(self.other_org)},
+                                        "POST", self.payload)
         self.assertEqual(code, 401)
-        # A key of organization B cannot read organization A's session.
-        foreign, _ = self.issue(self.other_org)
-        code, _, _ = await call(self.app, f"/v1/kyc/{body['session_id']}", headers=foreign)
+        foreign, _ = self.make_key(organization=self.other_org)
+        code, _, _ = await self.request(f"/v1/kyc/{body['session_id']}", foreign)
         self.assertEqual(code, 404)
+        with Session(self.engine) as db:
+            row = db.get(ApiKey, key_id)
+            self.assertEqual(len(row.key_sha256), 64)
+            self.assertNotIn(headers["X-API-Key"], (row.key_sha256, row.key_prefix))
+            self.assertTrue(headers["X-API-Key"].startswith(row.key_prefix))
+            self.assertIsNotNone(row.last_used_at)
+            session = db.get(KYCSession, UUID(body["session_id"]))
+            self.assertEqual(session.created_by, f"api_key:{key_id}")
+            actors = set(db.scalars(sa.select(AuditLog.actor_id).where(AuditLog.session_id == session.id)))
+            self.assertEqual(actors, {f"api_key:{key_id}"})
 
-    async def test_wrong_revoked_expired_and_malformed_keys_are_refused(self):
-        headers, key_id = self.issue()
-        tampered = headers["X-API-Key"][:-1] + ("A" if headers["X-API-Key"][-1] != "A" else "B")
-        for key in [tampered, "kyc_0000000000000000_" + "a" * 43, "kyc_short", "x" * 300, ""]:
-            code, _, _ = await self.create({**headers, "X-API-Key": key})
-            self.assertEqual(code, 401, key)
+    async def test_revoked_expired_and_unknown_keys_are_refused(self):
+        revoked, revoked_id = self.make_key()
+        expired, expired_id = self.make_key()
         with Session(self.engine) as db, db.begin():
-            db.get(ApiKey, key_id).expires_at = keys.now() - timedelta(seconds=1)
-        self.assertEqual((await self.create(headers))[0], 401)
-        revoked, revoked_id = self.issue()
-        with Session(self.engine) as db, db.begin():
-            keys.revoke_key(db, db.get(ApiKey, revoked_id), "administrator", uuid4())
-        self.assertEqual((await self.create(revoked))[0], 401)
+            db.get(ApiKey, revoked_id).revoked_at = datetime.now(timezone.utc)
+            db.get(ApiKey, expired_id).expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        for headers in (revoked, expired, {**revoked, "X-API-Key": "kyc_" + "x" * 43},
+                        {**revoked, "X-API-Key": "kyc_" + "x" * 300}):
+            code, body, _ = await self.request("/v1/document-types", headers)
+            self.assertEqual(code, 401, body)
 
-    async def test_suspended_organization_is_refused_with_a_valid_key(self):
-        headers, _ = self.issue()
+    async def test_suspended_organization_is_refused(self):
+        headers, _ = self.make_key()
         with Session(self.engine) as db, db.begin():
             db.get(Organization, self.org).active = False
-        code, body, _ = await self.create(headers)
+        code, body, _ = await self.request("/v1/document-types", headers)
         self.assertEqual((code, body["detail"]), (403, "This organization is suspended."))
 
-    async def test_only_a_hash_of_the_secret_is_stored(self):
-        headers, key_id = self.issue()
-        key = headers["X-API-Key"]
-        with Session(self.engine) as db:
-            record = db.get(ApiKey, key_id)
-            self.assertEqual(record.secret_sha256, keys.secret_hash(key))
-            self.assertTrue(key.startswith(record.key_prefix + "_"))
-            dumped = json.dumps([[str(value) for value in row] for table in Base.metadata.sorted_tables
-                                 for row in db.execute(sa.select(table)).all()])
-        self.assertNotIn(key, dumped)
-        self.assertNotIn(key.split("_", 2)[2], dumped)
+    async def test_scopes_are_enforced_per_route(self):
+        reader, _ = self.make_key(("sessions:read",))
+        writer, _ = self.make_key(("sessions:write",))
+        session_id = (await self.create())["session_id"]
+        self.assertEqual((await self.request("/v1/kyc/sessions", reader, "POST", self.payload))[0], 403)
+        self.assertEqual((await self.request(f"/v1/kyc/{session_id}/verify", reader, "POST", {}))[0], 403)
+        self.assertEqual((await self.request(f"/v1/kyc/{session_id}", reader))[0], 200)
+        self.assertEqual((await self.request(f"/v1/kyc/{session_id}/result", reader))[0], 200)
+        self.assertEqual((await self.request(f"/v1/kyc/{session_id}/result", writer))[0], 403)
+        self.assertEqual((await self.request(f"/v1/kyc/{session_id}/client-token", writer, "POST", {}))[0], 201)
+        code, body, _ = await self.request("/v1/api-keys", writer)
+        self.assertEqual(code, 403)
+        self.assertIn("keys:manage", body["detail"])
 
-    async def test_last_used_is_recorded(self):
-        headers, key_id = self.issue()
-        await call(self.app, "/v1/me", headers=headers)
-        with Session(self.engine) as db:
-            self.assertIsNotNone(db.get(ApiKey, key_id).last_used_at)
+    async def test_reviewer_tokens_are_not_client_credentials(self):
+        code, _, _ = await self.request("/v1/document-types", {"Authorization": "Bearer rvw_" + "x" * 43,
+                                                               "X-Organization-ID": str(self.org)})
+        self.assertEqual(code, 401)
 
-
-class ScopeTests(TenancyCase):
-    async def test_each_endpoint_requires_its_scope(self):
-        backend, _ = self.issue()
-        code, session, _ = await self.create(backend)
-        session_id = session["session_id"]
-        capture_only, _ = self.issue(scopes=["captures:write", "sessions:read"], name="Mobile capture")
-        self.assertEqual((await self.create(capture_only))[0], 403)
-        self.assertEqual((await call(self.app, f"/v1/kyc/{session_id}", headers=capture_only))[0], 200)
-        code, body, _ = await call(self.app, f"/v1/kyc/{session_id}/result", headers=capture_only)
-        self.assertEqual((code, body["detail"]), (403, "This API key does not have the results:read scope."))
-        self.assertEqual((await call(self.app, f"/v1/kyc/{session_id}/verify", "POST", {}, capture_only))[0], 403)
-        read_only, _ = self.issue(scopes=["sessions:read", "results:read"])
-        self.assertEqual((await call(self.app, f"/v1/kyc/{session_id}/result", headers=read_only))[0], 200)
-        for path in ["documents/front", "selfie", "liveness/challenge", "nfc/challenge"]:
-            code, _, _ = await call(self.app, f"/v1/kyc/{session_id}/{path}", "POST", {}, read_only)
-            self.assertEqual(code, 403, path)
-        # Reference data needs any valid key.
-        self.assertEqual((await call(self.app, "/v1/countries", headers=read_only))[0], 200)
-        self.assertEqual((await call(self.app, "/v1/api-keys", headers=backend))[0], 403)
-
-    async def test_me_describes_the_caller(self):
-        headers, key_id = self.issue(scopes=["sessions:read"])
-        code, body, _ = await call(self.app, "/v1/me", headers=headers)
+    async def test_organization_profile_reports_the_credential(self):
+        headers, key_id = self.make_key(("sessions:read",))
+        code, body, _ = await self.request("/v1/organization", headers)
         self.assertEqual(code, 200)
-        self.assertEqual(body, {"organization_id": str(self.org), "organization_name": "Bank A",
-                                "api_key_id": str(key_id), "actor_id": f"api_key:{key_id}",
-                                "scopes": ["sessions:read"], "rate_limit_per_minute": 120})
-
-    def test_unknown_scopes_are_rejected(self):
-        with self.assertRaises(ValueError):
-            keys.normalize_scopes(["sessions:create", "admin:everything"])
-        with self.assertRaises(ValueError):
-            keys.normalize_scopes([])
+        self.assertEqual(body["organization_id"], str(self.org))
+        self.assertEqual(body["credential"], {"type": "api_key", "key_id": str(key_id), "scopes": ["sessions:read"],
+                                              "rate_limit_per_minute": 600})
+        self.assertIn("results:identity", body["available_scopes"])
+        code, body, _ = await self.request("/v1/organization", self.headers)
+        self.assertEqual(body["credential"]["type"], "development_key")
 
 
-class KeyManagementTests(TenancyCase):
-    async def asyncSetUp(self):
-        await super().asyncSetUp()
-        self.admin, self.admin_id = self.issue(scopes=[*keys.DEFAULT_SCOPES, "keys:manage"], name="Admin")
-
-    async def test_issue_list_and_revoke(self):
-        code, issued, _ = await call(self.app, "/v1/api-keys", "POST",
-                                     {"name": "POS terminal", "scopes": ["captures:write", "sessions:read"],
-                                      "expires_in_days": 30}, self.admin)
-        self.assertEqual(code, 201, issued)
-        self.assertTrue(issued["key"].startswith(issued["key_prefix"] + "_"))
-        new = {"X-API-Key": issued["key"], "X-Organization-ID": str(self.org)}
-        self.assertEqual((await call(self.app, "/v1/me", headers=new))[0], 200)
-        code, listed, _ = await call(self.app, "/v1/api-keys", headers=self.admin)
-        self.assertEqual({row["name"] for row in listed}, {"Admin", "POS terminal"})
-        self.assertTrue(all("key" not in row and "secret_sha256" not in row for row in listed))
-        code, revoked, _ = await call(self.app, f"/v1/api-keys/{issued['id']}", "DELETE", headers=self.admin)
-        self.assertEqual((code, revoked["active"]), (200, False))
-        self.assertEqual((await call(self.app, "/v1/me", headers=new))[0], 401)
-        code, listed, _ = await call(self.app, "/v1/api-keys", headers=self.admin)
-        self.assertEqual([row["name"] for row in listed], ["Admin"])
+class SelfServiceKeyTests(TenantCase):
+    async def test_create_list_use_and_revoke_a_key(self):
+        code, created, _ = await self.request("/v1/api-keys", self.headers, "POST",
+                                              {"name": "Backend", "scopes": ["sessions:write", "sessions:read"],
+                                               "expires_in_days": 90})
+        self.assertEqual(code, 201, created)
+        self.assertTrue(created["api_key"].startswith("kyc_"))
+        self.assertEqual(created["status"], "ACTIVE")
+        new_headers = {"X-API-Key": created["api_key"], "X-Organization-ID": str(self.org)}
+        self.assertEqual((await self.request("/v1/kyc/sessions", new_headers, "POST", self.payload))[0], 201)
+        code, listed, _ = await self.request("/v1/api-keys", self.headers)
+        self.assertEqual([item["id"] for item in listed], [created["id"]])
+        self.assertNotIn("api_key", listed[0])
+        self.assertNotIn("key_sha256", listed[0])
+        self.assertIsNotNone(listed[0]["last_used_at"])
+        code, revoked, _ = await self.request(f"/v1/api-keys/{created['id']}", self.headers, "DELETE")
+        self.assertEqual((code, revoked["status"]), (200, "REVOKED"))
+        self.assertEqual((await self.request("/v1/kyc/sessions", new_headers, "POST", self.payload))[0], 401)
         with Session(self.engine) as db:
-            actions = list(db.scalars(sa.select(AuditLog.action).where(AuditLog.actor_id == f"api_key:{self.admin_id}")))
-        self.assertEqual(sorted(actions), ["API_KEY_CREATED", "API_KEY_REVOKED"])
+            actions = list(db.scalars(sa.select(AuditLog.action).where(AuditLog.session_id.is_(None))
+                                      .order_by(AuditLog.created_at)))
+        self.assertEqual(actions, ["API_KEY_CREATED", "API_KEY_REVOKED"])
 
-    async def test_a_key_cannot_grant_scopes_it_lacks(self):
-        limited, _ = self.issue(scopes=["keys:manage", "sessions:read"])
-        code, _, _ = await call(self.app, "/v1/api-keys", "POST", {"name": "Escalation", "scopes": ["results:read"]}, limited)
-        self.assertEqual(code, 403)
-        code, _, _ = await call(self.app, f"/v1/api-keys/{self.admin_id}/rotate", "POST", {}, limited)
-        self.assertEqual(code, 403)
-        code, _, _ = await call(self.app, "/v1/api-keys", "POST", {"name": "Bad", "scopes": ["root"]}, self.admin)
-        self.assertEqual(code, 422)
+    async def test_keys_cannot_escalate_scopes_or_limits(self):
+        manager, _ = self.make_key(("keys:manage", "sessions:read"), rate_limit_per_minute=100)
+        code, body, _ = await self.request("/v1/api-keys", manager, "POST", {"name": "x", "scopes": ["sessions:write"]})
+        self.assertEqual(code, 403, body)
+        code, body, _ = await self.request("/v1/api-keys", manager, "POST",
+                                           {"name": "x", "scopes": ["sessions:read"], "rate_limit_per_minute": 101})
+        self.assertEqual(code, 422, body)
+        code, body, _ = await self.request("/v1/api-keys", manager, "POST", {"name": "x", "scopes": ["session:capture"]})
+        self.assertEqual(code, 403, body)  # the client-token scope can never be granted to a key
+        code, body, _ = await self.request("/v1/api-keys", manager, "POST", {"name": "x", "scopes": ["sessions:read"]})
+        self.assertEqual((code, body["rate_limit_per_minute"]), (201, 100))
 
-    async def test_keys_of_another_organization_are_invisible(self):
-        _, foreign_id = self.issue(self.other_org)
-        self.assertEqual((await call(self.app, f"/v1/api-keys/{foreign_id}", "DELETE", headers=self.admin))[0], 404)
-        self.assertEqual((await call(self.app, f"/v1/api-keys/{foreign_id}/rotate", "POST", {}, self.admin))[0], 404)
-        with Session(self.engine) as db:
-            self.assertIsNone(db.get(ApiKey, foreign_id).revoked_at)
+    async def test_keys_of_another_organization_cannot_be_revoked(self):
+        _, foreign_id = self.make_key(organization=self.other_org)
+        code, _, _ = await self.request(f"/v1/api-keys/{foreign_id}", self.headers, "DELETE")
+        self.assertEqual(code, 404)
 
-    async def test_rotation_keeps_the_old_key_for_the_grace_period_only(self):
-        old, old_id = self.issue(name="Backend")
-        code, replacement, _ = await call(self.app, f"/v1/api-keys/{old_id}/rotate", "POST", {"grace_hours": 2}, self.admin)
-        self.assertEqual(code, 201, replacement)
-        self.assertEqual((replacement["name"], replacement["scopes"]), ("Backend", sorted(keys.DEFAULT_SCOPES)))
-        self.assertEqual((await call(self.app, "/v1/me", headers=old))[0], 200)
-        with Session(self.engine) as db:
-            remaining = keys.aware(db.get(ApiKey, old_id).expires_at) - keys.now()
-        self.assertTrue(timedelta(hours=1, minutes=59) < remaining <= timedelta(hours=2))
-        new = {"X-API-Key": replacement["key"], "X-Organization-ID": str(self.org)}
-        self.assertEqual((await call(self.app, "/v1/me", headers=new))[0], 200)
-        # Immediate rotation revokes the old key at once.
-        code, _, _ = await call(self.app, f"/v1/api-keys/{replacement['id']}/rotate", "POST", {"grace_hours": 0}, self.admin)
+
+class IdempotencyTests(TenantCase):
+    async def test_retried_creation_returns_the_same_session(self):
+        headers = {**self.headers, "Idempotency-Key": "order-12345-attempt"}
+        code, first, _ = await self.request("/v1/kyc/sessions", headers, "POST", self.payload)
         self.assertEqual(code, 201)
-        self.assertEqual((await call(self.app, "/v1/me", headers=new))[0], 401)
-        code, _, _ = await call(self.app, f"/v1/api-keys/{replacement['id']}/rotate", "POST", {}, self.admin)
+        code, second, response_headers = await self.request("/v1/kyc/sessions", headers, "POST", self.payload)
+        self.assertEqual((code, second["session_id"]), (200, first["session_id"]))
+        self.assertEqual(response_headers["idempotent-replayed"], "true")
+        code, body, _ = await self.request("/v1/kyc/sessions", headers, "POST", {**self.payload, "user_id": "someone-else"})
+        self.assertEqual(code, 409, body)
+        code, third, _ = await self.request("/v1/kyc/sessions", self.headers, "POST", self.payload)
+        self.assertNotEqual(third["session_id"], first["session_id"])  # no key, no deduplication
+        with Session(self.engine) as db:
+            self.assertEqual(db.scalar(sa.select(sa.func.count()).select_from(KYCSession)
+                                       .where(KYCSession.idempotency_key == "order-12345-attempt")), 1)
+            self.assertIn("SESSION_CREATE_REPLAYED", set(db.scalars(sa.select(AuditLog.action))))
+
+    async def test_keys_are_scoped_per_organization_and_validated(self):
+        foreign, _ = self.make_key(organization=self.other_org)
+        key = {"Idempotency-Key": "shared-key-0001"}
+        code, mine, _ = await self.request("/v1/kyc/sessions", {**self.headers, **key}, "POST", self.payload)
+        code, theirs, _ = await self.request("/v1/kyc/sessions", {**foreign, **key}, "POST", self.payload)
+        self.assertEqual(code, 201)
+        self.assertNotEqual(mine["session_id"], theirs["session_id"])
+        for bad in ("short", "has spaces in it", "x" * 129):
+            code, _, _ = await self.request("/v1/kyc/sessions", {**self.headers, "Idempotency-Key": bad}, "POST", self.payload)
+            self.assertEqual(code, 422, bad)
+
+
+class ClientTokenTests(TenantCase):
+    async def issue(self, session_id, headers=None):
+        code, body, _ = await self.request(f"/v1/kyc/{session_id}/client-token", headers or self.headers, "POST", {})
+        self.assertEqual(code, 201, body)
+        return body
+
+    async def test_token_is_limited_to_its_session_and_to_capture_and_status(self):
+        session_id = (await self.create())["session_id"]
+        other_session = (await self.create())["session_id"]
+        issued = await self.issue(session_id)
+        self.assertTrue(issued["client_token"].startswith("kst_"))
+        self.assertEqual(issued["scope"], "session:capture")
+        device = {"Authorization": f"Bearer {issued['client_token']}", "X-Organization-ID": str(self.org)}
+        self.assertEqual((await self.request(f"/v1/kyc/{session_id}", device))[0], 200)
+        self.assertEqual((await self.request(f"/v1/kyc/{session_id.upper()}", device))[0], 200)
+        code, _, _ = await self.request(f"/v1/kyc/{session_id}/liveness/challenge", device, "POST", {})
+        self.assertEqual(code, 409)  # authorized; the session is simply not at the liveness step
+        for path, method in ((f"/v1/kyc/{session_id}/result", "GET"), (f"/v1/kyc/{session_id}/verify", "POST"),
+                             (f"/v1/kyc/{session_id}/client-token", "POST"), ("/v1/kyc/sessions", "POST"),
+                             ("/v1/document-types", "GET"), ("/v1/api-keys", "GET")):
+            code, _, _ = await self.request(path, device, method, {} if method == "POST" else None)
+            self.assertEqual(code, 403, path)
+        self.assertEqual((await self.request(f"/v1/kyc/{other_session}", device))[0], 401)
+        self.assertEqual((await self.request(f"/v1/kyc/{session_id}", {**device, "X-Organization-ID": str(self.other_org)}))[0], 401)
+        with Session(self.engine) as db:
+            record = db.get(KYCSession, UUID(session_id))
+            self.assertEqual(len(record.client_token_sha256), 64)
+            self.assertIn("CLIENT_TOKEN_ISSUED", set(db.scalars(sa.select(AuditLog.action).where(AuditLog.session_id == record.id))))
+
+    async def test_reissue_revokes_and_expiry_ends_the_token(self):
+        session_id = (await self.create())["session_id"]
+        first = await self.issue(session_id)
+        second = await self.issue(session_id)
+        old = {"Authorization": f"Bearer {first['client_token']}", "X-Organization-ID": str(self.org)}
+        new = {"Authorization": f"Bearer {second['client_token']}", "X-Organization-ID": str(self.org)}
+        self.assertEqual((await self.request(f"/v1/kyc/{session_id}", old))[0], 401)
+        self.assertEqual((await self.request(f"/v1/kyc/{session_id}", new))[0], 200)
+        with Session(self.engine) as db, db.begin():
+            record = db.get(KYCSession, UUID(session_id))
+            record.created_at = datetime.now(timezone.utc) - timedelta(hours=2)
+            record.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        self.assertEqual((await self.request(f"/v1/kyc/{session_id}", new))[0], 401)
+        await self.request(f"/v1/kyc/{session_id}", self.headers)  # records EXPIRED
+        code, _, _ = await self.request(f"/v1/kyc/{session_id}/client-token", self.headers, "POST", {})
         self.assertEqual(code, 409)
 
 
-class RateLimitTests(TenancyCase):
-    async def test_per_key_limit_from_the_organization(self):
-        with Session(self.engine) as db, db.begin():
-            db.get(Organization, self.org).api_rate_limit_per_minute = 3
-        headers, _ = self.issue()
-        other, _ = self.issue()
-        remaining = []
-        for _ in range(3):
-            code, _, response_headers = await call(self.app, "/v1/me", headers=headers)
-            self.assertEqual(code, 200)
-            remaining.append(response_headers["x-ratelimit-remaining"])
-        self.assertEqual(remaining, ["2", "1", "0"])
-        code, body, response_headers = await call(self.app, "/v1/me", headers=headers)
-        self.assertEqual(code, 429)
-        self.assertGreaterEqual(int(response_headers["retry-after"]), 1)
-        self.assertEqual((await call(self.app, "/v1/me", headers=other))[0], 200)   # each key has its own budget
+class RateLimitTests(TenantCase):
+    async def test_each_credential_has_its_own_window(self):
+        limited, _ = self.make_key(rate_limit_per_minute=2)
+        other, _ = self.make_key(rate_limit_per_minute=2)
+        for _ in range(2):
+            self.assertEqual((await self.request("/v1/document-types", limited))[0], 200)
+        code, body, headers = await self.request("/v1/document-types", limited)
+        self.assertEqual(code, 429, body)
+        self.assertGreaterEqual(int(headers["retry-after"]), 1)
+        self.assertEqual((await self.request("/v1/document-types", other))[0], 200)
 
     def test_window_resets(self):
-        clock = [0.0]
-        limiter = RateLimiter(clock=lambda: clock[0])
-        self.assertTrue(limiter.hit("k", 1).allowed)
-        denied = limiter.hit("k", 1)
-        self.assertFalse(denied.allowed)
-        self.assertEqual(denied.retry_after, 60)
-        clock[0] = 60.0
-        self.assertTrue(limiter.hit("k", 1).allowed)
+        now = [0.0]
+        limiter = RateLimiter(window_seconds=60, clock=lambda: now[0])
+        self.assertIsNone(limiter.hit("k", 1))
+        self.assertAlmostEqual(limiter.hit("k", 1), 60)
+        now[0] = 60.0
+        self.assertIsNone(limiter.hit("k", 1))
 
 
-class IdempotencyTests(TenancyCase):
-    async def test_retry_with_the_same_key_returns_the_same_session(self):
-        headers, _ = self.issue()
-        retry = {"Idempotency-Key": "order-7781"}
-        code, first, first_headers = await self.create(headers, extra=retry)
-        self.assertEqual(code, 201)
-        self.assertNotIn("idempotent-replayed", first_headers)
-        code, second, second_headers = await self.create(headers, extra=retry)
-        self.assertEqual((code, second["session_id"]), (201, first["session_id"]))
-        self.assertEqual(second_headers["idempotent-replayed"], "true")
-        code, _, _ = await self.create(headers, {**PAYLOAD, "user_id": "someone-else"}, retry)
-        self.assertEqual(code, 422)
-        # Other organizations have their own key space.
-        foreign, _ = self.issue(self.other_org)
-        code, other, _ = await self.create(foreign, extra=retry)
-        self.assertEqual(code, 201)
-        self.assertNotEqual(other["session_id"], first["session_id"])
-        with Session(self.engine) as db:
-            self.assertEqual(db.scalar(sa.select(sa.func.count()).select_from(KYCSession)), 2)
-
-    async def test_expired_idempotency_record_allows_a_new_session(self):
-        headers, _ = self.issue()
-        retry = {"Idempotency-Key": "batch-1"}
-        _, first, _ = await self.create(headers, extra=retry)
+class MaskingTests(ReviewCase):
+    async def test_identity_is_masked_without_the_identity_scope(self):
+        session_id = await self.in_review()
         with Session(self.engine) as db, db.begin():
-            db.scalar(sa.select(IdempotencyKey)).created_at = keys.now() - timedelta(hours=25)
-        code, second, headers_out = await self.create(headers, extra=retry)
-        self.assertEqual(code, 201)
-        self.assertNotEqual(second["session_id"], first["session_id"])
-        self.assertNotIn("idempotent-replayed", headers_out)
+            _, reader_token = tenancy.create_key(db, self.org, "reader", ["sessions:read"], "test", uuid4())
+            _, full_token = tenancy.create_key(db, self.org, "full", ["sessions:read", "results:identity"], "test", uuid4())
+        for token, name, masked in ((reader_token, "S** S*****", True), (full_token, "SOK SOPHEA", False)):
+            code, body, _ = await call(self.app, f"/v1/kyc/{session_id}/result",
+                                       headers={"X-API-Key": token, "X-Organization-ID": str(self.org)})
+            self.assertEqual(code, 200, body)
+            self.assertEqual((body["identity"]["full_name"], body["identity_masked"]), (name, masked))
 
-    async def test_invalid_idempotency_key_is_rejected(self):
-        headers, _ = self.issue()
-        for value in ["has space", "x" * 129]:
-            self.assertEqual((await self.create(headers, extra={"Idempotency-Key": value}))[0], 422)
+    async def test_suspended_organization_blocks_reviewers(self):
+        with Session(self.engine) as db, db.begin():
+            db.get(Organization, self.org).active = False
+        code, body, _ = await call(self.app, "/v1/review/me", headers=self.reviewer)
+        self.assertEqual(code, 403, body)
 
 
-class DevelopmentKeyTests(TenancyCase):
-    def test_empty_development_key_means_disabled(self):
-        self.assertIsNone(configuration(uuid4(), development_api_key="").development_api_key)
-
-    settings_overrides = {"development_api_key": None}
-
-    async def test_development_key_can_be_disabled(self):
-        code, _, _ = await self.create({"X-API-Key": TEST_KEY, "X-Organization-ID": str(self.org)})
-        self.assertEqual(code, 401)
-        headers, _ = self.issue()
-        self.assertEqual((await self.create(headers))[0], 201)
+class ConfigurationTests(unittest.TestCase):
+    def test_development_key_is_optional_and_cannot_mimic_provisioned_credentials(self):
+        settings = Settings(_env_file=None, environment="test", database_url="sqlite://")
+        self.assertIsNone(settings.development_api_key)
+        for key in ("kyc_" + "a" * 40, "kst_" + "a" * 40):
+            with self.assertRaises(ValidationError):
+                Settings(_env_file=None, environment="test", database_url="sqlite://",
+                         development_api_key=key, development_organization_id=uuid4())
+        with self.assertRaises(ValidationError):
+            Settings(_env_file=None, environment="test", database_url="sqlite://", development_api_key=TEST_KEY)

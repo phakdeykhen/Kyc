@@ -6,8 +6,9 @@ reach client endpoints, so an integrating application can never approve its own
 sessions. Every permission check is enforced server-side; the dashboard only reflects it.
 """
 
-from collections.abc import Iterator
-from dataclasses import dataclass
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 import hashlib
 import secrets
 from typing import Annotated
@@ -17,7 +18,9 @@ from fastapi import Depends, Header, HTTPException, Request
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from kyc.db.models import Organization, Reviewer
+from kyc.api.dependencies import refuse
+from kyc.core.observability import route_label
+from kyc.db.models import AuditLog, Organization, Reviewer
 from kyc.db.session import set_tenant
 
 TOKEN_PREFIX = "rvw_"
@@ -59,6 +62,8 @@ class ReviewerContext:
     display_name: str
     role: str
     permissions: frozenset[str]
+    # Records a refused action outside the request's transaction, which the 403 rolls back (Phase 17).
+    on_denied: Callable[[str], None] | None = field(default=None, compare=False, repr=False)
 
     @property
     def actor_id(self) -> str:
@@ -66,6 +71,8 @@ class ReviewerContext:
 
     def require(self, permission: str) -> None:
         if permission not in self.permissions:
+            if self.on_denied is not None:
+                self.on_denied(permission)
             raise HTTPException(403, detail="Your reviewer role does not allow this.")
 
 
@@ -80,18 +87,45 @@ def review_session(request: Request,
                    organization: Annotated[str | None, Header(alias="X-Organization-ID")] = None) -> Iterator[ReviewSession]:
     token = (authorization or "").removeprefix("Bearer ").strip()
     if not token.startswith(TOKEN_PREFIX) or len(token) > 200:
-        raise HTTPException(401, detail="A reviewer token is required.")
+        raise refuse(request, 401, "REVIEWER_TOKEN_MISSING", "A reviewer token is required.")
     try:
         organization_id = UUID(organization or "")
     except ValueError:
-        raise HTTPException(400, detail="A valid X-Organization-ID is required.") from None
+        raise refuse(request, 400, "ORGANIZATION_HEADER_INVALID", "A valid X-Organization-ID is required.") from None
     with request.app.state.session_factory() as db, db.begin():
         set_tenant(db, organization_id)  # RLS: a token can only be found inside its own organization
         row = db.scalar(sa.select(Reviewer).where(Reviewer.organization_id == organization_id,
                                                   Reviewer.token_sha256 == token_hash(token), Reviewer.active.is_(True)))
-        if row is None or not db.get(Organization, organization_id):
-            raise HTTPException(401, detail="A valid reviewer token is required.")
-        yield ReviewSession(db, ReviewerContext(organization_id, row.id, row.display_name, row.role, ROLES[row.role]))
+        organization = db.get(Organization, organization_id)
+        if row is None or organization is None:
+            raise refuse(request, 401, "REVIEWER_TOKEN_INVALID", "A valid reviewer token is required.")
+        if (row.expires_at is None and request.app.state.settings.environment == "production") or \
+                (row.expires_at is not None and _aware(row.expires_at) <= datetime.now(timezone.utc)):
+            raise refuse(request, 401, "REVIEWER_TOKEN_EXPIRED", "This reviewer token has expired; ask for a new one.")
+        if not organization.active:
+            raise refuse(request, 403, "ORGANIZATION_SUSPENDED", "This organization is suspended.")
+        if row.role not in ROLES:
+            raise refuse(request, 403, "REVIEWER_ROLE_INVALID", "Your reviewer role does not allow this.")
+        context = ReviewerContext(organization_id, row.id, row.display_name, row.role, ROLES[row.role],
+                                  on_denied=_denial_recorder(request, organization_id, row.id))
+        yield ReviewSession(db, context)
 
 
-Review = Annotated[ReviewSession, Depends(review_session)]
+def _aware(value: datetime) -> datetime:
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+def _denial_recorder(request: Request, organization_id: UUID, reviewer_id: UUID) -> Callable[[str], None]:
+    def record(permission: str) -> None:
+        request.state.security_reason = "REVIEWER_PERMISSION_DENIED"
+        with request.app.state.session_factory() as db, db.begin():
+            set_tenant(db, organization_id)
+            session_id = request.path_params.get("session_id")
+            db.add(AuditLog(organization_id=organization_id, session_id=UUID(str(session_id)) if session_id else None,
+                            actor_id=f"reviewer:{reviewer_id}", action="REVIEW_ACCESS_DENIED",
+                            request_id=request.state.request_id, reason_codes=["REVIEW_ACCESS_DENIED"],
+                            event_metadata={"permission": permission, "path": route_label(request)}))
+    return record
+
+
+Review = Annotated[ReviewSession, Depends(review_session, scope="function")]

@@ -34,10 +34,10 @@ and verified cryptographically only against keys in `BARCODE_TRUST_STORE`. See
 [Phase 6](docs/architecture-phase6.md) and [Phase 7](docs/architecture-phase7.md).
 
 Phase 10 adds active liveness: after the selfie, the person follows a random,
-single-use sequence of head movements. Each movement is verified with 3D facial
-geometry, which a printed or on-screen photo cannot reproduce, and the person must
-stay the same throughout. Frames are never stored, and the uncalibrated policy
-returns REVIEW at best. See [Phase 10](docs/architecture-phase10.md).
+single-use sequence of head movements. Facial landmark geometry checks the movements,
+and the person must stay the same throughout. Frames are never stored. The uncalibrated
+geometry heuristic returns REVIEW at best, including uncertain flat-face findings;
+identical-image replay remains a FAIL. See [Phase 10](docs/architecture-phase10.md).
 
 Phases 8–9 add CPU face detection, selfie quality recapture, aligned face embeddings,
 and 1:1 comparison against the accepted document portrait. Selfie submission requires
@@ -45,6 +45,40 @@ explicit biometric consent. Face photos and templates are encrypted with separat
 keyrings and retention deadlines. The default comparison policy is uncalibrated and
 always returns `REVIEW`; its cosine score is not an identity probability. Liveness
 and the final risk decision remain later stages.
+
+Phase 15 makes the API multi-tenant. Organizations are provisioned with
+`scripts/manage_tenants.py` and get scoped, expiring, revocable API keys (`kyc_…`). Each
+key is stored only as a hash and found only inside its own organization's row-level
+security context. A suspended organization is locked out completely.
+- Routes enforce scopes. Results mask identity unless the key holds `results:identity`.
+- `Idempotency-Key` makes session creation safe to retry.
+- Per-key rate limits return 429.
+- Session client tokens (`kst_…`) let a phone or browser capture evidence for one
+  session without ever holding an API key.
+
+See [Phase 15](docs/architecture-phase15.md).
+
+Phase 17 adds production configuration checks, HTTP security headers, privacy-safe
+security logging, CIDR-restricted keys, expiring reviewer tokens, current-policy document
+consent, personal-data erasure and encryption-key resealing. Remote SDK transports require
+HTTPS and refuse redirects. Run bootstrap again to apply `0012_phase17_finalize`, then
+`scripts/security_check.py` to verify effective API-role privileges and tenant isolation.
+See [Phase 17](docs/architecture-phase17.md) for setup, curl/Postman checks, rotation and
+the remaining deployment controls.
+
+Phase 16 adds signed webhooks and SDKs. Every session state change becomes a webhook
+delivery in the same database transaction (a transactional outbox).
+- **Signing.** Each delivery is signed with HMAC-SHA256 over a timestamp and the body,
+  so replays can be refused. Each carries a stable event ID for deduplication.
+- **Retries.** Failed deliveries are retried with backoff by the API and by
+  `scripts/deliver_webhooks.py`.
+- **SSRF.** Targets must resolve only to public addresses. This is checked again at
+  every delivery, and the connection goes to the checked address.
+- **SDKs.** `sdk/python` and `sdk/typescript` provide server clients, device clients and
+  webhook verification. `sdk/openapi.json` is the contract for the mobile SDKs, which
+  are not built yet.
+
+See [Phase 16](docs/architecture-phase16.md) and [sdk/README.md](sdk/README.md).
 
 See the design docs ([Phase 1](docs/architecture-phase1.md), [Phase 2](docs/architecture-phase2.md),
 [Phase 3](docs/architecture-phase3.md), [Phase 4](docs/architecture-phase4.md),
@@ -133,9 +167,8 @@ The Docker image installs Tesseract with the Khmer models. When running Python
 directly, install them yourself (macOS: `brew install tesseract tesseract-lang`).
 
 Open `http://127.0.0.1:8000/docs`, or `http://127.0.0.1:8000/capture/` for the
-camera client. Authenticated requests send `X-API-Key` and `X-Organization-ID`. Use an
-organization API key (see [API keys](#api-keys-phase-15)), or in development the generated
-`.env` values `DEVELOPMENT_API_KEY` and `DEVELOPMENT_ORGANIZATION_ID`. Liveness is at
+camera client. Use the generated `.env` values for both
+`X-API-Key` and `X-Organization-ID` in authenticated requests. Liveness is at
 `/health/live`; database/migration readiness is at `/health/ready`.
 
 Stop the containers with `docker compose down`. The PostgreSQL and capture volumes
@@ -169,54 +202,16 @@ downloads weights during a request. Run the provisioner again with `--verify-onl
 to check installed files without network access. Missing or corrupt models make
 selfie processing unavailable (HTTP 503).
 
-## API keys (Phase 15)
-
-Each client application gets its own key, issued to one organization. Only the key's
-SHA-256 is stored, and the key is printed once. An operator provisions organizations and
-their first key with the migration role:
-
-```sh
-PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py org-create "Acme Bank" --rate-limit 120
-PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py key-create ORG_ID "Acme admin" \
-  --scope keys:manage --scope sessions:create --scope sessions:read \
-  --scope captures:write --scope sessions:verify --scope results:read
-PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py key-list ORG_ID
-PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py key-rotate ORG_ID KEY_ID --grace-hours 24
-PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py key-revoke ORG_ID KEY_ID
-PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py org-suspend ORG_ID   # org-activate to undo
-```
-
-With Docker: `docker compose run --rm migrate python scripts/manage_tenants.py ...`.
-
-| Scope | Allows |
-| --- | --- |
-| `sessions:create` | `POST /v1/kyc/sessions` |
-| `sessions:read` | `GET /v1/kyc/{session}` (status only) |
-| `captures:write` | documents, selfie, liveness and NFC uploads and challenges |
-| `sessions:verify` | `POST /v1/kyc/{session}/verify` |
-| `results:read` | `GET /v1/kyc/{session}/result` (identity fields) |
-| `keys:manage` | `GET/POST /v1/api-keys`, `POST /v1/api-keys/{id}/rotate`, `DELETE /v1/api-keys/{id}` |
-
-Keys without `--scope` get every scope except `keys:manage`. A key holding `keys:manage`
-can issue keys only with scopes it holds itself. For a mobile or browser capture client,
-issue a key with only `captures:write` and `sessions:read`, so it cannot read identity
-results. `GET /v1/me` shows the calling organization, key and scopes.
-
-Each key may make the organization's `api_rate_limit_per_minute` requests per minute
-(default 120). Responses carry `X-RateLimit-Limit` and `X-RateLimit-Remaining`, and a
-429 carries `Retry-After`. Send `Idempotency-Key` on `POST /v1/kyc/sessions` to retry
-safely: the same key and body return the same session for 24 hours
-(`Idempotent-Replayed: true`). The same key with a different body is refused with 422.
-
 ## Environment variables
 
 | Variable | Purpose |
 | --- | --- |
-| `ENVIRONMENT` | `development` or `test`; production stays gated until Phase 17 |
+| `ENVIRONMENT` | `development`, `test` or `production`; production requires the [Phase 17 security configuration](docs/architecture-phase17.md) |
+| `DEVELOPMENT_API_KEY`, `DEVELOPMENT_ORGANIZATION_ID` | Optional since Phase 15: a local all-scope key bound to one organization |
 | `DATABASE_URL` | Restricted application connection, `postgresql+psycopg2://...` |
 | `MIGRATION_DATABASE_URL` | Separate owner connection used only for migration/bootstrap |
-| `DEVELOPMENT_API_KEY` | Optional development fallback key for the development organization, minimum 32 characters; empty or unset disables it. Real clients use organization API keys |
-| `DEVELOPMENT_ORGANIZATION_ID` | UUID of the development organization (bootstrap and the development key) |
+| `DEVELOPMENT_API_KEY` | Generated secret, minimum 32 characters |
+| `DEVELOPMENT_ORGANIZATION_ID` | UUID bound to the development credential |
 | `POSTGRES_PASSWORD` | Local Compose migration-role password |
 | `KYC_APP_PASSWORD` | Local Compose restricted-role password |
 | `SESSION_TTL_SECONDS` | Session lifetime, 60–3600 seconds; default 900 |
@@ -240,6 +235,16 @@ safely: the same key and body return the same session for 24 hours
 | `FACE_MATCH_PASS_THRESHOLD`, `FACE_MATCH_FAIL_THRESHOLD` | Operator policy settings, defaults 0.363/0.20; inactive for automatic PASS/FAIL while uncalibrated |
 | `FACE_MATCH_CALIBRATION_REFERENCE` | Required evidence reference with a distinct policy version when calibrated mode is enabled; setting it does not validate the model |
 | `TEST_DATABASE_URL` | Optional isolated live test database, name ending `_test` |
+| `API_RATE_LIMIT_PER_MINUTE` | Development-key limit and ceiling for keys created via the API; default 600 (Phase 15) |
+| `CLIENT_TOKEN_RATE_LIMIT_PER_MINUTE` | Per session client token; default 120 (Phase 15) |
+| `WEBHOOK_DELIVERY_MODE` | `background` (API sends after commit; worker sends retries) or `worker` (Phase 16) |
+| `WEBHOOK_TIMEOUT_SECONDS`, `WEBHOOK_MAX_ATTEMPTS` | Per-attempt timeout (10 s) and attempts before `ABANDONED` (8) |
+| `WEBHOOK_SECRET_OVERLAP_HOURS` | Hours the previous secret keeps signing after a rotation; default 24 |
+| `WEBHOOK_DELIVERY_RETENTION_DAYS` | Finished deliveries purged after this; default 30 |
+| `WEBHOOK_ALLOW_PRIVATE_TARGETS` | Development only: allow `http` and private addresses for a local receiver; default false |
+| `WEB_CONCURRENCY` | uvicorn worker processes (about one per vCPU); each has its own pool and admission limit (Phase 18) |
+| `MAX_CONCURRENT_REQUESTS` | `/v1/` requests in flight per process; 0 = pool capacity minus 3 (Phase 18) |
+| `REQUEST_QUEUE_TIMEOUT_SECONDS` | Longest an excess request queues before 503 + `Retry-After`; default 5 |
 | `REDIS_URL` | Reserved cache setting; integration is not implemented in Phase 1 |
 | `GCP_PROJECT_ID`, `GCS_CAPTURE_BUCKET`, `GCS_BIOMETRIC_BUCKET`, `PUBSUB_TOPIC` | Reserved GCP integration settings |
 
@@ -251,6 +256,7 @@ placeholder `.env.example` public; never publish a populated `.env`.
 ```sh
 PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
 node scripts/test_capture_client.cjs
+(cd sdk/typescript && npm test)              # TypeScript SDK (Node 22.18+)
 PYTHONPATH=src .venv/bin/python -m alembic upgrade 0003_phase3:0004_phase8_9 --sql > artifacts/phase8-9-postgresql.sql
 ```
 
@@ -258,7 +264,7 @@ Fast tests execute the real FastAPI ASGI application and transactional service
 against an isolated SQLite test database. They do not open a web server socket.
 The frozen migration is upgraded, compared with ORM metadata, downgraded, and
 upgraded again. Its PostgreSQL SQL is checked separately for native types and
-all twenty-four forced RLS policies. SQLite is refused outside test mode.
+all seventeen forced RLS policies. SQLite is refused outside test mode.
 
 For a live PostgreSQL RLS check, install the pinned dependencies and set
 `TEST_DATABASE_URL` to a dedicated database with a name ending `_test`. Use a
@@ -279,6 +285,20 @@ Phase 5 also renders fictional Cambodia and foreign passport data pages and test
 real MRZ OCR. These fixtures require the macOS Khmer Sangam MN, Arial and Courier
 New Bold fonts, plus Pillow RAQM. Docker supplies OCR models but does not supply
 those fixture fonts. Synthetic OCR tests do not establish real-document accuracy.
+
+### Load and performance tests (Phase 18)
+
+Run these against a running API with a provisioned key for a dedicated test organization;
+they create real sessions. See [docs/architecture-phase18.md](docs/architecture-phase18.md).
+
+```sh
+export KYC_LOAD_API_KEY=...       # from scripts/manage_tenants.py key create ... --rate-limit 100000
+python scripts/load_test.py --organization ORG --scenario mixed --concurrency 1,8,32,64 --duration 20
+python scripts/benchmark_stages.py cpu
+python scripts/benchmark_stages.py pipeline --organization ORG --sessions 8 --parallel 1,4
+# OCR tier for DOCUMENT_PROCESSING_MODE=deferred:
+python scripts/process_documents.py ORG --parallel 4 --loop 1
+```
 
 ## Curl checks
 
@@ -345,6 +365,68 @@ hand-off return 409, and more than `MAX_CAPTURE_ATTEMPTS` uploads return 429.
 For an NSSF card, create the session with `"expected_document_type":"KH_NSSF"`. Its
 result reports `expiry_status: NOT_APPLICABLE` and `mrz: NOT_APPLICABLE`, because the
 card prints neither.
+
+### Tenants, API keys and client tokens (Phase 15)
+
+Provision an organization and a server key (rerun bootstrap first to apply `0009_phase15`):
+
+```sh
+PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py org create "Acme Bank"
+ORG=<organization_id from the output>
+PYTHONPATH=src .venv/bin/python scripts/manage_tenants.py key create $ORG "Acme backend" \
+  --scope sessions:write --scope sessions:read --scope results:identity --scope webhooks:manage --scope keys:manage
+KEY=<the kyc_… key printed once>
+```
+
+Create a session idempotently (a retry returns 200 with `Idempotent-Replayed: true`),
+then issue a device token:
+
+```sh
+curl -s http://127.0.0.1:8000/v1/kyc/sessions -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG" \
+  -H 'Idempotency-Key: signup-42-attempt' -H 'Content-Type: application/json' \
+  -d '{"user_id":"customer-42","country":"KH","expected_document_type":"KH_NATIONAL_ID"}'
+curl -s -X POST "http://127.0.0.1:8000/v1/kyc/$SESSION/client-token" -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG"
+# On the device: capture and status only, for this one session
+curl -s "http://127.0.0.1:8000/v1/kyc/$SESSION/documents/front" -H "Authorization: Bearer $CLIENT_TOKEN" \
+  -H "X-Organization-ID: $ORG" -F file=@front.jpg
+```
+
+Manage keys with a `keys:manage` key. Keys created this way get at most the creator's
+scopes and rate limit:
+
+```sh
+curl -s http://127.0.0.1:8000/v1/organization -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG"
+curl -s http://127.0.0.1:8000/v1/api-keys -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG" \
+  -H 'Content-Type: application/json' -d '{"name":"read-only reporting","scopes":["sessions:read"],"expires_in_days":90}'
+curl -s -X DELETE "http://127.0.0.1:8000/v1/api-keys/$KEY_ID" -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG"
+```
+
+Expected refusals:
+- a revoked, expired or unknown key, or a key sent with another organization's ID: 401;
+- a suspended organization or a missing scope: 403;
+- a client token on `/result`, `/verify` or another route: 403;
+- a client token on another session: 401;
+- too many requests: 429 with `Retry-After`.
+
+### Webhooks (Phase 16)
+
+With a `webhooks:manage` key (`PII_ENCRYPTION_KEYS` must be configured):
+
+```sh
+curl -s http://127.0.0.1:8000/v1/webhooks -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG" \
+  -H 'Content-Type: application/json' -d '{"url":"https://api.example.com/kyc/events","event_types":["kyc.verified","kyc.rejected","kyc.review.required"]}'
+# → {"id": …, "secret": "whsec_…"}  (the secret is shown once)
+curl -s -X POST "http://127.0.0.1:8000/v1/webhooks/$ENDPOINT/test" -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG"
+curl -s "http://127.0.0.1:8000/v1/webhooks/$ENDPOINT/deliveries?status=ABANDONED" -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG"
+curl -s -X POST "http://127.0.0.1:8000/v1/webhooks/$ENDPOINT/rotate-secret" -H "X-API-Key: $KEY" -H "X-Organization-ID: $ORG"
+PYTHONPATH=src .venv/bin/python scripts/deliver_webhooks.py --loop 15   # retries; run alongside the API
+```
+
+Verify deliveries with `kyc_sdk.verify_webhook` or `verifyWebhook` from the TypeScript SDK
+(see [sdk/README.md](sdk/README.md)). A private or non-https URL returns 422. A local
+receiver needs `WEBHOOK_ALLOW_PRIVATE_TARGETS=true` and is for development only. The
+[Phases 15–16 Postman collection](requests/phase15-16.postman.json) covers tenants, keys,
+client tokens and webhooks.
 
 ### Passport data-page workflow
 
@@ -430,13 +512,16 @@ Schedule `scripts/purge_captures.py` to remove expired face photos, templates an
 quality evidence. Organization capture/template retention settings both default
 to 24 hours. Expired templates also remove their dependent comparisons.
 
-## Security concerns and next phase
+## Security and deployment limits
 
-The development credential is not production tenant authentication. Captures are
-encrypted and retention-limited, but local keys live in `.env`. Production needs
-Secret Manager/KMS and CMEK storage (Phases 17/19). Biometric consent is required
-before selfie processing; earlier document capture has no consent gate yet. The quality thresholds are uncalibrated heuristics, and the gate never
-judges authenticity. No biometric templates are returned by the public API. Migration
+Production refuses development credentials; use provisioned API keys. Captures are
+encrypted and retention-limited, with independent keyrings for captures, identity,
+biometrics and webhook secrets. Local keys live in `.env`; production secret injection,
+KMS and CMEK storage are deployment work. Explicit document consent is required in
+production, and biometric consent is required before selfie processing. Erasure clears
+personal artifacts and free-text review notes while preserving coded decisions and audits.
+The quality thresholds remain uncalibrated. No biometric templates are returned by the
+public API. Migration
 credentials must not be given to the API deployment. See
 [Phase 2 security concerns](docs/architecture-phase2.md#4-security-concerns).
 

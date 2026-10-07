@@ -1,1 +1,1 @@
-"""Phase 15: organization credentials (API keys), scopes and per-key rate limits."""
+"""Tenant credentials: API keys, session client tokens, scopes and rate limits (Phase 15)."""

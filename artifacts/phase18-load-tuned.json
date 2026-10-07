@@ -1,0 +1,1634 @@
+{
+  "runs": [
+    {
+      "tool": "scripts/load_test.py",
+      "label": "tuned, 1 process",
+      "scenario": "status_poll",
+      "base_url": "http://127.0.0.1:8018",
+      "date": "2026-10-06T14:39:07+0700",
+      "client_host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "settings": {
+        "duration_s": 12.0,
+        "warmup_s": 3.0,
+        "sessions": 200
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "duration_s": 12.0,
+          "requests": 955,
+          "throughput_rps": 79.6,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 955
+          },
+          "latency_ms": {
+            "mean": 12.5,
+            "p50": 11.24,
+            "p90": 15.53,
+            "p95": 18.34,
+            "p99": 28.38,
+            "max": 157.62
+          },
+          "operations": {
+            "status_poll": {
+              "requests": 955,
+              "p50_ms": 11.24,
+              "p95_ms": 18.34,
+              "p99_ms": 28.38
+            }
+          }
+        },
+        {
+          "concurrency": 8,
+          "duration_s": 12.0,
+          "requests": 1046,
+          "throughput_rps": 87.2,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 1046
+          },
+          "latency_ms": {
+            "mean": 91.72,
+            "p50": 81.32,
+            "p90": 132.0,
+            "p95": 163.93,
+            "p99": 262.84,
+            "max": 327.23
+          },
+          "operations": {
+            "status_poll": {
+              "requests": 1046,
+              "p50_ms": 81.32,
+              "p95_ms": 163.93,
+              "p99_ms": 262.84
+            }
+          }
+        },
+        {
+          "concurrency": 32,
+          "duration_s": 12.0,
+          "requests": 846,
+          "throughput_rps": 70.5,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 846
+          },
+          "latency_ms": {
+            "mean": 454.34,
+            "p50": 389.16,
+            "p90": 690.33,
+            "p95": 857.4,
+            "p99": 1106.55,
+            "max": 1142.91
+          },
+          "operations": {
+            "status_poll": {
+              "requests": 846,
+              "p50_ms": 389.16,
+              "p95_ms": 857.4,
+              "p99_ms": 1106.55
+            }
+          }
+        },
+        {
+          "concurrency": 64,
+          "duration_s": 12.0,
+          "requests": 846,
+          "throughput_rps": 70.5,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 846
+          },
+          "latency_ms": {
+            "mean": 885.18,
+            "p50": 853.06,
+            "p90": 1432.54,
+            "p95": 1619.85,
+            "p99": 1688.57,
+            "max": 1753.79
+          },
+          "operations": {
+            "status_poll": {
+              "requests": 846,
+              "p50_ms": 853.06,
+              "p95_ms": 1619.85,
+              "p99_ms": 1688.57
+            }
+          }
+        },
+        {
+          "concurrency": 128,
+          "duration_s": 12.0,
+          "requests": 974,
+          "throughput_rps": 81.2,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 974
+          },
+          "latency_ms": {
+            "mean": 1573.36,
+            "p50": 1558.77,
+            "p90": 1895.35,
+            "p95": 1941.99,
+            "p99": 2059.75,
+            "max": 2113.07
+          },
+          "operations": {
+            "status_poll": {
+              "requests": 974,
+              "p50_ms": 1558.77,
+              "p95_ms": 1941.99,
+              "p99_ms": 2059.75
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tool": "scripts/load_test.py",
+      "label": "tuned, 1 process",
+      "scenario": "result",
+      "base_url": "http://127.0.0.1:8018",
+      "date": "2026-10-06T14:40:36+0700",
+      "client_host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "settings": {
+        "duration_s": 12.0,
+        "warmup_s": 3.0,
+        "sessions": 200
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "duration_s": 12.0,
+          "requests": 459,
+          "throughput_rps": 38.2,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 459
+          },
+          "latency_ms": {
+            "mean": 26.06,
+            "p50": 24.29,
+            "p90": 29.88,
+            "p95": 34.52,
+            "p99": 57.24,
+            "max": 108.5
+          },
+          "operations": {
+            "result": {
+              "requests": 459,
+              "p50_ms": 24.29,
+              "p95_ms": 34.52,
+              "p99_ms": 57.24
+            }
+          }
+        },
+        {
+          "concurrency": 8,
+          "duration_s": 12.0,
+          "requests": 644,
+          "throughput_rps": 53.7,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 644
+          },
+          "latency_ms": {
+            "mean": 148.45,
+            "p50": 145.6,
+            "p90": 177.83,
+            "p95": 191.7,
+            "p99": 238.84,
+            "max": 256.8
+          },
+          "operations": {
+            "result": {
+              "requests": 644,
+              "p50_ms": 145.6,
+              "p95_ms": 191.7,
+              "p99_ms": 238.84
+            }
+          }
+        },
+        {
+          "concurrency": 32,
+          "duration_s": 12.0,
+          "requests": 446,
+          "throughput_rps": 37.2,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 446
+          },
+          "latency_ms": {
+            "mean": 862.33,
+            "p50": 827.4,
+            "p90": 1154.01,
+            "p95": 1204.05,
+            "p99": 1262.9,
+            "max": 1311.5
+          },
+          "operations": {
+            "result": {
+              "requests": 446,
+              "p50_ms": 827.4,
+              "p95_ms": 1204.05,
+              "p99_ms": 1262.9
+            }
+          }
+        },
+        {
+          "concurrency": 64,
+          "duration_s": 12.0,
+          "requests": 617,
+          "throughput_rps": 51.4,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 617
+          },
+          "latency_ms": {
+            "mean": 1251.79,
+            "p50": 1217.17,
+            "p90": 1479.29,
+            "p95": 1561.09,
+            "p99": 1593.79,
+            "max": 1627.24
+          },
+          "operations": {
+            "result": {
+              "requests": 617,
+              "p50_ms": 1217.17,
+              "p95_ms": 1561.09,
+              "p99_ms": 1593.79
+            }
+          }
+        },
+        {
+          "concurrency": 128,
+          "duration_s": 12.0,
+          "requests": 360,
+          "throughput_rps": 30.0,
+          "success_rate": 0.95,
+          "statuses": {
+            "200": 342,
+            "503": 18
+          },
+          "latency_ms": {
+            "mean": 4501.62,
+            "p50": 4677.51,
+            "p90": 5144.29,
+            "p95": 5256.87,
+            "p99": 5421.09,
+            "max": 5520.63
+          },
+          "operations": {
+            "result": {
+              "requests": 360,
+              "p50_ms": 4677.51,
+              "p95_ms": 5256.87,
+              "p99_ms": 5421.09
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tool": "scripts/load_test.py",
+      "label": "tuned, 1 process",
+      "scenario": "create_session",
+      "base_url": "http://127.0.0.1:8018",
+      "date": "2026-10-06T14:41:55+0700",
+      "client_host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "settings": {
+        "duration_s": 12.0,
+        "warmup_s": 3.0,
+        "sessions": 0
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "duration_s": 12.0,
+          "requests": 544,
+          "throughput_rps": 45.3,
+          "success_rate": 1.0,
+          "statuses": {
+            "201": 544
+          },
+          "latency_ms": {
+            "mean": 21.97,
+            "p50": 17.5,
+            "p90": 32.56,
+            "p95": 37.36,
+            "p99": 101.37,
+            "max": 161.04
+          },
+          "operations": {
+            "create_session": {
+              "requests": 544,
+              "p50_ms": 17.5,
+              "p95_ms": 37.36,
+              "p99_ms": 101.37
+            }
+          }
+        },
+        {
+          "concurrency": 8,
+          "duration_s": 12.0,
+          "requests": 956,
+          "throughput_rps": 79.7,
+          "success_rate": 1.0,
+          "statuses": {
+            "201": 956
+          },
+          "latency_ms": {
+            "mean": 100.14,
+            "p50": 96.35,
+            "p90": 122.51,
+            "p95": 134.06,
+            "p99": 191.12,
+            "max": 240.82
+          },
+          "operations": {
+            "create_session": {
+              "requests": 956,
+              "p50_ms": 96.35,
+              "p95_ms": 134.06,
+              "p99_ms": 191.12
+            }
+          }
+        },
+        {
+          "concurrency": 32,
+          "duration_s": 12.0,
+          "requests": 761,
+          "throughput_rps": 63.4,
+          "success_rate": 1.0,
+          "statuses": {
+            "201": 761
+          },
+          "latency_ms": {
+            "mean": 506.0,
+            "p50": 446.08,
+            "p90": 719.08,
+            "p95": 776.58,
+            "p99": 970.36,
+            "max": 1060.58
+          },
+          "operations": {
+            "create_session": {
+              "requests": 761,
+              "p50_ms": 446.08,
+              "p95_ms": 776.58,
+              "p99_ms": 970.36
+            }
+          }
+        },
+        {
+          "concurrency": 64,
+          "duration_s": 12.0,
+          "requests": 856,
+          "throughput_rps": 71.3,
+          "success_rate": 1.0,
+          "statuses": {
+            "201": 856
+          },
+          "latency_ms": {
+            "mean": 884.02,
+            "p50": 816.26,
+            "p90": 1165.1,
+            "p95": 1311.62,
+            "p99": 1366.75,
+            "max": 1394.67
+          },
+          "operations": {
+            "create_session": {
+              "requests": 856,
+              "p50_ms": 816.26,
+              "p95_ms": 1311.62,
+              "p99_ms": 1366.75
+            }
+          }
+        },
+        {
+          "concurrency": 128,
+          "duration_s": 12.0,
+          "requests": 852,
+          "throughput_rps": 71.0,
+          "success_rate": 1.0,
+          "statuses": {
+            "201": 852
+          },
+          "latency_ms": {
+            "mean": 1845.0,
+            "p50": 1768.84,
+            "p90": 2486.5,
+            "p95": 2556.28,
+            "p99": 2705.13,
+            "max": 2749.25
+          },
+          "operations": {
+            "create_session": {
+              "requests": 852,
+              "p50_ms": 1768.84,
+              "p95_ms": 2556.28,
+              "p99_ms": 2705.13
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tool": "scripts/load_test.py",
+      "label": "tuned, 1 process",
+      "scenario": "mixed",
+      "base_url": "http://127.0.0.1:8018",
+      "date": "2026-10-06T14:43:21+0700",
+      "client_host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "settings": {
+        "duration_s": 12.0,
+        "warmup_s": 3.0,
+        "sessions": 200
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "duration_s": 12.0,
+          "requests": 705,
+          "throughput_rps": 58.8,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 647,
+            "201": 58
+          },
+          "latency_ms": {
+            "mean": 16.92,
+            "p50": 13.28,
+            "p90": 27.38,
+            "p95": 30.72,
+            "p99": 64.53,
+            "max": 214.09
+          },
+          "operations": {
+            "create_session": {
+              "requests": 58,
+              "p50_ms": 15.89,
+              "p95_ms": 48.79,
+              "p99_ms": 69.47
+            },
+            "organization": {
+              "requests": 73,
+              "p50_ms": 10.62,
+              "p95_ms": 23.46,
+              "p99_ms": 50.05
+            },
+            "result": {
+              "requests": 76,
+              "p50_ms": 28.49,
+              "p95_ms": 63.81,
+              "p99_ms": 80.01
+            },
+            "status_poll": {
+              "requests": 498,
+              "p50_ms": 12.81,
+              "p95_ms": 24.25,
+              "p99_ms": 51.58
+            }
+          }
+        },
+        {
+          "concurrency": 8,
+          "duration_s": 12.0,
+          "requests": 823,
+          "throughput_rps": 68.6,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 733,
+            "201": 90
+          },
+          "latency_ms": {
+            "mean": 116.6,
+            "p50": 104.5,
+            "p90": 168.92,
+            "p95": 205.22,
+            "p99": 279.94,
+            "max": 426.86
+          },
+          "operations": {
+            "create_session": {
+              "requests": 90,
+              "p50_ms": 122.62,
+              "p95_ms": 225.35,
+              "p99_ms": 317.63
+            },
+            "organization": {
+              "requests": 81,
+              "p50_ms": 87.22,
+              "p95_ms": 158.14,
+              "p99_ms": 294.69
+            },
+            "result": {
+              "requests": 68,
+              "p50_ms": 140.25,
+              "p95_ms": 242.21,
+              "p99_ms": 426.86
+            },
+            "status_poll": {
+              "requests": 584,
+              "p50_ms": 100.16,
+              "p95_ms": 187.17,
+              "p99_ms": 277.28
+            }
+          }
+        },
+        {
+          "concurrency": 32,
+          "duration_s": 12.0,
+          "requests": 1104,
+          "throughput_rps": 92.0,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 981,
+            "201": 123
+          },
+          "latency_ms": {
+            "mean": 347.86,
+            "p50": 341.37,
+            "p90": 416.72,
+            "p95": 460.04,
+            "p99": 511.2,
+            "max": 563.26
+          },
+          "operations": {
+            "create_session": {
+              "requests": 123,
+              "p50_ms": 357.1,
+              "p95_ms": 446.43,
+              "p99_ms": 513.46
+            },
+            "organization": {
+              "requests": 116,
+              "p50_ms": 316.31,
+              "p95_ms": 442.61,
+              "p99_ms": 476.16
+            },
+            "result": {
+              "requests": 93,
+              "p50_ms": 372.02,
+              "p95_ms": 505.2,
+              "p99_ms": 563.26
+            },
+            "status_poll": {
+              "requests": 772,
+              "p50_ms": 338.64,
+              "p95_ms": 459.71,
+              "p99_ms": 507.52
+            }
+          }
+        },
+        {
+          "concurrency": 64,
+          "duration_s": 12.0,
+          "requests": 843,
+          "throughput_rps": 70.2,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 764,
+            "201": 79
+          },
+          "latency_ms": {
+            "mean": 906.97,
+            "p50": 836.26,
+            "p90": 1230.51,
+            "p95": 1293.9,
+            "p99": 1395.23,
+            "max": 1434.52
+          },
+          "operations": {
+            "create_session": {
+              "requests": 79,
+              "p50_ms": 854.28,
+              "p95_ms": 1324.66,
+              "p99_ms": 1395.23
+            },
+            "organization": {
+              "requests": 101,
+              "p50_ms": 758.25,
+              "p95_ms": 1261.13,
+              "p99_ms": 1301.81
+            },
+            "result": {
+              "requests": 70,
+              "p50_ms": 910.39,
+              "p95_ms": 1356.17,
+              "p99_ms": 1434.52
+            },
+            "status_poll": {
+              "requests": 593,
+              "p50_ms": 839.93,
+              "p95_ms": 1284.56,
+              "p99_ms": 1386.07
+            }
+          }
+        },
+        {
+          "concurrency": 128,
+          "duration_s": 12.0,
+          "requests": 836,
+          "throughput_rps": 69.7,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 760,
+            "201": 76
+          },
+          "latency_ms": {
+            "mean": 1863.94,
+            "p50": 1784.47,
+            "p90": 2340.95,
+            "p95": 2376.64,
+            "p99": 2431.56,
+            "max": 2503.7
+          },
+          "operations": {
+            "create_session": {
+              "requests": 76,
+              "p50_ms": 1802.93,
+              "p95_ms": 2400.15,
+              "p99_ms": 2468.48
+            },
+            "organization": {
+              "requests": 85,
+              "p50_ms": 1762.78,
+              "p95_ms": 2345.35,
+              "p99_ms": 2372.2
+            },
+            "result": {
+              "requests": 91,
+              "p50_ms": 1789.25,
+              "p95_ms": 2429.4,
+              "p99_ms": 2503.7
+            },
+            "status_poll": {
+              "requests": 584,
+              "p50_ms": 1786.76,
+              "p95_ms": 2375.48,
+              "p99_ms": 2418.2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tool": "scripts/load_test.py",
+      "label": "tuned, 4 workers",
+      "scenario": "health",
+      "base_url": "http://127.0.0.1:8018",
+      "date": "2026-10-06T14:45:03+0700",
+      "client_host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "settings": {
+        "duration_s": 12.0,
+        "warmup_s": 3.0,
+        "sessions": 0
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "duration_s": 12.0,
+          "requests": 5211,
+          "throughput_rps": 434.2,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 5211
+          },
+          "latency_ms": {
+            "mean": 2.26,
+            "p50": 2.07,
+            "p90": 2.7,
+            "p95": 3.13,
+            "p99": 5.29,
+            "max": 97.94
+          },
+          "operations": {
+            "health": {
+              "requests": 5211,
+              "p50_ms": 2.07,
+              "p95_ms": 3.13,
+              "p99_ms": 5.29
+            }
+          }
+        },
+        {
+          "concurrency": 8,
+          "duration_s": 12.0,
+          "requests": 10873,
+          "throughput_rps": 906.1,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 10873
+          },
+          "latency_ms": {
+            "mean": 8.78,
+            "p50": 6.33,
+            "p90": 12.43,
+            "p95": 16.85,
+            "p99": 61.77,
+            "max": 384.65
+          },
+          "operations": {
+            "health": {
+              "requests": 10873,
+              "p50_ms": 6.33,
+              "p95_ms": 16.85,
+              "p99_ms": 61.77
+            }
+          }
+        },
+        {
+          "concurrency": 32,
+          "duration_s": 12.0,
+          "requests": 17161,
+          "throughput_rps": 1430.1,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 17161
+          },
+          "latency_ms": {
+            "mean": 22.32,
+            "p50": 20.65,
+            "p90": 28.55,
+            "p95": 32.87,
+            "p99": 68.31,
+            "max": 276.77
+          },
+          "operations": {
+            "health": {
+              "requests": 17161,
+              "p50_ms": 20.65,
+              "p95_ms": 32.87,
+              "p99_ms": 68.31
+            }
+          }
+        },
+        {
+          "concurrency": 64,
+          "duration_s": 12.0,
+          "requests": 13478,
+          "throughput_rps": 1123.2,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 13478
+          },
+          "latency_ms": {
+            "mean": 56.92,
+            "p50": 45.08,
+            "p90": 92.21,
+            "p95": 123.13,
+            "p99": 235.58,
+            "max": 410.01
+          },
+          "operations": {
+            "health": {
+              "requests": 13478,
+              "p50_ms": 45.08,
+              "p95_ms": 123.13,
+              "p99_ms": 235.58
+            }
+          }
+        },
+        {
+          "concurrency": 128,
+          "duration_s": 12.0,
+          "requests": 9037,
+          "throughput_rps": 753.1,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 9037
+          },
+          "latency_ms": {
+            "mean": 169.92,
+            "p50": 143.64,
+            "p90": 276.05,
+            "p95": 360.9,
+            "p99": 495.26,
+            "max": 687.16
+          },
+          "operations": {
+            "health": {
+              "requests": 9037,
+              "p50_ms": 143.64,
+              "p95_ms": 360.9,
+              "p99_ms": 495.26
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tool": "scripts/load_test.py",
+      "label": "tuned, 4 workers",
+      "scenario": "status_poll",
+      "base_url": "http://127.0.0.1:8018",
+      "date": "2026-10-06T14:46:33+0700",
+      "client_host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "settings": {
+        "duration_s": 12.0,
+        "warmup_s": 3.0,
+        "sessions": 200
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "duration_s": 12.0,
+          "requests": 387,
+          "throughput_rps": 32.2,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 387
+          },
+          "latency_ms": {
+            "mean": 30.48,
+            "p50": 18.22,
+            "p90": 44.7,
+            "p95": 70.19,
+            "p99": 238.53,
+            "max": 1198.89
+          },
+          "operations": {
+            "status_poll": {
+              "requests": 387,
+              "p50_ms": 18.22,
+              "p95_ms": 70.19,
+              "p99_ms": 238.53
+            }
+          }
+        },
+        {
+          "concurrency": 8,
+          "duration_s": 12.0,
+          "requests": 2836,
+          "throughput_rps": 236.3,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 2836
+          },
+          "latency_ms": {
+            "mean": 33.87,
+            "p50": 30.86,
+            "p90": 49.91,
+            "p95": 56.87,
+            "p99": 103.31,
+            "max": 224.75
+          },
+          "operations": {
+            "status_poll": {
+              "requests": 2836,
+              "p50_ms": 30.86,
+              "p95_ms": 56.87,
+              "p99_ms": 103.31
+            }
+          }
+        },
+        {
+          "concurrency": 32,
+          "duration_s": 12.0,
+          "requests": 3825,
+          "throughput_rps": 318.8,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 3825
+          },
+          "latency_ms": {
+            "mean": 100.68,
+            "p50": 95.75,
+            "p90": 140.12,
+            "p95": 156.58,
+            "p99": 199.5,
+            "max": 305.73
+          },
+          "operations": {
+            "status_poll": {
+              "requests": 3825,
+              "p50_ms": 95.75,
+              "p95_ms": 156.58,
+              "p99_ms": 199.5
+            }
+          }
+        },
+        {
+          "concurrency": 64,
+          "duration_s": 12.0,
+          "requests": 3199,
+          "throughput_rps": 266.6,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 3199
+          },
+          "latency_ms": {
+            "mean": 242.27,
+            "p50": 219.86,
+            "p90": 401.56,
+            "p95": 492.12,
+            "p99": 600.38,
+            "max": 677.14
+          },
+          "operations": {
+            "status_poll": {
+              "requests": 3199,
+              "p50_ms": 219.86,
+              "p95_ms": 492.12,
+              "p99_ms": 600.38
+            }
+          }
+        },
+        {
+          "concurrency": 128,
+          "duration_s": 12.0,
+          "requests": 3037,
+          "throughput_rps": 253.1,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 3037
+          },
+          "latency_ms": {
+            "mean": 525.06,
+            "p50": 412.11,
+            "p90": 1020.54,
+            "p95": 1149.85,
+            "p99": 1639.42,
+            "max": 1824.64
+          },
+          "operations": {
+            "status_poll": {
+              "requests": 3037,
+              "p50_ms": 412.11,
+              "p95_ms": 1149.85,
+              "p99_ms": 1639.42
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tool": "scripts/load_test.py",
+      "label": "tuned, 4 workers",
+      "scenario": "result",
+      "base_url": "http://127.0.0.1:8018",
+      "date": "2026-10-06T14:47:59+0700",
+      "client_host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "settings": {
+        "duration_s": 12.0,
+        "warmup_s": 3.0,
+        "sessions": 200
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "duration_s": 12.0,
+          "requests": 394,
+          "throughput_rps": 32.8,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 394
+          },
+          "latency_ms": {
+            "mean": 30.32,
+            "p50": 27.35,
+            "p90": 36.98,
+            "p95": 45.4,
+            "p99": 66.15,
+            "max": 227.7
+          },
+          "operations": {
+            "result": {
+              "requests": 394,
+              "p50_ms": 27.35,
+              "p95_ms": 45.4,
+              "p99_ms": 66.15
+            }
+          }
+        },
+        {
+          "concurrency": 8,
+          "duration_s": 12.0,
+          "requests": 1482,
+          "throughput_rps": 123.5,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 1482
+          },
+          "latency_ms": {
+            "mean": 64.74,
+            "p50": 57.49,
+            "p90": 94.28,
+            "p95": 111.83,
+            "p99": 193.68,
+            "max": 273.26
+          },
+          "operations": {
+            "result": {
+              "requests": 1482,
+              "p50_ms": 57.49,
+              "p95_ms": 111.83,
+              "p99_ms": 193.68
+            }
+          }
+        },
+        {
+          "concurrency": 32,
+          "duration_s": 12.0,
+          "requests": 1312,
+          "throughput_rps": 109.3,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 1312
+          },
+          "latency_ms": {
+            "mean": 295.52,
+            "p50": 262.32,
+            "p90": 470.38,
+            "p95": 536.82,
+            "p99": 616.76,
+            "max": 740.12
+          },
+          "operations": {
+            "result": {
+              "requests": 1312,
+              "p50_ms": 262.32,
+              "p95_ms": 536.82,
+              "p99_ms": 616.76
+            }
+          }
+        },
+        {
+          "concurrency": 64,
+          "duration_s": 12.0,
+          "requests": 1210,
+          "throughput_rps": 100.8,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 1210
+          },
+          "latency_ms": {
+            "mean": 632.91,
+            "p50": 601.53,
+            "p90": 960.9,
+            "p95": 1065.13,
+            "p99": 1194.86,
+            "max": 1529.52
+          },
+          "operations": {
+            "result": {
+              "requests": 1210,
+              "p50_ms": 601.53,
+              "p95_ms": 1065.13,
+              "p99_ms": 1194.86
+            }
+          }
+        },
+        {
+          "concurrency": 128,
+          "duration_s": 12.0,
+          "requests": 1271,
+          "throughput_rps": 105.9,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 1271
+          },
+          "latency_ms": {
+            "mean": 1252.37,
+            "p50": 1214.51,
+            "p90": 1651.85,
+            "p95": 1977.95,
+            "p99": 2429.46,
+            "max": 2632.12
+          },
+          "operations": {
+            "result": {
+              "requests": 1271,
+              "p50_ms": 1214.51,
+              "p95_ms": 1977.95,
+              "p99_ms": 2429.46
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tool": "scripts/load_test.py",
+      "label": "tuned, 4 workers",
+      "scenario": "create_session",
+      "base_url": "http://127.0.0.1:8018",
+      "date": "2026-10-06T14:49:16+0700",
+      "client_host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "settings": {
+        "duration_s": 12.0,
+        "warmup_s": 3.0,
+        "sessions": 0
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "duration_s": 12.0,
+          "requests": 376,
+          "throughput_rps": 31.3,
+          "success_rate": 1.0,
+          "statuses": {
+            "201": 376
+          },
+          "latency_ms": {
+            "mean": 31.53,
+            "p50": 22.61,
+            "p90": 47.69,
+            "p95": 79.5,
+            "p99": 157.77,
+            "max": 315.69
+          },
+          "operations": {
+            "create_session": {
+              "requests": 376,
+              "p50_ms": 22.61,
+              "p95_ms": 79.5,
+              "p99_ms": 157.77
+            }
+          }
+        },
+        {
+          "concurrency": 8,
+          "duration_s": 12.0,
+          "requests": 1671,
+          "throughput_rps": 139.2,
+          "success_rate": 1.0,
+          "statuses": {
+            "201": 1671
+          },
+          "latency_ms": {
+            "mean": 57.32,
+            "p50": 50.41,
+            "p90": 89.32,
+            "p95": 112.89,
+            "p99": 173.81,
+            "max": 334.24
+          },
+          "operations": {
+            "create_session": {
+              "requests": 1671,
+              "p50_ms": 50.41,
+              "p95_ms": 112.89,
+              "p99_ms": 173.81
+            }
+          }
+        },
+        {
+          "concurrency": 32,
+          "duration_s": 12.0,
+          "requests": 2482,
+          "throughput_rps": 206.8,
+          "success_rate": 1.0,
+          "statuses": {
+            "201": 2482
+          },
+          "latency_ms": {
+            "mean": 153.82,
+            "p50": 131.95,
+            "p90": 237.18,
+            "p95": 287.85,
+            "p99": 444.66,
+            "max": 560.3
+          },
+          "operations": {
+            "create_session": {
+              "requests": 2482,
+              "p50_ms": 131.95,
+              "p95_ms": 287.85,
+              "p99_ms": 444.66
+            }
+          }
+        },
+        {
+          "concurrency": 64,
+          "duration_s": 12.0,
+          "requests": 1444,
+          "throughput_rps": 120.3,
+          "success_rate": 1.0,
+          "statuses": {
+            "201": 1444
+          },
+          "latency_ms": {
+            "mean": 524.74,
+            "p50": 403.55,
+            "p90": 987.13,
+            "p95": 1214.99,
+            "p99": 1460.47,
+            "max": 1748.92
+          },
+          "operations": {
+            "create_session": {
+              "requests": 1444,
+              "p50_ms": 403.55,
+              "p95_ms": 1214.99,
+              "p99_ms": 1460.47
+            }
+          }
+        },
+        {
+          "concurrency": 128,
+          "duration_s": 12.0,
+          "requests": 2226,
+          "throughput_rps": 185.5,
+          "success_rate": 1.0,
+          "statuses": {
+            "201": 2226
+          },
+          "latency_ms": {
+            "mean": 674.62,
+            "p50": 637.64,
+            "p90": 829.42,
+            "p95": 948.41,
+            "p99": 1245.22,
+            "max": 1438.12
+          },
+          "operations": {
+            "create_session": {
+              "requests": 2226,
+              "p50_ms": 637.64,
+              "p95_ms": 948.41,
+              "p99_ms": 1245.22
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tool": "scripts/load_test.py",
+      "label": "tuned, 4 workers",
+      "scenario": "mixed",
+      "base_url": "http://127.0.0.1:8018",
+      "date": "2026-10-06T14:50:39+0700",
+      "client_host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "settings": {
+        "duration_s": 12.0,
+        "warmup_s": 3.0,
+        "sessions": 200
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "duration_s": 12.0,
+          "requests": 901,
+          "throughput_rps": 75.1,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 824,
+            "201": 77
+          },
+          "latency_ms": {
+            "mean": 13.24,
+            "p50": 10.79,
+            "p90": 22.83,
+            "p95": 24.96,
+            "p99": 33.82,
+            "max": 167.15
+          },
+          "operations": {
+            "create_session": {
+              "requests": 77,
+              "p50_ms": 14.0,
+              "p95_ms": 25.91,
+              "p99_ms": 167.15
+            },
+            "organization": {
+              "requests": 91,
+              "p50_ms": 9.03,
+              "p95_ms": 10.61,
+              "p99_ms": 15.1
+            },
+            "result": {
+              "requests": 95,
+              "p50_ms": 24.21,
+              "p95_ms": 36.13,
+              "p99_ms": 107.95
+            },
+            "status_poll": {
+              "requests": 638,
+              "p50_ms": 10.63,
+              "p95_ms": 14.27,
+              "p99_ms": 25.13
+            }
+          }
+        },
+        {
+          "concurrency": 8,
+          "duration_s": 12.0,
+          "requests": 2480,
+          "throughput_rps": 206.7,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 2229,
+            "201": 251
+          },
+          "latency_ms": {
+            "mean": 38.63,
+            "p50": 30.62,
+            "p90": 63.6,
+            "p95": 82.63,
+            "p99": 183.2,
+            "max": 574.11
+          },
+          "operations": {
+            "create_session": {
+              "requests": 251,
+              "p50_ms": 35.72,
+              "p95_ms": 83.19,
+              "p99_ms": 194.76
+            },
+            "organization": {
+              "requests": 245,
+              "p50_ms": 26.56,
+              "p95_ms": 64.79,
+              "p99_ms": 210.0
+            },
+            "result": {
+              "requests": 237,
+              "p50_ms": 57.25,
+              "p95_ms": 188.28,
+              "p99_ms": 384.12
+            },
+            "status_poll": {
+              "requests": 1747,
+              "p50_ms": 28.27,
+              "p95_ms": 67.61,
+              "p99_ms": 112.75
+            }
+          }
+        },
+        {
+          "concurrency": 32,
+          "duration_s": 12.0,
+          "requests": 2378,
+          "throughput_rps": 198.2,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 2137,
+            "201": 241
+          },
+          "latency_ms": {
+            "mean": 161.42,
+            "p50": 127.56,
+            "p90": 287.76,
+            "p95": 366.18,
+            "p99": 617.15,
+            "max": 912.27
+          },
+          "operations": {
+            "create_session": {
+              "requests": 241,
+              "p50_ms": 146.17,
+              "p95_ms": 371.29,
+              "p99_ms": 517.21
+            },
+            "organization": {
+              "requests": 233,
+              "p50_ms": 112.94,
+              "p95_ms": 305.57,
+              "p99_ms": 531.61
+            },
+            "result": {
+              "requests": 214,
+              "p50_ms": 185.28,
+              "p95_ms": 563.53,
+              "p99_ms": 859.38
+            },
+            "status_poll": {
+              "requests": 1690,
+              "p50_ms": 119.99,
+              "p95_ms": 341.0,
+              "p99_ms": 611.17
+            }
+          }
+        },
+        {
+          "concurrency": 64,
+          "duration_s": 12.0,
+          "requests": 2053,
+          "throughput_rps": 171.1,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 1841,
+            "201": 212
+          },
+          "latency_ms": {
+            "mean": 373.18,
+            "p50": 335.15,
+            "p90": 689.46,
+            "p95": 822.18,
+            "p99": 943.62,
+            "max": 1252.94
+          },
+          "operations": {
+            "create_session": {
+              "requests": 212,
+              "p50_ms": 355.24,
+              "p95_ms": 843.92,
+              "p99_ms": 917.45
+            },
+            "organization": {
+              "requests": 206,
+              "p50_ms": 315.64,
+              "p95_ms": 802.49,
+              "p99_ms": 870.71
+            },
+            "result": {
+              "requests": 172,
+              "p50_ms": 427.35,
+              "p95_ms": 962.77,
+              "p99_ms": 1026.04
+            },
+            "status_poll": {
+              "requests": 1463,
+              "p50_ms": 319.44,
+              "p95_ms": 793.13,
+              "p99_ms": 908.63
+            }
+          }
+        },
+        {
+          "concurrency": 128,
+          "duration_s": 12.0,
+          "requests": 2231,
+          "throughput_rps": 185.9,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 2020,
+            "201": 211
+          },
+          "latency_ms": {
+            "mean": 696.2,
+            "p50": 698.84,
+            "p90": 900.95,
+            "p95": 948.3,
+            "p99": 1061.41,
+            "max": 1166.14
+          },
+          "operations": {
+            "create_session": {
+              "requests": 211,
+              "p50_ms": 728.5,
+              "p95_ms": 958.27,
+              "p99_ms": 1111.83
+            },
+            "organization": {
+              "requests": 241,
+              "p50_ms": 664.49,
+              "p95_ms": 897.67,
+              "p99_ms": 984.45
+            },
+            "result": {
+              "requests": 207,
+              "p50_ms": 764.98,
+              "p95_ms": 1027.85,
+              "p99_ms": 1103.33
+            },
+            "status_poll": {
+              "requests": 1572,
+              "p50_ms": 694.17,
+              "p95_ms": 935.46,
+              "p99_ms": 1049.45
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tool": "scripts/load_test.py",
+      "label": "deferred processing, 4 API workers + document worker x4",
+      "scenario": "document_upload",
+      "base_url": "http://127.0.0.1:8018",
+      "date": "2026-10-06T14:51:54+0700",
+      "client_host": {
+        "platform": "macOS-15.7.8-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "cpus": 12
+      },
+      "settings": {
+        "duration_s": 12.0,
+        "warmup_s": 3.0,
+        "sessions": 0
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "duration_s": 12.0,
+          "requests": 35,
+          "throughput_rps": 2.9,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 35
+          },
+          "latency_ms": {
+            "mean": 342.76,
+            "p50": 295.37,
+            "p90": 425.5,
+            "p95": 505.67,
+            "p99": 1390.39,
+            "max": 1390.39
+          },
+          "operations": {
+            "document_upload": {
+              "requests": 35,
+              "p50_ms": 295.37,
+              "p95_ms": 505.67,
+              "p99_ms": 1390.39
+            }
+          }
+        },
+        {
+          "concurrency": 4,
+          "duration_s": 12.0,
+          "requests": 125,
+          "throughput_rps": 10.4,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 125
+          },
+          "latency_ms": {
+            "mean": 340.62,
+            "p50": 343.18,
+            "p90": 400.81,
+            "p95": 444.07,
+            "p99": 487.33,
+            "max": 500.81
+          },
+          "operations": {
+            "document_upload": {
+              "requests": 125,
+              "p50_ms": 343.18,
+              "p95_ms": 444.07,
+              "p99_ms": 487.33
+            }
+          }
+        },
+        {
+          "concurrency": 8,
+          "duration_s": 12.0,
+          "requests": 200,
+          "throughput_rps": 16.7,
+          "success_rate": 1.0,
+          "statuses": {
+            "200": 200
+          },
+          "latency_ms": {
+            "mean": 424.58,
+            "p50": 412.83,
+            "p90": 518.27,
+            "p95": 546.25,
+            "p99": 580.93,
+            "max": 624.05
+          },
+          "operations": {
+            "document_upload": {
+              "requests": 200,
+              "p50_ms": 412.83,
+              "p95_ms": 546.25,
+              "p99_ms": 580.93
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "note": "After Phase 18 changes (admission control, lock-free status read). The '1 process' runs overlapped with unit tests on the same machine and are indicative only."
+}

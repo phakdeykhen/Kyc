@@ -2,62 +2,108 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPException, Request, Response, UploadFile, status
+from fastapi.responses import JSONResponse
 
-from kyc.api.dependencies import Database, Scope, Tenant
-from kyc.api.schemas import COUNTRY_CODES, CaptureError, CaptureResponse, DocumentSide, SessionCreate, SessionResponse, SessionResult, SelfieResponse, VerifyResponse
+from kyc.api.dependencies import AnyApiKey, Capture, Database, Eraser, SessionReader, SessionWriter, StatusReader, TenantContext
+from kyc.api.schemas import COUNTRY_CODES, CaptureError, CaptureResponse, ClientTokenResponse, ConsentRequest, ConsentResponse, DocumentSide, SessionCreate, SessionResponse, SessionResult, SelfieResponse, VerifyResponse
 from kyc.documents.adapters import adapter_for
 from kyc.documents.requirements import requirement_for
 from kyc.domain.enums import DocumentType
 from kyc.services.captures import CaptureLimits, submit_capture
+from kyc.services.consent import DOCUMENT_SCOPE, active_consent, record_document_consent
+from kyc.services.erasure import delete_objects, erase_session
 from kyc.services.biometrics import SelfieLimits, submit_selfie
-from kyc.services.liveness import LivenessLimits, issue_challenge, submit_liveness
+from kyc.services.liveness import LivenessLimits, guide_step, issue_challenge, submit_liveness
 from kyc.services.nfc import NFCLimits, issue_nfc_challenge, submit_nfc
 from kyc.services.results import build_result
 from kyc.services.risk import verify_session
-from kyc.services.sessions import create_session, get_session, respond
+from kyc.services.sessions import aware, create_session, get_session, issue_client_token, respond
 
 router = APIRouter(prefix="/v1")
 
 CAPTURE_RESPONSES = {
     409: {"model": CaptureError, "description": "Session expired, closed, or not accepting document capture."},
     413: {"description": "Upload exceeds the size limit."},
-    422: {"description": "Unreadable or unsupported image, or a side this document type does not have."},
+    422: {"description": "Unreadable or unsupported image, a side this document type does not have, or "
+                         "DOCUMENT_CONSENT_REQUIRED (POST /consent first)."},
     429: {"model": CaptureError, "description": "Capture attempt limit reached for this session."},
     503: {"description": "Capture storage is not configured."},
 }
 
 
-CREATE = [Scope("sessions:create")]
-READ = [Scope("sessions:read")]
-CAPTURE = [Scope("captures:write")]
-VERIFY = [Scope("sessions:verify")]
-RESULTS = [Scope("results:read")]
-
-
-@router.post("/kyc/sessions", response_model=SessionResponse, status_code=status.HTTP_201_CREATED, dependencies=CREATE,
-             responses={409: {"description": "Same Idempotency-Key in flight."},
-                        422: {"description": "Idempotency-Key reused with a different body."}})
-def start_session(body: SessionCreate, request: Request, response: Response, tenant: Tenant, db: Database,
-                  idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key", min_length=1, max_length=128,
-                                                                pattern=r"^[A-Za-z0-9_.:-]+$")] = None):
-    """Create a session. Send an Idempotency-Key to retry safely: the same key and body return the same session for 24 h."""
+@router.post("/kyc/sessions", response_model=SessionResponse, status_code=status.HTTP_201_CREATED, responses={
+    200: {"model": SessionResponse, "description": "Replay of an earlier request with the same Idempotency-Key."},
+    409: {"description": "Idempotency-Key already used with a different request."},
+})
+def start_session(body: SessionCreate, request: Request, response: Response, tenant: SessionWriter, db: Database,
+                  idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key", min_length=8, max_length=128,
+                                                                pattern=r"^[A-Za-z0-9._:-]+$")] = None):
+    """Create a session. Send an Idempotency-Key so that retrying after a timeout cannot create a duplicate."""
     record, replayed = create_session(db, tenant, body, request.app.state.settings.session_ttl_seconds,
                                       request.state.request_id, idempotency_key)
     if replayed:
+        response.status_code = status.HTTP_200_OK
         response.headers["Idempotent-Replayed"] = "true"
     return respond(record)
 
 
-@router.get("/kyc/{session_id}", response_model=SessionResponse, dependencies=READ)
-def read_session(session_id: UUID, request: Request, tenant: Tenant, db: Database):
-    return respond(get_session(db, tenant, session_id, request.state.request_id))
+@router.get("/kyc/{session_id}", response_model=SessionResponse)
+def read_session(session_id: UUID, request: Request, tenant: StatusReader, db: Database):
+    # One row, so no lock is needed for a consistent answer; devices poll this (Phase 18).
+    return respond(get_session(db, tenant, session_id, request.state.request_id, lock=False))
 
 
-@router.get("/kyc/{session_id}/result", response_model=SessionResult, dependencies=RESULTS)
-def read_result(session_id: UUID, request: Request, tenant: Tenant, db: Database):
+@router.post("/kyc/{session_id}/client-token", response_model=ClientTokenResponse, status_code=status.HTTP_201_CREATED,
+             responses={409: {"description": "The session is closed."}})
+def client_token(session_id: UUID, request: Request, tenant: SessionWriter, db: Database):
+    """Issue a token for the user's device: it can capture evidence for, and read the status of, this session only.
+
+    Issuing a new token revokes the previous one. Never ship an API key to a browser or mobile app.
+    """
     record = get_session(db, tenant, session_id, request.state.request_id)
-    # Extracted evidence only; the PASS/REVIEW/FAIL decision belongs to the risk engine (Phase 13).
-    return build_result(db, record, request.app.state.field_cipher)
+    token = issue_client_token(db, tenant, record, request.state.request_id)
+    return ClientTokenResponse(session_id=record.id, client_token=token, scope="session:capture",
+                               expires_at=aware(record.expires_at))
+
+
+@router.get("/kyc/{session_id}/result", response_model=SessionResult)
+def read_result(session_id: UUID, request: Request, tenant: SessionReader, db: Database):
+    """Identity fields are masked unless the credential holds the results:identity scope."""
+    record = get_session(db, tenant, session_id, request.state.request_id)
+    return build_result(db, record, request.app.state.field_cipher, reveal_identity="results:identity" in tenant.scopes)
+
+
+@router.post("/kyc/{session_id}/consent", response_model=ConsentResponse, responses={
+    409: {"description": "The session is closed."}})
+def give_consent(session_id: UUID, body: ConsentRequest, request: Request, response: Response, tenant: Capture,
+    db: Database):
+    """Record the person's consent to document processing, from their device, before capture.
+
+    Required before document uploads when the platform runs with REQUIRE_DOCUMENT_CONSENT (always in production).
+    """
+    record = get_session(db, tenant, session_id, request.state.request_id)
+    policy = request.app.state.settings.document_consent_policy_version
+    consent, created = record_document_consent(db, tenant, record, policy, request.state.request_id)
+    response.status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+    return ConsentResponse(session_id=record.id, scope=consent.scope, policy_version=consent.policy_version,
+                           granted_at=aware(consent.created_at))
+
+
+@router.post("/kyc/{session_id}/erase", responses={404: {"description": "Session not found."}})
+def erase(session_id: UUID, request: Request, tenant: Eraser, db: Database, background: BackgroundTasks):
+    """Erase this session's personal and biometric data now (data-subject request). Requires data:erase.
+
+    The status, decision reason codes and audit trail are kept; an unfinished session is closed first.
+    Repeating the call is harmless.
+    """
+    record = get_session(db, tenant, session_id, request.state.request_id)
+    report = erase_session(db, tenant, record, request.state.request_id)
+    # Commit explicitly before registering destructive storage work. This guarantee must
+    # not depend on when a FastAPI version tears down dependencies that yield.
+    db.commit()
+    if report.object_refs and request.app.state.capture_store is not None:
+        background.add_task(delete_objects, request.app.state.capture_store, report)  # after the commit
+    return report.view(record.status.value)
 
 
 def _process_after_commit(state, organization_id: UUID, session_id: UUID, request_id: UUID) -> None:
@@ -76,12 +122,18 @@ def _assess_if_processing(outcome, background: BackgroundTasks, request: Request
     return outcome
 
 
-def _capture(session_id: UUID, side: str, file: UploadFile, request: Request, tenant: Tenant, db: Database,
+def _capture(session_id: UUID, side: str, file: UploadFile, request: Request, tenant: TenantContext, db: Database,
              background: BackgroundTasks):
     state = request.app.state
     if state.capture_store is None:
         raise HTTPException(503, detail="Capture storage is not configured.")
     settings = state.settings
+    if settings.require_document_consent:
+        record = get_session(db, tenant, session_id, request.state.request_id)
+        if active_consent(db, record, DOCUMENT_SCOPE, settings.document_consent_policy_version) is None:
+            return JSONResponse(status_code=422, content={
+                "detail": "Record the person's consent with POST /v1/kyc/{session}/consent before uploading documents.",
+                "reason_code": "DOCUMENT_CONSENT_REQUIRED", "attempts_remaining": None})
     data = file.file.read(settings.max_capture_bytes + 1)
     limits = CaptureLimits(settings.max_capture_bytes, settings.max_capture_pixels, settings.max_capture_attempts)
     outcome = submit_capture(db, tenant, session_id, side, data, state.quality_engine, state.capture_store,
@@ -93,33 +145,33 @@ def _capture(session_id: UUID, side: str, file: UploadFile, request: Request, te
     return outcome
 
 
-@router.post("/kyc/{session_id}/documents", response_model=CaptureResponse, responses=CAPTURE_RESPONSES, dependencies=CAPTURE)
-def upload_document(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
+@router.post("/kyc/{session_id}/documents", response_model=CaptureResponse, responses=CAPTURE_RESPONSES)
+def upload_document(session_id: UUID, request: Request, tenant: Capture, db: Database, background: BackgroundTasks,
                     side: Annotated[DocumentSide, Form()], file: Annotated[UploadFile, File()]):
     """Upload one side. Passports use DATA_PAGE; cards use FRONT and BACK."""
     return _capture(session_id, side, file, request, tenant, db, background)
 
 
-@router.post("/kyc/{session_id}/documents/front", response_model=CaptureResponse, responses=CAPTURE_RESPONSES, dependencies=CAPTURE)
-def upload_front(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
+@router.post("/kyc/{session_id}/documents/front", response_model=CaptureResponse, responses=CAPTURE_RESPONSES)
+def upload_front(session_id: UUID, request: Request, tenant: Capture, db: Database, background: BackgroundTasks,
                  file: Annotated[UploadFile, File()]):
     return _capture(session_id, "FRONT", file, request, tenant, db, background)
 
 
-@router.post("/kyc/{session_id}/documents/back", response_model=CaptureResponse, responses=CAPTURE_RESPONSES, dependencies=CAPTURE)
-def upload_back(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
+@router.post("/kyc/{session_id}/documents/back", response_model=CaptureResponse, responses=CAPTURE_RESPONSES)
+def upload_back(session_id: UUID, request: Request, tenant: Capture, db: Database, background: BackgroundTasks,
                 file: Annotated[UploadFile, File()]):
     return _capture(session_id, "BACK", file, request, tenant, db, background)
 
 
-@router.post("/kyc/{session_id}/selfie", response_model=SelfieResponse, dependencies=CAPTURE, responses={
+@router.post("/kyc/{session_id}/selfie", response_model=SelfieResponse, responses={
     409: {"model": CaptureError, "description": "Session is not accepting selfies."},
     413: {"description": "Upload exceeds the size limit."},
     422: {"description": "Consent is required, or image is unreadable."},
     429: {"model": CaptureError, "description": "Selfie attempt limit reached."},
     503: {"description": "Models, encrypted storage, or document portrait unavailable."},
 })
-def upload_selfie(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
+def upload_selfie(session_id: UUID, request: Request, tenant: Capture, db: Database, background: BackgroundTasks,
                   file: Annotated[UploadFile, File()], biometric_consent: Annotated[bool, Form()]):
     """Assess one selfie and compare it only to this session's document portrait."""
     state, settings = request.app.state, request.app.state.settings
@@ -139,24 +191,50 @@ def _liveness_limits(settings) -> LivenessLimits:
                           settings.max_selfie_pixels)
 
 
-@router.post("/kyc/{session_id}/liveness/challenge", dependencies=CAPTURE, responses={
+@router.post("/kyc/{session_id}/liveness/challenge", responses={
     409: {"model": CaptureError, "description": "Session is not waiting for liveness."},
     429: {"model": CaptureError, "description": "Liveness attempt limit reached."},
 })
-def liveness_challenge(session_id: UUID, request: Request, tenant: Tenant, db: Database):
+def liveness_challenge(session_id: UUID, request: Request, tenant: Capture, db: Database):
     """Issue a single-use, randomly ordered head-movement challenge (expires quickly)."""
     state = request.app.state
     return issue_challenge(db, tenant, session_id, _liveness_limits(state.settings), state.liveness_policy,
                            request.state.request_id)
 
 
-@router.post("/kyc/{session_id}/liveness", dependencies=CAPTURE, responses={
+@router.post("/kyc/{session_id}/liveness/guide", responses={
+    409: {"model": CaptureError, "description": "Challenge unknown, used or expired, or session not waiting for liveness."},
+    413: {"description": "Upload exceeds the size limit."},
+    422: {"description": "Unreadable frame, unknown step, or a baseline frame without exactly one face."},
+    503: {"description": "Face models unavailable."},
+})
+def guide_liveness(session_id: UUID, request: Request, tenant: Capture, db: Database,
+                   challenge_id: Annotated[UUID, Form()], nonce: Annotated[str, Form(max_length=128)],
+                   step: Annotated[int, Form(ge=0, le=20)],
+                   frame: Annotated[UploadFile, File(description="Current raw (unmirrored) camera frame")],
+                   baseline: Annotated[UploadFile | None, File(description="The frame accepted for step 0")] = None):
+    """Live feedback while the person follows one step: is the face visible, and is the movement done?
+
+    Advisory only. It does not use up the challenge or record evidence, and frames are not stored;
+    POST /liveness judges the submitted frames again with the same geometry.
+    """
+    state = request.app.state
+    limits = _liveness_limits(state.settings)
+    data = frame.file.read(limits.max_frame_bytes + 1)
+    reference = baseline.file.read(limits.max_frame_bytes + 1) if baseline is not None else None
+    if len(data) > limits.max_frame_bytes or (reference is not None and len(reference) > limits.max_frame_bytes):
+        raise HTTPException(413, detail="Frame is too large.")
+    return guide_step(db, tenant, session_id, challenge_id, nonce, step, data, reference or None, state.face_engine,
+                      state.liveness_policy, limits, request.state.request_id)
+
+
+@router.post("/kyc/{session_id}/liveness", responses={
     409: {"model": CaptureError, "description": "Challenge unknown, used or expired, or session not waiting for liveness."},
     413: {"description": "Upload exceeds the size limit."},
     422: {"description": "Frames unreadable or not matched to steps."},
     503: {"description": "Face models unavailable."},
 })
-def upload_liveness(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
+def upload_liveness(session_id: UUID, request: Request, tenant: Capture, db: Database, background: BackgroundTasks,
                     challenge_id: Annotated[UUID, Form()], nonce: Annotated[str, Form(max_length=128)],
                     frame_steps: Annotated[str, Form(max_length=200, description="Comma-separated step index per frame")],
                     frames: Annotated[list[UploadFile], File(description="Raw (unmirrored) camera frames")]):
@@ -180,11 +258,11 @@ def _nfc_limits(settings) -> NFCLimits:
     return NFCLimits(settings.nfc_challenge_ttl_seconds, settings.max_nfc_attempts)
 
 
-@router.post("/kyc/{session_id}/nfc/challenge", dependencies=CAPTURE, responses={
+@router.post("/kyc/{session_id}/nfc/challenge", responses={
     409: {"model": CaptureError, "description": "Session is not waiting for the chip step."},
     429: {"model": CaptureError, "description": "Chip attempt limit reached."},
 })
-def nfc_challenge(session_id: UUID, request: Request, tenant: Tenant, db: Database):
+def nfc_challenge(session_id: UUID, request: Request, tenant: Capture, db: Database):
     """Issue a fresh 8-byte Active Authentication challenge for the chip to sign."""
     return issue_nfc_challenge(db, tenant, session_id, _nfc_limits(request.app.state.settings), request.state.request_id)
 
@@ -198,12 +276,12 @@ def _optional_file(upload: UploadFile | None, limit: int) -> bytes | None:
     return data or None
 
 
-@router.post("/kyc/{session_id}/nfc", dependencies=CAPTURE, responses={
+@router.post("/kyc/{session_id}/nfc", responses={
     409: {"model": CaptureError, "description": "Challenge invalid, or session not waiting for the chip step."},
     413: {"description": "Upload exceeds the size limit."},
     429: {"model": CaptureError, "description": "Chip attempt limit reached."},
 })
-def upload_nfc(session_id: UUID, request: Request, tenant: Tenant, db: Database, background: BackgroundTasks,
+def upload_nfc(session_id: UUID, request: Request, tenant: Capture, db: Database, background: BackgroundTasks,
                read_status: Annotated[Literal["READ", "NOT_SUPPORTED", "NOT_AVAILABLE", "FAILED"], Form()] = "READ",
                access_protocol: Annotated[Literal["PACE", "BAC"] | None, Form()] = None,
                challenge_id: Annotated[UUID | None, Form()] = None,
@@ -224,17 +302,17 @@ def upload_nfc(session_id: UUID, request: Request, tenant: Tenant, db: Database,
     return _assess_if_processing(outcome, background, request, tenant, session_id)
 
 
-@router.post("/kyc/{session_id}/verify", response_model=VerifyResponse, dependencies=VERIFY, responses={
+@router.post("/kyc/{session_id}/verify", response_model=VerifyResponse, responses={
     409: {"model": CaptureError, "description": "Session not ready, expired, or document not processed."},
 })
-def verify(session_id: UUID, request: Request, tenant: Tenant, db: Database):
+def verify(session_id: UUID, request: Request, tenant: SessionWriter, db: Database):
     """Run the deterministic risk engine for a PROCESSING session, or return the decision already made."""
     record = get_session(db, tenant, session_id, request.state.request_id)
     return verify_session(db, tenant, record, request.app.state.assessor, request.state.request_id)
 
 
 @router.get("/document-types")
-def document_types(tenant: Tenant):
+def document_types(tenant: AnyApiKey):
     return {"document_types": [{"type": item.value,
             "country": "KH" if item.value.startswith("KH_") else None,
             "required_sides": list(requirement_for(item).sides),
@@ -243,7 +321,7 @@ def document_types(tenant: Tenant):
 
 
 @router.get("/countries")
-def countries(tenant: Tenant):
+def countries(tenant: AnyApiKey):
     # Country-specific adapters, plus document types read from their ICAO MRZ whatever the issuing country.
     return {"countries": sorted(COUNTRY_CODES), "verification_adapters_available": ["KH"],
             "any_country_document_types": ["PASSPORT"]}

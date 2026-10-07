@@ -27,7 +27,9 @@ def front_lines(**overrides):
             line("ភិនភាគ: ប្រជ្រុយ", 0.78)]
 
 
-BACK = [line(text, 0.7 + index * 0.08) for index, text in enumerate(td1())]  # valid ICAO TD1
+BACK = [line(text, 0.7 + index * 0.08) for index, text in enumerate(td1())]  # valid ICAO TD1 (printed on the front)
+# What OCR finds on the real card's back: a heading by the fingerprint/seal area, no identity text, no MRZ.
+CARD_BACK = [line("ព្រះរាជាណាចក្រកម្ពុជា", 0.1)]
 
 
 class KhmerNormalizationTests(unittest.TestCase):
@@ -69,8 +71,12 @@ class AdapterTests(unittest.TestCase):
         front = self.adapter.classify(front_lines(), "FRONT")
         self.assertEqual((front.document_type, front.document_side), (DocumentType.KH_NATIONAL_ID, "FRONT"))
         self.assertGreaterEqual(front.confidence, 0.9)
-        back = self.adapter.classify(BACK, "BACK")
-        self.assertEqual(back.document_side, "BACK")
+        # Real cards print the "IDKHM" MRZ under the portrait; the back is a fingerprint/seal area.
+        mrz_side = self.adapter.classify(front_lines() + BACK, "FRONT")
+        self.assertEqual(mrz_side.document_side, "FRONT")
+        self.assertGreater(mrz_side.confidence, front.confidence - 0.01)
+        back = self.adapter.classify([line("ព្រះរាជាណាចក្រកម្ពុជា", 0.1), line("<<<<<<<<<<<<<<<<<<<<<<<<<<", 0.8)], "BACK")
+        self.assertEqual(back.document_side, "BACK", "MRZ-like noise without the card's own MRZ is not a front")
         passport = self.adapter.classify([line("KINGDOM OF CAMBODIA PASSPORT", 0.1), line("P<KHMSOK<<SOPHEA<<<<<<<<<<<<<<<<<<<<<<<<<<<", 0.8)], "FRONT")
         self.assertEqual(passport.document_type, DocumentType.KH_PASSPORT)  # the more specific card type
         unknown = self.adapter.classify([line("hello world", 0.1)], "FRONT")
@@ -266,3 +272,75 @@ class NSSFAdapterTests(unittest.TestCase):
         self.assertEqual(self.adapter.classify(nssf_front(), "FRONT").document_type, DocumentType.KH_NSSF)
         back = self.adapter.classify(NSSF_BACK, "BACK")
         self.assertEqual(back.document_side, "BACK")
+
+
+class RealCardLayoutTests(unittest.TestCase):
+    """Phase 18 real-card test: the MRZ shares the portrait side and is often read with filler noise."""
+
+    def setUp(self):
+        self.adapter = adapter_for(DocumentType.KH_NATIONAL_ID)
+        self.mrz = td1()   # IDKHM…, 9003152F2912316KHM<<<<<<<<<<<4, SOK<<SOPHEA…
+
+    def test_mrz_filler_noise_and_lost_tail_are_repaired_only_when_check_digits_agree(self):
+        from kyc.mrz import parser
+        head = self.mrz[1][:18]
+        for noisy in (head + "<<<<CEEECEECEEG", head + "<<<<<<<<", head + "<<<<<<<<<<<4"):
+            with self.subTest(noisy=noisy):
+                result = parser.read([self.mrz[0], noisy, self.mrz[2]])
+                self.assertTrue(parser._fields_verified(result))
+                self.assertEqual((result.document_number, str(result.date_of_birth), str(result.expiry_date)),
+                                 ("010203040", "1990-03-15", "2029-12-31"))
+        repaired = parser.read([self.mrz[0], head + "<<<<CEEECEECEEG", self.mrz[2]])
+        self.assertIn("MRZ_CHAR_CORRECTED", repaired.flags)
+        self.assertIn("MRZ_COMPOSITE_UNVERIFIED", repaired.flags, "A lost composite digit is never invented")
+        self.assertFalse(repaired.mrz_valid)
+        wrong_birth = head.replace("900315", "900316") + "<<<<CEEECEECEEG"
+        result = parser.read([self.mrz[0], wrong_birth, self.mrz[2]])
+        self.assertFalse(result is not None and parser._fields_verified(result), "No repair hides a wrong birth date")
+
+    def test_a_verified_mrz_turns_an_unreadable_khmer_name_into_review_not_recapture(self):
+        no_name = [item for item in front_lines() if "គោត្តនាម" not in item.text]
+        verified = self.adapter.extract_fields({"FRONT": no_name + [line(text, 0.8 + i * 0.05) for i, text in enumerate(self.mrz)],
+                                                "BACK": []})
+        check = {c.check_type: c for c in self.adapter.validate_fields(verified, TODAY)}["REQUIRED_FIELDS"]
+        self.assertEqual((check.result, check.reason_codes), (CheckResult.REVIEW, ("FIELD_MISSING",)))
+        self.assertIn("full_name_local", check.details["missing"])
+        unverified = self.adapter.extract_fields({"FRONT": no_name, "BACK": []})
+        check = {c.check_type: c for c in self.adapter.validate_fields(unverified, TODAY)}["REQUIRED_FIELDS"]
+        self.assertEqual(check.result, CheckResult.FAIL, "Without a verified MRZ the name is still critical")
+
+    def test_real_card_multi_pass_mrz_extracts_clean_name_and_avoids_mrz_line_as_number(self):
+        # Multiple OCR passes on a real card: noisy names with filler characters, MRZ lines with leading 'O',
+        # and truncated line 2 tails.
+        raw_lines = [
+            ": គៅគ្គនាមនិងនាម: COB. HE :: ON :",
+            "| Fe —7 ម្លៃខែឆ្នាំកំណើត:/២៦.១១.២០០៣ sss: ប្រុស កំពស់ ១៦៥ HB",
+            "ទីកន្លែងកំនើគ: ឃុំជៀប ស្រុកទឹកផុស កំពង់ឆ្នាំង - ន",
+            "មុ អាសយផ្វានៈ ភូមិកោះខ្ទុម្ភ",
+            "10%កស0405477038<<<<<<<<<<<<<<<",
+            "_ 0311225M3006025KHM<<<<ceeeceeceeg",
+            "| KHENS<PHAKDEY<<<cccccceeceeeee",
+            "IDKHM0405477038<<<<<<<<<<<<<",
+            "0311225M3006025KHM<<<<<<<<",
+            "IDKHMO405477038<<<<<<<<",
+            "KHEN<<PHAKDEY<<<<<<<<<<<",
+        ]
+        ocr_lines = [line(t, 0.1 + i * 0.05) for i, t in enumerate(raw_lines)]
+        doc = self.adapter.extract_fields({"FRONT": ocr_lines, "BACK": []})
+        self.assertEqual(doc.document_number, "040547703")
+        self.assertEqual(doc.full_name, "KHEN PHAKDEY")
+        self.assertEqual(doc.sex, "M")
+        self.assertEqual(str(doc.date_of_birth), "2003-11-22")
+        self.assertEqual(str(doc.expiry_date), "2030-06-02")
+        checks = {c.check_type: c for c in self.adapter.validate_fields(doc, TODAY)}
+        self.assertEqual(checks["MRZ_CONSISTENCY"].result, CheckResult.PASS)
+        self.assertEqual(checks["DOCUMENT_NUMBER_FORMAT"].result, CheckResult.PASS)
+        self.assertEqual(checks["REQUIRED_FIELDS"].result, CheckResult.REVIEW)
+        self.assertIn("full_name_local", checks["REQUIRED_FIELDS"].details["missing"])
+
+    def test_10_digit_visual_number_matches_9_digit_mrz(self):
+        from kyc.mrz import parser
+        result = parser.read(self.mrz)
+        # Visual zone has 10 digits; MRZ has 9 digits
+        compared = parser.compare(result, {"document_number": "0102030405"})
+        self.assertEqual(compared["document_number"], "MATCH")

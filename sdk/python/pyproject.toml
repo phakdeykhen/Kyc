@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kyc-sdk"
+version = "0.18.0"
+description = "Client and webhook verification for the Universal Identity Platform KYC API"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["kyc_sdk*"]

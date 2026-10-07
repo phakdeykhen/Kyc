@@ -35,7 +35,10 @@ const SCORE_LABELS = {
   document_coverage: "Coverage", perspective_score: "Alignment", resolution_score: "Resolution", overall_quality: "Overall",
 };
 const state = { apiKey: "", orgId: "", session: null, sides: [], current: null, stream: null, busy: false,
-  mode: "setup", cameraVersion: 0, pollTimer: null, polling: false, stepDelayMs: 1600 };
+  documentConsentRecorded: false, mode: "setup", cameraVersion: 0, pollTimer: null, polling: false, live: null,
+  // Guided liveness timing: one server check per interval (≈90 a minute, inside the client-token rate limit),
+  // a stronger hint after nudgeAfterMs without progress, and a help card after helpAfterMs.
+  guideIntervalMs: 650, nudgeAfterMs: 5000, helpAfterMs: 15000 };
 const $ = (id) => document.getElementById(id);
 const CAMERA_PREFIX = { selfie: "selfie-", liveness: "liveness-" };
 const cameraElement = (id) => $(`${CAMERA_PREFIX[state.mode] || ""}${id}`);
@@ -58,12 +61,15 @@ async function api(path, options = {}) {
 }
 
 function updateButtons() {
-  $("shoot").disabled = state.busy || state.mode !== "document" || !state.current || !state.stream;
-  $("file").disabled = state.busy || state.mode !== "document" || !state.current;
+  const mayCaptureDocument = !state.busy && state.mode === "document" && !!state.current && $("document-consent").checked;
+  $("shoot").disabled = !mayCaptureDocument || !state.stream;
+  $("file").disabled = !mayCaptureDocument;
   const maySubmitSelfie = !state.busy && state.mode === "selfie" && $("biometric-consent").checked;
   $("selfie-shoot").disabled = !maySubmitSelfie || !state.stream;
   $("selfie-file").disabled = !maySubmitSelfie;
   $("liveness-start").disabled = state.busy || state.mode !== "liveness" || !state.stream;
+  $("liveness-start").hidden = !!state.live;
+  $("liveness-cancel").hidden = !state.live;
   $("resume-session").disabled = state.busy || state.polling;
   $("session-form").querySelector('button[type="submit"]').disabled = state.busy || state.polling;
   $("refresh-session").disabled = state.polling || state.busy;
@@ -105,6 +111,8 @@ function resetSession() {
   stopCamera();
   state.current = null;
   state.session = null;
+  state.documentConsentRecorded = false;
+  $("document-consent").checked = false;
   $("biometric-consent").checked = false;
   $("result").hidden = true;
   setMode("setup");
@@ -347,8 +355,10 @@ function liveHints(time, version) {
     if (mean < 60) hint = TEXT.MORE_LIGHT;
     else if (mean > 225) hint = TEXT.LESS_LIGHT;
     else if (sharpness < 40) hint = TEXT.HOLD_STILL;
-    cameraElement("hint").textContent = hint;
-    cameraElement("frame").classList.toggle("good", hint.startsWith("Light and focus OK"));
+    if (!state.live) {  // while a guided check runs, its own feedback owns the hint
+      cameraElement("hint").textContent = hint;
+      cameraElement("frame").classList.toggle("good", hint.startsWith("Light and focus OK"));
+    }
   }
   requestAnimationFrame((nextTime) => liveHints(nextTime, version));
 }
@@ -362,10 +372,33 @@ function grabFrame() {
   return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
 }
 
+async function recordDocumentConsent() {
+  // Phase 17: consent to document processing is recorded once per session, before the first upload.
+  if (state.documentConsentRecorded) return true;
+  const result = await api(`/v1/kyc/${state.session.session_id}/consent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scope: "DOCUMENT_PROCESSING", granted: true }),
+  });
+  if (!result.ok) {
+    showError(result);
+    return false;
+  }
+  state.documentConsentRecorded = true;
+  return true;
+}
+
 async function submit(blob) {
   if (state.busy || state.mode !== "document" || !state.current || !blob) return;
+  if (!$("document-consent").checked) {
+    return showError({ status: 0, body: { detail: "Consent to document processing is required before uploading." } });
+  }
   state.busy = true;
   updateButtons();
+  if (!(await recordDocumentConsent())) {
+    state.busy = false;
+    return updateButtons();
+  }
   $("hint").textContent = "Checking quality…";
   const form = new FormData();
   form.append("side", state.current);
@@ -427,39 +460,234 @@ async function submitSelfie(blob) {
   }
 }
 
-// Active liveness: the server picks a random sequence; raw (unmirrored) frames go back with each step index.
+// Guided active liveness. The server picks a random sequence; for each step the page asks the server,
+// a frame at a time, whether the person has done the movement (same geometry as the final check), and
+// only moves on once two frames in a row show it. Raw (unmirrored) frames go back with each step index.
+const STEP_TEXT = {
+  LOOK_STRAIGHT: { say: "Look straight at the camera", cue: "" },
+  TURN_LEFT: { say: "Turn your head to your left", cue: "left",
+    more: "Turn further, as if looking over your left shoulder.", wrong: "That's the other way. Turn to your left." },
+  TURN_RIGHT: { say: "Turn your head to your right", cue: "right",
+    more: "Turn further, as if looking over your right shoulder.", wrong: "That's the other way. Turn to your right." },
+  LOOK_UP: { say: "Tilt your head up", cue: "up",
+    more: "Lift your chin higher, as if looking at the ceiling.", wrong: "That's down. Tilt your head up instead." },
+  LOOK_DOWN: { say: "Tilt your head down", cue: "down",
+    more: "Lower your chin further, as if looking at the floor.", wrong: "That's up. Tilt your head down instead." },
+};
+const FACE_TEXT = {
+  NO_FACE: "We can't see your face. Keep it inside the oval.",
+  MULTIPLE_FACES: "Only your face should be in view.",
+  UNCLEAR: "Hold still with your whole face in the oval and good light.",
+};
+const HOLD_FRAMES = 2;
+
+class LivenessStop extends Error {
+  constructor(reason, result) { super(reason); this.reason = reason; this.result = result; }
+}
+
+function grabSmallFrame(maxWidth = 640) {
+  const video = cameraElement("video");
+  if (!video.videoWidth || !video.videoHeight) return Promise.resolve(null);
+  const scale = Math.min(1, maxWidth / video.videoWidth);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(video.videoWidth * scale); canvas.height = Math.round(video.videoHeight * scale);
+  canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+}
+
+function renderDots(current, done) {
+  const steps = state.live.issued.steps;
+  $("liveness-dots").hidden = false;
+  $("liveness-dots").replaceChildren(...steps.map((step, index) => {
+    const dot = document.createElement("li");
+    dot.className = index < done ? "done" : index === current ? "current" : "";
+    dot.textContent = STEP_TEXT[step.step] ? STEP_TEXT[step.step].say : step.instruction;
+    return dot;
+  }));
+}
+
+function showStep(index, kind) {
+  const steps = state.live.issued.steps;
+  const text = STEP_TEXT[steps[index].step] || { say: steps[index].instruction, cue: "" };
+  $("liveness-step").textContent = kind === "center" ? "Turn your head back to the center" : text.say;
+  $("liveness-cue").hidden = kind !== "move" || !text.cue;
+  $("liveness-cue").className = `cue ${kind === "move" ? text.cue : ""}`;
+  $("liveness-coach").textContent = kind === "move" ? `Step ${index} of ${steps.length - 1} · keep going until the dot turns green`
+    : kind === "baseline" ? "Hold still for a moment." : "";
+  coach(kind === "move" ? "Move slowly." : "Keep your face inside the oval.", 0);
+}
+
+function coach(text, progress, good = false) {
+  $("liveness-hint").textContent = text;
+  $("liveness-frame").classList.toggle("good", good);
+  $("liveness-meter").hidden = progress === null;
+  if (progress !== null) $("liveness-meter-fill").style.width = `${Math.round(progress * 100)}%`;
+}
+
+async function guideCall(index, blob) {
+  const live = state.live, form = new FormData();
+  form.append("challenge_id", live.issued.challenge_id);
+  form.append("nonce", live.issued.nonce);
+  form.append("step", String(index));
+  form.append("frame", blob, "frame.jpg");
+  if (live.baseline) form.append("baseline", live.baseline, "baseline.jpg");
+  return api(`/v1/kyc/${state.session.session_id}/liveness/guide`, { method: "POST", body: form });
+}
+
+function askForHelp(index, kind) {
+  const step = state.live.issued.steps[index].step;
+  const tips = kind === "move" ? [STEP_TEXT[step].more, "Move slowly and keep your whole face inside the oval.",
+    "Keep the phone still at eye level and move only your head.", "Make sure your face is evenly lit."]
+    : ["Hold the phone at eye level, about an arm's length away.", "Keep your whole face inside the oval.",
+       "Find even light and remove anything covering your face."];
+  $("liveness-help-tips").replaceChildren(...tips.map((tip) => {
+    const item = document.createElement("li");
+    item.textContent = tip;
+    return item;
+  }));
+  $("liveness-help").hidden = false;
+  coach("Paused.", null);
+  return new Promise((resolve, reject) => { state.live.help = { resolve, reject }; });
+}
+
+function closeHelp(action) {
+  const live = state.live;
+  $("liveness-help").hidden = true;
+  if (!live || !live.help) return;
+  const help = live.help;
+  live.help = null;
+  if (action === "retry") help.resolve();
+  else help.reject(new LivenessStop(action));
+}
+
+// Repeats until HOLD_FRAMES consecutive frames satisfy the step; returns those frames.
+// kind: "baseline" (clear frontal face), "move" (the step's movement) or "center" (back to the baseline).
+async function followStep(index, kind) {
+  const live = state.live;
+  const text = STEP_TEXT[live.issued.steps[index].step] || {};
+  showStep(index, kind);
+  let held = [], started = Date.now();
+  for (;;) {
+    if (state.mode !== "liveness" && !live.stopped) live.stopped = "CANCELLED";  // the page moved on
+    if (live.stopped) throw new LivenessStop(live.stopped);
+    const tick = Date.now();
+    const blob = await grabSmallFrame();
+    const result = blob ? await guideCall(index, blob) : null;
+    if (live.stopped) throw new LivenessStop(live.stopped);
+    let satisfied = false;
+    if (result && !result.ok) {
+      if (result.status === 409 || result.status === 404) throw new LivenessStop("CHALLENGE_CLOSED", result);
+      if (result.status !== 0 && result.status !== 429 && result.status < 500) throw new LivenessStop("ERROR", result);
+      coach("The connection is slow. Keep still…", null);
+    } else if (result) {
+      const body = result.body;
+      if (body.face !== "OK") {
+        held = [];
+        coach(FACE_TEXT[body.face] || FACE_TEXT.UNCLEAR, 0);
+      } else {
+        satisfied = kind === "baseline" || body.state === (kind === "center" ? "CENTERED" : "DONE");
+        const elapsed = Date.now() - started;
+        const hint = satisfied ? (held.length + 1 >= HOLD_FRAMES ? "Done!" : "Hold it there…")
+          : body.state === "WRONG_DIRECTION" ? text.wrong
+          : kind === "center" ? "Look straight at the camera again."
+          : elapsed > state.nudgeAfterMs ? text.more : "Keep going, slowly.";
+        coach(hint, kind === "move" ? (satisfied ? 1 : body.progress) : (satisfied ? 1 : 0), satisfied);
+      }
+    }
+    if (satisfied) {
+      held.push(blob);
+      if (held.length >= HOLD_FRAMES) return held;
+    } else {
+      held = [];
+      if (Date.now() - started > state.helpAfterMs) {
+        await askForHelp(index, kind);  // resolves on "Try this step again"; rejects on start over / cancel
+        showStep(index, kind);
+        started = Date.now();
+        continue;
+      }
+    }
+    await wait(state.guideIntervalMs - (Date.now() - tick));
+  }
+}
+
+function stopLiveness(reason) {
+  if (!state.live) return;
+  state.live.stopped = reason;
+  closeHelp(reason);
+}
+
+function endLiveness() {
+  state.live = null;
+  state.busy = false;
+  $("liveness-help").hidden = true;
+  $("liveness-cue").hidden = true;
+  $("liveness-meter").hidden = true;
+  $("liveness-dots").hidden = true;
+  $("liveness-coach").textContent = "";
+  updateButtons();
+}
+
 async function runLiveness() {
   if (state.busy || state.mode !== "liveness" || !state.stream) return;
   state.busy = true;
+  $("result").hidden = true;
+  $("liveness-tips").hidden = true;
   updateButtons();
   const id = state.session.session_id;
   const issued = await api(`/v1/kyc/${id}/liveness/challenge`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
   if (!issued.ok) {
-    state.busy = false;
-    updateButtons();
+    endLiveness();
+    $("liveness-tips").hidden = false;
     return showError(issued);
   }
+  state.live = { issued: issued.body, baseline: null, stopped: null, help: null };
+  updateButtons();
   const frames = [], steps = [];
-  for (const step of issued.body.steps) {
-    $("liveness-step").textContent = step.instruction;
-    await wait(step.index === 0 ? Math.min(900, state.stepDelayMs) : state.stepDelayMs);
-    for (let shot = 0; shot < 2; shot++) {
-      const blob = await grabFrame();
-      if (blob) { frames.push(blob); steps.push(step.index); }
-      await wait(state.stepDelayMs ? 250 : 0);
+  try {
+    renderDots(0, 0);
+    const baseline = await followStep(0, "baseline");
+    state.live.baseline = baseline[0];
+    baseline.forEach((blob) => { frames.push(blob); steps.push(0); });
+    const sequence = issued.body.steps;
+    for (let index = 1; index < sequence.length; index++) {
+      renderDots(index, index);
+      const done = await followStep(index, "move");
+      done.forEach((blob) => { frames.push(blob); steps.push(index); });
+      renderDots(index + 1, index + 1);
+      if (index < sequence.length - 1) await followStep(0, "center");
     }
+  } catch (stop) {
+    const reason = stop instanceof LivenessStop ? stop.reason : "ERROR";
+    endLiveness();
+    $("liveness-tips").hidden = false;
+    $("liveness-step").textContent = reason === "CANCELLED" ? "" : "Press I'm ready to try again.";
+    if (reason === "RESTART") return runLiveness();
+    if (reason === "CHALLENGE_CLOSED") {
+      $("result").hidden = false;
+      $("verdict").className = "verdict retry";
+      $("verdict").textContent = "Time ran out for this check";
+      $("instructions").replaceChildren();
+      $("scores").replaceChildren();
+      $("next").textContent = `Press I'm ready to start a new check. ${issued.body.attempts_remaining} attempts left.`;
+    } else if (reason === "ERROR") {
+      showError(stop.result || { status: 0, body: { detail: "Something went wrong. Try again." } });
+    }
+    return;
   }
   $("liveness-step").textContent = "Checking…";
+  coach("All steps done. Checking…", null, true);
   const form = new FormData();
   form.append("challenge_id", issued.body.challenge_id);
   form.append("nonce", issued.body.nonce);
   form.append("frame_steps", steps.join(","));
   frames.forEach((blob, index) => form.append("frames", blob, `frame-${index}.jpg`));
   const result = await api(`/v1/kyc/${id}/liveness`, { method: "POST", body: form });
-  state.busy = false;
-  updateButtons();
-  if (!result.ok) return showError(result);
+  endLiveness();
+  if (!result.ok) {
+    $("liveness-tips").hidden = false;
+    return showError(result);
+  }
   showLiveness(result.body);
 }
 
@@ -476,7 +704,8 @@ function showLiveness(body) {
     return item;
   }));
   $("scores").replaceChildren();
-  $("liveness-step").textContent = retry ? "Press Start to try again." : "";
+  $("liveness-step").textContent = retry ? "Press I'm ready to try again." : "";
+  $("liveness-tips").hidden = !retry;
   if (retry) {
     $("next").textContent = `${body.attempts_remaining} attempts left.`;
   } else {
@@ -492,7 +721,7 @@ function showResult(body) {
   $("result").hidden = false;
   const accepted = body.capture_status === "ACCEPTED";
   $("verdict").className = `verdict ${accepted ? "ok" : "retry"}`;
-  $("verdict").textContent = accepted ? `${body.side.replace("_", " ")} accepted` : `Please retake the ${body.side.replace("_", " ")}`;
+  $("verdict").textContent = accepted ? `${body.side.replace("_", " ")} photo accepted` : `Please retake the ${body.side.replace("_", " ")}`;
   $("instructions").replaceChildren(...body.instructions.map((code) => {
     const item = document.createElement("li");
     item.textContent = TEXT[code] || "Please take another clear document photo.";
@@ -517,7 +746,7 @@ function showResult(body) {
   renderSides(body.sides);
   $("next").textContent = state.current
     ? `Next: capture the ${state.current.replace("_", " ")}. ${body.attempts_remaining} attempts left.`
-    : `All sides accepted. Session status: ${body.status}. The document engine takes over from here.`;
+    : "Photo quality passed for all sides. We are now checking your document details. Identity verification is still in progress.";
   if (!state.current) {
     stopCamera();
     $("hint").textContent = "Capture complete.";
@@ -538,12 +767,27 @@ function showError(result) {
 }
 
 $("session-form").addEventListener("submit", startSession);
+
+// Development convenience: a link ending in #key=…&org=… pre-fills the form (e.g. from a QR code on
+// the operator's screen). The fragment is never sent to any server, and it is removed from the
+// address bar and this history entry at once.
+(function prefillFromFragment() {
+  if (typeof location === "undefined" || !location.hash || location.hash.length < 2) return;
+  const params = new URLSearchParams(location.hash.slice(1));
+  if (params.get("key")) $("api-key").value = params.get("key");
+  if (params.get("org")) $("org-id").value = params.get("org");
+  if (typeof history !== "undefined" && history.replaceState) history.replaceState(null, "", location.pathname);
+})();
 $("resume-session").addEventListener("click", resumeSession);
 $("refresh-session").addEventListener("click", refreshSession);
 $("biometric-consent").addEventListener("change", updateButtons);
+$("document-consent").addEventListener("change", updateButtons);
 $("shoot").addEventListener("click", async () => submit(await grabFrame()));
 $("selfie-shoot").addEventListener("click", async () => submitSelfie(await grabFrame()));
 $("liveness-start").addEventListener("click", runLiveness);
+$("liveness-retry-step").addEventListener("click", () => closeHelp("retry"));
+$("liveness-restart").addEventListener("click", () => stopLiveness("RESTART"));
+$("liveness-cancel").addEventListener("click", () => stopLiveness("CANCELLED"));
 $("file").addEventListener("change", (event) => {
   const [file] = event.target.files;
   event.target.value = "";

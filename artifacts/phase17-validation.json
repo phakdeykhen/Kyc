@@ -1,0 +1,47 @@
+{
+  "version": "0.17.0",
+  "phase": 17,
+  "date": "2026-10-06",
+  "tests": 440,
+  "passed": 440,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "duration_seconds": 235.831,
+  "test_transcript": "artifacts/phase17-tests.txt",
+  "postgresql": "live isolated kyc_test schemas",
+  "native_face_fixture": "pinned public OpenCV sample",
+  "database_security": {
+    "passed": 24,
+    "failed": 0,
+    "forced_rls_tables": 25,
+    "api_role": "kyc_app",
+    "report": "artifacts/phase17-security-check.json"
+  },
+  "runtime_dependencies": {
+    "audited_packages": 31,
+    "known_vulnerabilities": 0,
+    "pip_check": "passed",
+    "report": "artifacts/phase17-dependencies.json"
+  },
+  "typescript_sdk": {
+    "tests": 6,
+    "passed": 6,
+    "strict_typecheck": "passed",
+    "compiler_version": "5.9.3",
+    "transcript": "artifacts/phase17-typescript-tests.txt"
+  },
+  "capture_client_smoke": "passed",
+  "openapi_paths": 34,
+  "migrations_applied_locally": ["0011_phase17", "0012_phase17_finalize"],
+  "limitations": [
+    "Local loopback DB transport is unencrypted; production configuration requires TLS or a non-overridden Unix socket.",
+    "Docker execution was not validated because Docker is not installed.",
+    "GCP deployment, IAM/CMEK/KMS and managed secret injection remain Phase 19 work.",
+    "mTLS/request signing and SSO/MFA are not implemented; rate limits are per process.",
+    "Backup and partner-payload deletion require their own lifecycle controls.",
+    "Face/liveness calibration and physical NFC validation remain unverified."
+  ],
+  "phase18_started": false,
+  "success": true
+}

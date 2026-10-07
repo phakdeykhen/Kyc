@@ -1,40 +1,33 @@
-"""Per-key request rate limit: a fixed one-minute window held in this process.
+"""Per-credential fixed-window rate limiting.
 
-Each API process counts on its own, so N replicas allow up to N times the limit. A shared
-counter (Redis, already reserved as REDIS_URL) replaces this in the deployment phases.
+In-process only: with several API instances each enforces its own window, so the
+effective limit is the per-key limit times the instance count. A shared store
+(Memorystore) replaces this in the deployment phase.
 """
 
-from dataclasses import dataclass
-import math
+from collections.abc import Callable
 import threading
 import time
 
 
-@dataclass(frozen=True)
-class RateDecision:
-    allowed: bool
-    limit: int
-    remaining: int
-    retry_after: int
-
-
 class RateLimiter:
-    WINDOW = 60.0
-
-    def __init__(self, clock=time.monotonic):
-        self._clock = clock
+    def __init__(self, window_seconds: float = 60.0, clock: Callable[[], float] = time.monotonic, max_keys: int = 50_000):
+        self.window = window_seconds
+        self.clock = clock
+        self.max_keys = max_keys
         self._lock = threading.Lock()
         self._windows: dict[str, tuple[float, int]] = {}
 
-    def hit(self, key: str, limit: int) -> RateDecision:
-        current = self._clock()
+    def hit(self, key: str, limit: int) -> float | None:
+        """Count one request; return the seconds to wait when the limit is exceeded."""
+        now = self.clock()
         with self._lock:
-            start, count = self._windows.get(key, (current, 0))
-            if current - start >= self.WINDOW:
-                start, count = current, 0
-            if len(self._windows) > 10_000:   # forget idle keys
-                self._windows = {k: v for k, v in self._windows.items() if current - v[0] < self.WINDOW}
+            start, count = self._windows.get(key, (now, 0))
+            if now - start >= self.window:
+                start, count = now, 0
             if count >= limit:
-                return RateDecision(False, limit, 0, max(1, math.ceil(self.WINDOW - (current - start))))
+                return max(self.window - (now - start), 0.001)
+            if key not in self._windows and len(self._windows) >= self.max_keys:
+                self._windows = {name: value for name, value in self._windows.items() if now - value[0] < self.window}
             self._windows[key] = (start, count + 1)
-            return RateDecision(True, limit, limit - count - 1, 0)
+            return None

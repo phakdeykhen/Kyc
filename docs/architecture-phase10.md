@@ -1,6 +1,7 @@
 # Phase 10 — Liveness / anti-spoof
 
-Status: implemented on 5 October 2026.
+Status: implemented on 5 October 2026; uncalibrated flat-geometry rejection corrected
+after a phone-test report on 6 October 2026.
 
 ## 1. Design (spec §14)
 
@@ -43,9 +44,13 @@ looking up/down changes `b`; the centred frame keeps the two nearly independent.
 
 * A step is completed when its frames move the right coordinate by at least the policy
   movement (a ~10° turn) in the right direction. Frames must be raw, unmirrored camera frames.
-* A **flat face** is a frame whose eye/mouth triangle deformed strongly while the nose
-  stayed on the face plane. That is definitive evidence of a picture: FAIL,
-  `attack_type: PRINTED_OR_SCREEN_PHOTO`.
+* A **flat-geometry finding** is a frame whose eye/mouth triangle deformed strongly
+  while the nose's relative coordinates barely changed. Expression, perspective and
+  landmark estimation error can produce the same measurements on a live head. Under
+  the uncalibrated policy, an incomplete challenge with this finding returns REVIEW,
+  `attack_type: POSSIBLE_PRINTED_OR_SCREEN_PHOTO`, and requires manual review.
+  It cannot automatically verify. A calibrated policy retains the configured FAIL
+  behavior, which requires validation on genuine users and attack media.
 * The same image submitted for every step is FAIL, `STATIC_REPLAY`.
 * **Identity continuity.** Every frame is embedded and compared with the session's
   encrypted selfie template. A frame below the face-match fail boundary gives REVIEW,
@@ -55,15 +60,16 @@ looking up/down changes `b`; the centred frame keeps the two nearly independent.
 
 ### Results and honesty
 
-* `ACTIVE-GEOMETRY-2026.10.1` is **uncalibrated**. A completed challenge returns REVIEW
+* `ACTIVE-GEOMETRY-2026.10.2` is **uncalibrated**. A completed challenge returns REVIEW
   (`UNCALIBRATED_LIVENESS_POLICY`) until the policy is validated on presentation-attack
-  data and `LIVENESS_CALIBRATED=true`. FAIL is still possible on definitive evidence.
+  data and `LIVENESS_CALIBRATED=true`. Uncertain flat geometry also requires REVIEW;
+  byte-identical replay still returns FAIL.
 * Thresholds never leave the server. Responses carry the result, a completion score,
   the attack type, per-step completion and an attack **coverage** map:
 
 | Attack | Coverage |
 | --- | --- |
-| Printed photo, photo on a screen | covered by 3D geometry |
+| Printed photo, photo on a screen | partial: uncalibrated geometry heuristic |
 | Video replay, device replay | partial: random challenge + single-use nonce |
 | Virtual camera / stream injection | partial: nonce + 120 s TTL; no device attestation |
 | 3D mask | not supported |
@@ -109,3 +115,22 @@ requests/phase10.postman.json     + challenge and frame requests
 * **Positive-path evidence.** A genuine moving head was not available. Live completion
   is verified with projected 3D landmarks. With real YuNet, a real photo moved and
   tilted in front of the camera completed 0 of 3 moves and was never accepted.
+
+### Phone-test correction (6 October 2026)
+
+The reported Khmer ID session passed current document photo quality and expiry checks.
+Its only hard rejection reason was `LIVENESS_FAILED`, produced by the uncalibrated
+`FLAT_FACE_PRESENTATION` heuristic. OCR/MRZ discrepancies and uncalibrated face comparison
+were review findings. Since liveness frames are not retained, the original sequence
+cannot be replayed or independently classified as a presentation attack.
+
+A regression using a projected live 3D head and modest mouth/nose landmark displacement
+reproduces the previous false rejection. Version `.2` preserves the suspicious finding
+and incomplete challenge as review evidence. Existing decisions remain unchanged;
+new sessions use the corrected policy. The capture page now says "photo accepted"
+and explains that document details and identity verification remain pending.
+
+This is a correction to how uncertain evidence is handled, not empirical validation of
+liveness accuracy. Measure genuine-user rejection and attack acceptance on real capture
+data before enabling calibrated automatic decisions. [NIST's PAD evaluation](https://www.nist.gov/publications/face-analysis-technology-evaluation-fate-part-10-performance-passive-software-based)
+provides a reference for evaluating software presentation-attack detectors.

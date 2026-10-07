@@ -2,8 +2,8 @@
 
 Frames must be raw, unmirrored camera frames. The policy is versioned and, until it is
 calibrated on presentation-attack data, can return at best REVIEW; it can still return
-FAIL for definitive evidence (byte-identical replay, a flat face). Thresholds never leave
-the server.
+FAIL for byte-identical replay. Flat geometry is a heuristic, not proof of a photo:
+uncalibrated findings go to review. Thresholds never leave the server.
 """
 
 from dataclasses import dataclass, field
@@ -21,8 +21,8 @@ from kyc.liveness.geometry import PoseSample, pose
 DIRECTIONS = {"TURN_LEFT": ("a", 1), "TURN_RIGHT": ("a", -1), "LOOK_UP": ("b", 1), "LOOK_DOWN": ("b", -1)}
 # What this method can and cannot detect, reported with every result (spec §14 "where supported").
 COVERAGE = {
-    "PRINTED_PHOTO": "COVERED_BY_3D_GEOMETRY",
-    "PHOTO_ON_SCREEN": "COVERED_BY_3D_GEOMETRY",
+    "PRINTED_PHOTO": "PARTIAL_GEOMETRY_HEURISTIC",
+    "PHOTO_ON_SCREEN": "PARTIAL_GEOMETRY_HEURISTIC",
     "VIDEO_REPLAY": "PARTIAL_RANDOM_CHALLENGE_AND_NONCE",
     "SCREEN_OR_DEVICE_REPLAY": "PARTIAL_RANDOM_CHALLENGE_AND_NONCE",
     "MASK_3D": "NOT_SUPPORTED",
@@ -33,7 +33,7 @@ COVERAGE = {
 
 @dataclass(frozen=True)
 class ActiveLivenessPolicy:
-    version: str = "ACTIVE-GEOMETRY-2026.10.1"
+    version: str = "ACTIVE-GEOMETRY-2026.10.2"
     calibrated: bool = False
     movement: float = 0.08           # minimum directed change of a/b (≈10° head turn)
     planar_deformation: float = 0.12  # eye/mouth triangle aspect change that should move the nose
@@ -52,6 +52,30 @@ class LivenessOutcome:
     steps: list[dict] = field(default_factory=list)
     metrics: dict = field(default_factory=dict)
     instructions: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Guidance:
+    """Advisory, per-frame feedback while the person follows a step; never evidence."""
+    state: str        # DONE | KEEP_GOING | WRONG_DIRECTION for a movement; CENTERED | NOT_CENTERED for the baseline
+    progress: float   # 0–1 in quarter steps, so the threshold itself is not disclosed
+
+
+def guide(baseline: PoseSample, sample: PoseSample, step: str,
+          policy: ActiveLivenessPolicy | None = None) -> Guidance:
+    """Same geometry and threshold as `assess`, so a step reported DONE here completes there."""
+    policy = policy or ActiveLivenessPolicy()
+    if step == BASELINE:
+        offset = max(abs(sample.a - baseline.a), abs(sample.b - baseline.b))
+        centered = offset <= policy.movement / 2
+        return Guidance("CENTERED" if centered else "NOT_CENTERED", 1.0 if centered else 0.0)
+    axis, sign = DIRECTIONS[step]
+    move = sign * (getattr(sample, axis) - getattr(baseline, axis))
+    if move >= policy.movement:
+        return Guidance("DONE", 1.0)
+    if move <= -policy.movement / 2:
+        return Guidance("WRONG_DIRECTION", 0.0)
+    return Guidance("KEEP_GOING", min(0.75, max(0.0, move / policy.movement)) // 0.25 * 0.25)
 
 
 def _retry(reasons, steps=(), instructions=("FOLLOW_EACH_INSTRUCTION",), metrics=None) -> LivenessOutcome:
@@ -104,7 +128,7 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
         step_results.append({"step": name, "completed": bool(moves) and max(moves) >= policy.movement,
                              "frames": len(moves)})
 
-    # Flat-face signature: the face changed shape, but the nose did not move off the face plane.
+    # Possible flat geometry: expression and landmark error can produce the same measurements.
     flat_frames = 0
     for sample in (s for group in samples.values() for s in group):
         deformation = abs(sample.aspect / baseline.aspect - 1)
@@ -115,6 +139,13 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
     metrics = {"frames": len(frames), "unique_frames": len(set(hashes)), "frames_with_face": len(detections),
                "steps_completed": completed, "steps_required": len(steps) - 1, "flat_face_frames": flat_frames}
     if flat_frames and completed < len(steps) - 1:
+        if not policy.calibrated:
+            # An incomplete challenge remains unverified. Do not convert uncertain
+            # five-landmark geometry into an automatic rejection of a live person.
+            return LivenessOutcome(CheckResult.REVIEW, round(completed / (len(steps) - 1), 3),
+                                   ["FLAT_FACE_PRESENTATION", "CHALLENGE_NOT_COMPLETED", "UNCALIBRATED_LIVENESS_POLICY"],
+                                   False, attack_type="POSSIBLE_PRINTED_OR_SCREEN_PHOTO",
+                                   steps=step_results, metrics=metrics)
         return LivenessOutcome(CheckResult.FAIL, 0.0, ["FLAT_FACE_PRESENTATION"], False,
                                attack_type="PRINTED_OR_SCREEN_PHOTO", steps=step_results, metrics=metrics)
     if completed < len(steps) - 1:

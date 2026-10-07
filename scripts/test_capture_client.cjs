@@ -63,11 +63,25 @@ const enqueue = (body, status = 200) => queue.push({ body, status });
   assert.equal(run('state.current'), 'DATA_PAGE');
   assert.equal(cameraRequests.at(-1).video.facingMode.ideal, 'environment');
   const quality = Object.fromEntries(['blur_score', 'glare_score', 'brightness_score', 'shadow_score', 'document_coverage', 'perspective_score', 'resolution_score', 'overall_quality'].map(key => [key, .9]));
+  assert.equal(elements.file.disabled, true, 'Document upload waits for document consent');
+  const beforeDocumentConsent = requests.length;
+  await run('submit(new Blob(["doc"], {type: "image/jpeg"}))');
+  assert.equal(requests.length, beforeDocumentConsent, 'Document consent must be checked before upload');
+  elements['document-consent'].checked = true;
+  run('updateButtons()');
+  assert.equal(elements.file.disabled, false);
+  enqueue({ session_id: sessionId, scope: 'DOCUMENT_PROCESSING', policy_version: 'DOCUMENT-CONSENT-2026.10.1', granted_at: new Date().toISOString() }, 201);
   enqueue({ capture_status: 'ACCEPTED', side: 'DATA_PAGE', status: 'DOCUMENT_PROCESSING', instructions: [], quality, sides: { DATA_PAGE: 'ACCEPTED' }, attempts_remaining: 19 });
   enqueue(session('DOCUMENT_PROCESSING'));
   await run('submit(new Blob(["doc"], {type: "image/jpeg"}))');
+  assert.equal(requests.at(-3).path, `/v1/kyc/${sessionId}/consent`, 'Consent is recorded before the first document upload');
+  assert.equal(JSON.parse(requests.at(-3).options.body).scope, 'DOCUMENT_PROCESSING');
   assert.equal(run('state.mode'), 'processing');
   assert.ok(timers.length, 'Processing schedules a refresh');
+  assert.equal(elements.verdict.textContent, 'DATA PAGE photo accepted', 'Capture acceptance describes the photo');
+  assert.match(elements.next.textContent, /Photo quality passed.*checking your document details.*Identity verification is still in progress/,
+    'Passing photo quality does not claim that identity verification is complete');
+  assert.doesNotMatch(elements.next.textContent, /DOCUMENT_PROCESSING/, 'The capture handoff uses plain language');
   enqueue(session('SELFIE_REQUIRED'));
   await run('refreshSession()');
   assert.equal(run('state.mode'), 'selfie');
@@ -83,26 +97,66 @@ const enqueue = (body, status = 200) => queue.push({ body, status });
   assert.equal(elements['liveness-start'].disabled, false);
   assert.equal(elements.scores.children.length, 0, 'No similarity percentage displayed');
   assert.match(elements.verdict.textContent, /comparison needs review/);
-  // Liveness: random steps from the server, two raw frames per step, nonce echoed back.
-  run('state.stepDelayMs = 0');
-  const challenge = { challenge_id: '11111111-1111-4111-8111-111111111111', nonce: 'n'.repeat(43),
+  // Guided liveness: the server confirms each step frame by frame; a step needs two good frames in a row,
+  // and the person looks straight again between steps. Two frames per step are submitted, nonce echoed back.
+  run('state.guideIntervalMs = 0');
+  const challenge = { challenge_id: '11111111-1111-4111-8111-111111111111', nonce: 'n'.repeat(43), attempts_remaining: 4,
     steps: [{ index: 0, step: 'LOOK_STRAIGHT', instruction: 'Look straight at the camera.' },
             { index: 1, step: 'TURN_RIGHT', instruction: 'Slowly turn your head to your right.' },
             { index: 2, step: 'LOOK_DOWN', instruction: 'Tilt your head down slightly.' },
             { index: 3, step: 'TURN_LEFT', instruction: 'Slowly turn your head to your left.' }] };
+  const guide = (state, face = 'OK', progress = 0) => enqueue({ step: 'ANY', face, state, progress });
+  const centre = () => { guide('CENTERED'); guide('CENTERED'); };
+  const flush = async () => { for (let i = 0; i < 50; i++) await new Promise(resolve => setImmediate(resolve)); };
   enqueue(challenge);
+  guide(null); guide(null);                                    // baseline: two clear frontal frames
+  guide('WRONG_DIRECTION'); guide('DONE'); guide('KEEP_GOING', 'OK', .5); guide('DONE'); guide('DONE');  // a lapse resets the hold
+  centre();
+  guide(null, 'NO_FACE'); guide('DONE'); guide('DONE');       // LOOK_DOWN, after the face briefly left the frame
+  centre();
+  guide('DONE'); guide('DONE');                                // TURN_LEFT: last step, no centring after it
   enqueue({ status: 'LIVENESS_REQUIRED', result: 'REVIEW', retry_allowed: true, attempts_remaining: 3,
             instructions: ['FOLLOW_EACH_INSTRUCTION'], reason_codes: ['CHALLENGE_NOT_COMPLETED'] });
+  const before = requests.length;
   await run('runLiveness()');
+  assert.equal(queue.length, 0, 'Every scripted guidance answer was used');
+  const guided = requests.slice(before + 1, -1).map(request => request.options.body);
+  assert.ok(requests.slice(before + 1, -1).every(request => request.path.endsWith('/liveness/guide')));
+  assert.equal(guided[0].get('step'), '0');
+  assert.equal(guided[0].get('baseline'), null, 'The baseline frame is captured first');
+  assert.ok(guided[2].get('baseline'), 'Movement checks compare against the baseline frame');
+  assert.equal(guided[2].get('nonce'), challenge.nonce);
   const upload = requests.at(-1).options.body;
   assert.equal(upload.get('nonce'), challenge.nonce);
   assert.equal(upload.get('frame_steps'), '0,0,1,1,2,2,3,3');
   assert.equal(upload.getAll('frames').length, 8);
   assert.equal(run('state.mode'), 'liveness', 'Retry keeps the liveness step open');
+  assert.equal(run('state.live'), null);
+  assert.equal(elements['liveness-tips'].hidden, false, 'Tips are shown again before a retry');
   assert.match(elements.verdict.textContent, /try the movement check again/);
+  // The challenge runs out mid-check: say so and offer a new one.
   enqueue(challenge);
-  enqueue({ status: 'PROCESSING', result: 'REVIEW', retry_allowed: false, attempts_remaining: 2, instructions: [], score: 1 });
+  guide(null); guide(null);
+  enqueue({ detail: 'The challenge expired.', reason_code: 'CHALLENGE_EXPIRED' }, 409);
   await run('runLiveness()');
+  assert.match(elements.verdict.textContent, /Time ran out/);
+  assert.equal(run('state.busy'), false);
+  // No progress for too long: a help card pauses the check; "Try this step again" keeps the same challenge.
+  run('state.helpAfterMs = -1');
+  enqueue(challenge);
+  guide(null); guide(null);
+  guide('KEEP_GOING', 'OK', .25);
+  const pending = run('runLiveness()');
+  await flush();
+  assert.equal(elements['liveness-help'].hidden, false, 'Help card shown when the step is not followed');
+  assert.equal(elements['liveness-help-tips'].children.length, 4);
+  assert.match(elements['liveness-help-tips'].children[0].textContent, /right shoulder/);
+  guide('DONE'); guide('DONE'); centre(); guide('DONE'); guide('DONE'); centre(); guide('DONE'); guide('DONE');
+  enqueue({ status: 'PROCESSING', result: 'REVIEW', retry_allowed: false, attempts_remaining: 2, instructions: [], score: 1 });
+  elements['liveness-retry-step'].listeners.click();
+  await pending;
+  assert.equal(elements['liveness-help'].hidden, true);
+  assert.equal(requests.filter(request => request.path.endsWith('/liveness/challenge')).length, 3, 'Retrying a step needs no new challenge');
   assert.equal(run('state.mode'), 'done');
   assert.equal(run('state.stream'), null);
   assert.match(elements.verdict.textContent, /needs review/);
@@ -127,6 +181,21 @@ const enqueue = (body, status = 200) => queue.push({ body, status });
   await run('resumeSession()');
   assert.match(elements.verdict.textContent, /Identity verified/);
   assert.match(elements.verdict.className, /ok/);
+  assert.equal(elements.scores.children.length, 0, 'Verified outcomes clear photo quality meters');
+  run('state.sides = ["FRONT", "BACK"]');
+  await run(`showResult(${JSON.stringify({ capture_status: 'ACCEPTED', side: 'BACK', status: 'DOCUMENT_PROCESSING',
+    instructions: [], quality, sides: { FRONT: 'ACCEPTED', BACK: 'ACCEPTED' }, attempts_remaining: 18 })})`);
+  assert.equal(elements.verdict.textContent, 'BACK photo accepted');
+  assert.equal(elements.scores.children.length, 16, 'Accepted document photos display their quality checks');
+  enqueue(session('REJECTED'));
+  enqueue({ status: 'REJECTED', decision: { result: 'FAIL', reason_codes: ['LIVENESS_FAILED'] } });
+  await run('refreshSession()');
+  assert.equal(run('state.mode'), 'done');
+  assert.equal(elements.verdict.textContent, 'We could not verify your identity');
+  assert.equal(elements.scores.children.length, 0, 'Rejected outcomes clear previous photo quality meters');
+  assert.equal(elements.instructions.children.length, 0, 'Final outcomes clear earlier capture instructions');
+  assert.doesNotMatch(elements.next.textContent + elements.verdict.textContent, /LIVENESS_FAILED|FAIL|REJECTED/,
+    'Rejected outcomes keep diagnostic codes out of the person-facing page');
   context.navigator.mediaDevices.getUserMedia = async () => { throw new Error('Camera blocked'); };
   enqueue(session('SELFIE_REQUIRED'));
   await run('resumeSession()');
@@ -144,5 +213,5 @@ const enqueue = (body, status = 200) => queue.push({ body, status });
   assert.match(elements['selfie-hint'].textContent, /could not be completed/);
   assert.equal(queue.length, 0);
   context.window.pagehide();
-  console.log('Capture UI smoke passed: consent, resume, recapture, document handoff/polling, cameras, review, liveness challenge/retry/finish, unavailable engine, stopped streams and no probability.');
+  console.log('Capture UI smoke passed: document and biometric consent, resume, recapture, document handoff/polling, cameras, review, guided liveness steps/help/timeout/retry/finish, unavailable engine, stopped streams and no probability.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

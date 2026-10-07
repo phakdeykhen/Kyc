@@ -8,7 +8,7 @@ Approval is guarded: a human can resolve uncertainty, but cannot approve missing
 evidence, a failed required check or cryptographic tamper proof.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
@@ -25,7 +25,7 @@ from kyc.domain.state_machine import Event, VerificationEvidence
 from kyc.review.access import REASONS, ReviewerContext
 from kyc.services.biometrics import clear_identity_evidence
 from kyc.services.results import collect_evidence, mask
-from kyc.services.sessions import apply_event, aware
+from kyc.services.sessions import apply_event, aware, is_expired
 
 IDENTITY_FIELDS = ("full_name", "full_name_local", "date_of_birth", "sex", "nationality", "document_number",
                    "expiry_date", "issue_date", "place_of_birth", "address", "national_id_number", "mrz")
@@ -48,20 +48,24 @@ def _latest(db, model, record, *where):
 
 def _session(db: Session, reviewer: ReviewerContext, session_id: UUID, lock: bool = False) -> KYCSession:
     query = sa.select(KYCSession).where(KYCSession.id == session_id, KYCSession.organization_id == reviewer.organization_id)
-    record = db.scalar(query.with_for_update() if lock else query)
+    # Serialize case/image reads with erasure as well as decisions. The entire response
+    # is built inside this transaction, so a note cannot be decrypted after erasure wins.
+    record = db.scalar(query.with_for_update())
     if record is None:
         raise HTTPException(404, detail="Case not found.")
     return record
 
 
 # Queue -----------------------------------------------------------------------------
-def queue(db: Session, reviewer: ReviewerContext, limit: int, offset: int) -> dict:
+def queue(db: Session, reviewer: ReviewerContext, limit: int, offset: int, order: str = "oldest") -> dict:
     reviewer.require("VIEW_CASE")
-    scope = (KYCSession.organization_id == reviewer.organization_id, KYCSession.status == SessionStatus.MANUAL_REVIEW)
-    total = db.scalar(sa.select(sa.func.count()).select_from(KYCSession).where(*scope)) or 0
-    rows = db.scalars(sa.select(KYCSession).where(*scope).order_by(KYCSession.updated_at, KYCSession.id)
-                      .limit(limit).offset(offset)).all()
     now = datetime.now(timezone.utc)
+    # Cases in review do not expire, so every one of them is listed.
+    scope = [KYCSession.organization_id == reviewer.organization_id, KYCSession.status == SessionStatus.MANUAL_REVIEW]
+    total = db.scalar(sa.select(sa.func.count()).select_from(KYCSession).where(*scope)) or 0
+    order_clause = (KYCSession.updated_at.desc(), KYCSession.id.desc()) if order == "newest" else (KYCSession.updated_at.asc(), KYCSession.id.asc())
+    rows = db.scalars(sa.select(KYCSession).where(*scope).order_by(*order_clause)
+                      .limit(limit).offset(offset)).all()
     items = []
     for record in rows:
         assessment = _latest(db, RiskAssessmentRecord, record)
@@ -81,12 +85,39 @@ def queue(db: Session, reviewer: ReviewerContext, limit: int, offset: int) -> di
     return {"total": total, "limit": limit, "offset": offset, "items": items}
 
 
+# All sessions ----------------------------------------------------------------------
+def sessions(db: Session, reviewer: ReviewerContext, limit: int, offset: int, status: SessionStatus | None = None,
+             user_id: str | None = None) -> dict:
+    """Every session of the organization, newest change first; open one with the case view."""
+    reviewer.require("VIEW_CASE")
+    now = datetime.now(timezone.utc)
+    base = [KYCSession.organization_id == reviewer.organization_id]
+    if user_id:
+        base.append(KYCSession.user_id == user_id)
+    scope = base + ([KYCSession.status == status] if status is not None else [])
+    # Per-status counts ignore the status filter, so the filter buttons always show every total.
+    counts = dict(db.execute(sa.select(KYCSession.status, sa.func.count()).where(*base)
+                             .group_by(KYCSession.status)).all())
+    total = db.scalar(sa.select(sa.func.count()).select_from(KYCSession).where(*scope)) or 0
+    rows = db.scalars(sa.select(KYCSession).where(*scope)
+                      .order_by(KYCSession.updated_at.desc(), KYCSession.id.desc()).limit(limit).offset(offset)).all()
+    return {"total": total, "limit": limit, "offset": offset,
+            "counts": {item.value: counts.get(item, 0) for item in SessionStatus},
+            "items": [{"session_id": record.id, "user_id": record.user_id, "status": record.status,
+                       "expected_document_type": record.expected_document_type, "country": record.country,
+                       "verification_level": record.verification_level, "created_at": aware(record.created_at),
+                       "updated_at": aware(record.updated_at), "expires_at": aware(record.expires_at),
+                       # Expiry is recorded lazily, on the session's next request.
+                       "expired": is_expired(record, now), "erased": record.erased_at is not None}
+                      for record in rows]}
+
+
 # Case view -------------------------------------------------------------------------
 def case(db: Session, reviewer: ReviewerContext, session_id: UUID, field_cipher, request_id: UUID) -> dict:
     reviewer.require("VIEW_CASE")
     record = _session(db, reviewer, session_id)
-    identity = "VIEW_IDENTITY" in reviewer.permissions and field_cipher is not None
-    images_allowed = "VIEW_IMAGES" in reviewer.permissions
+    identity = "VIEW_IDENTITY" in reviewer.permissions and field_cipher is not None and record.erased_at is None
+    images_allowed = "VIEW_IMAGES" in reviewer.permissions and record.erased_at is None
     evidence = collect_evidence(db, record)
     document = evidence.document
     now = datetime.now(timezone.utc)
@@ -133,7 +164,7 @@ def case(db: Session, reviewer: ReviewerContext, session_id: UUID, field_cipher,
     for row in db.scalars(sa.select(ManualReview).where(ManualReview.organization_id == record.organization_id,
                                                         ManualReview.session_id == record.id).order_by(ManualReview.created_at)):
         note = None
-        if identity:
+        if identity and row.reason_ciphertext is not None:
             note = field_cipher.open(row.reason_ciphertext, row.key_version, _note_context(record, row.id))
         history.append({"action": row.action, "reason_code": row.reason_code, "decided_at": aware(row.created_at),
                         "reviewer": names.get(_uuid(row.reviewer_id), "former reviewer"), "note": note})
@@ -152,7 +183,8 @@ def case(db: Session, reviewer: ReviewerContext, session_id: UUID, field_cipher,
                     "created_at": aware(record.created_at), "updated_at": aware(record.updated_at),
                     "expires_at": aware(record.expires_at)},
         "permissions": sorted(reviewer.permissions),
-        "decision_options": {action: list(codes) for action, codes in REASONS.items()} if "DECIDE" in reviewer.permissions else {},
+        "decision_options": {action: list(codes) for action, codes in REASONS.items()}
+                            if "DECIDE" in reviewer.permissions and record.erased_at is None else {},
         "risk": None if assessment is None else {
             "decision": assessment.decision, "reason_codes": assessment.reason_codes, "policy_version": assessment.policy_version,
             "assessed_at": aware(assessment.created_at), "trace": assessment.check_summary.get("trace", []),
@@ -207,6 +239,8 @@ def _note_context(record: KYCSession, review_id: UUID) -> str:
 def image(db: Session, reviewer: ReviewerContext, session_id: UUID, image_id: UUID, store, request_id: UUID) -> Response:
     reviewer.require("VIEW_IMAGES")
     record = _session(db, reviewer, session_id)
+    if record.erased_at is not None:
+        raise HTTPException(404, detail="Image not found.")
     now = datetime.now(timezone.utc)
     found = db.scalar(sa.select(DocumentImage).where(DocumentImage.id == image_id,
                       DocumentImage.organization_id == record.organization_id, DocumentImage.session_id == record.id))
@@ -242,14 +276,14 @@ def approval_blockers(evidence, required: tuple[str, ...]) -> list[str]:
 
 
 def decide(db: Session, reviewer: ReviewerContext, session_id: UUID, action: str, reason_code: str, note: str,
-           expected_version: int, field_cipher, policy, request_id: UUID):
+           expected_version: int, field_cipher, policy, request_id: UUID, session_ttl_seconds: int = 900):
     reviewer.require("DECIDE")
     if reason_code not in REASONS[action]:
         return _error(422, "REASON_CODE_NOT_ALLOWED", f"Use one of: {', '.join(REASONS[action])}.")
     if field_cipher is None:
         return _error(503, "PII_ENCRYPTION_NOT_CONFIGURED", "Review notes cannot be stored securely.")
     record = _session(db, reviewer, session_id, lock=True)
-    if record.status != SessionStatus.MANUAL_REVIEW:
+    if record.erased_at is not None or record.status != SessionStatus.MANUAL_REVIEW:
         return _error(409, "CASE_NOT_IN_REVIEW", f"The case is {record.status.value}.", status=record.status.value)
     if record.version != expected_version:
         return _error(409, "CASE_CHANGED", "The case changed since you opened it. Reload and review again.",
@@ -286,6 +320,9 @@ def decide(db: Session, reviewer: ReviewerContext, session_id: UUID, action: str
         if evidence.document is not None:
             clear_identity_evidence(db, record, evidence.document)
         apply_event(db, record, tenant, Event.RECAPTURE_REQUIRED, request_id)
+        # The person needs time to capture again; the review may have outlasted the old lifetime.
+        record.expires_at = max(aware(record.expires_at),
+                                datetime.now(timezone.utc) + timedelta(seconds=session_ttl_seconds))
     db.add(AuditLog(organization_id=reviewer.organization_id, session_id=record.id, actor_id=reviewer.actor_id,
                     action="REVIEW_DECISION", request_id=request_id, from_status=previous.value, to_status=record.status.value,
                     reason_codes=[reason_code], event_metadata={"version": record.version, "action": action,
@@ -293,4 +330,3 @@ def decide(db: Session, reviewer: ReviewerContext, session_id: UUID, action: str
     db.flush()
     return {"session_id": record.id, "status": record.status, "version": record.version, "action": action,
             "reason_code": reason_code}
-

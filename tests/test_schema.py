@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from io import StringIO
+import logging
 from pathlib import Path
 import unittest
 from uuid import uuid4
@@ -47,7 +48,7 @@ class SchemaTests(unittest.TestCase):
             "document_checks", "mrz_results", "barcode_results", "nfc_results", "biometric_templates",
             "face_comparisons", "liveness_checks", "fraud_signals", "risk_assessments", "manual_reviews",
             "consents", "audit_logs", "liveness_challenges", "nfc_challenges", "selfie_captures", "face_quality_checks", "reviewers",
-            "api_keys", "idempotency_keys",
+            "api_keys", "webhook_endpoints", "webhook_deliveries",
         })
 
     def test_cross_tenant_artifact_link_fails_at_database_layer(self):
@@ -100,10 +101,28 @@ class SchemaTests(unittest.TestCase):
         config.attributes["database_url"] = "postgresql+psycopg2://unused@localhost/kyc_test"
         command.upgrade(config, "head", sql=True)
         sql = output.getvalue()
-        self.assertEqual(sql.count("CREATE POLICY tenant_isolation"), 24)
-        self.assertEqual(sql.count("FORCE ROW LEVEL SECURITY"), 24)
+        self.assertEqual(sql.count("CREATE POLICY tenant_isolation"), 25)
+        self.assertEqual(sql.count("FORCE ROW LEVEL SECURITY"), 25)
         self.assertIn("TIMESTAMP WITH TIME ZONE", sql)
         self.assertIn("JSONB", sql)
         self.assertIn("UUID", sql)
         self.assertIn("WITH CHECK", sql)
         self.assertIn("NULLIF(current_setting('app.organization_id', true), '')::uuid", sql)
+
+    def test_migrations_preserve_existing_security_logging(self):
+        logger = logging.getLogger("kyc.security")
+        previous = logger.disabled
+        logger.disabled = False
+        try:
+            Base.metadata.drop_all(self.engine)
+            config = Config(str(ROOT / "alembic.ini"))
+            config.attributes["database_url"] = "sqlite://"
+            with self.engine.begin() as connection:
+                config.attributes["connection"] = connection
+                with self.assertLogs("kyc.security", logging.WARNING) as events:
+                    command.upgrade(config, "head")
+                    logger.warning("Security logging remains active after migration")
+                self.assertEqual(len(events.records), 1)
+                self.assertFalse(logger.disabled)
+        finally:
+            logger.disabled = previous

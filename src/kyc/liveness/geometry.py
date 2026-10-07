@@ -8,8 +8,9 @@ handheld camera. A real head is not flat: the nose stands in front of the eye/mo
 so turning left/right changes `a` (yaw) and looking up/down changes `b` (pitch), and the
 centred frame keeps the two nearly independent.
 
-Deformation of the eye/mouth triangle (its aspect ratio) shows the face *looked* different
-between frames. Deformation with unchanged (a, b) is the signature of a tilted flat picture.
+Deformation of the eye/mouth triangle with unchanged (a, b) can indicate a tilted flat
+picture. Expression, camera perspective and landmark estimation error can produce the
+same measurements on a live head, so this is a heuristic requiring empirical calibration.
 """
 
 from dataclasses import dataclass

@@ -94,6 +94,49 @@ class ReviewQueueAndCaseTests(ReviewCase):
         self.assertEqual([item["session_id"] for item in queue["items"]], [str(first), str(second)])  # oldest first
         self.assertEqual(queue["items"][0]["reason_codes"], ["DOCUMENT_AUTHENTICITY_UNVERIFIED"])
 
+    async def test_cases_in_review_do_not_expire_and_recapture_starts_a_new_lifetime(self):
+        session_id = await self.in_review()
+        code, issued, _ = await call(self.app, f"/v1/kyc/{session_id}/client-token", "POST", body={}, headers=self.headers)
+        self.assertEqual(code, 201, issued)
+        device = {"Authorization": f"Bearer {issued['client_token']}", "X-Organization-ID": str(self.org)}
+        now = datetime.now(timezone.utc)
+        with Session(self.engine) as db, db.begin():
+            record = db.get(KYCSession, session_id)
+            record.created_at, record.expires_at = now - timedelta(hours=3), now - timedelta(hours=2)
+        code, queue, _ = await self.get("/v1/review/queue", self.reviewer)
+        self.assertEqual([item["session_id"] for item in queue["items"]], [str(session_id)])
+        for headers in (self.headers, device):  # neither the client nor the device expires it
+            code, body, _ = await call(self.app, f"/v1/kyc/{session_id}", headers=headers)
+            self.assertEqual((code, body["status"]), (200, "MANUAL_REVIEW"), body)
+        code, body, _ = await self.decide(session_id, action="REQUEST_RECAPTURE", reason_code="GLARE_OR_BLUR",
+                                          note="Glare covers the date of birth.")
+        self.assertEqual((code, body["status"]), (200, "DOCUMENT_REQUIRED"), body)
+        code, body, _ = await call(self.app, f"/v1/kyc/{session_id}", headers=device)
+        self.assertEqual((code, body["status"]), (200, "DOCUMENT_REQUIRED"), body)
+        self.assertGreater(datetime.fromisoformat(body["expires_at"]), now + timedelta(seconds=60))
+
+    async def test_all_sessions_lists_every_status_with_counts_and_filters(self):
+        in_review = await self.in_review()
+        selfie = self.ready(status="SELFIE_REQUIRED")
+        code, page, _ = await self.get("/v1/review/sessions", self.auditor)
+        self.assertEqual(code, 200, page)
+        self.assertEqual(page["items"][0]["session_id"], str(selfie))  # newest change first
+        self.assertEqual({item["session_id"] for item in page["items"]}, {str(in_review), str(selfie)})
+        self.assertEqual((page["counts"]["MANUAL_REVIEW"], page["counts"]["SELFIE_REQUIRED"], page["counts"]["VERIFIED"]),
+                         (1, 1, 0))
+        code, page, _ = await self.get("/v1/review/sessions?status=MANUAL_REVIEW", self.auditor)
+        self.assertEqual(([item["session_id"] for item in page["items"]], page["total"], page["counts"]["SELFIE_REQUIRED"]),
+                         ([str(in_review)], 1, 1))  # counts ignore the status filter
+        code, page, _ = await self.get("/v1/review/sessions?user_id=synthetic-customer", self.auditor)
+        self.assertTrue(page["items"] and all(item["user_id"] == "synthetic-customer" for item in page["items"]))
+        code, page, _ = await self.get("/v1/review/sessions?user_id=nobody", self.auditor)
+        self.assertEqual((page["total"], page["items"]), (0, []))
+        self.assertEqual((await self.get("/v1/review/sessions?status=NOT_A_STATUS", self.auditor))[0], 422)
+        foreign_reviewer, _ = self.make_reviewer("Tenant B reviewer", "REVIEWER", organization=self.other_org)
+        code, page, _ = await self.get("/v1/review/sessions", foreign_reviewer)
+        self.assertEqual(page["total"], 0)
+        self.assertEqual((await self.get("/v1/review/sessions", self.headers))[0], 401)  # client API key
+
     async def test_reviewer_sees_identity_and_photos_and_every_view_is_audited(self):
         session_id = await self.in_review()
         code, case, _ = await self.get(f"/v1/review/{session_id}", self.reviewer)

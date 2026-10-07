@@ -62,11 +62,9 @@ class Organization(Record, Base):
     pii_retention_days: Mapped[int] = mapped_column(default=30, server_default="30")
     capture_retention_hours: Mapped[int] = mapped_column(default=24, server_default="24")
     template_retention_hours: Mapped[int] = mapped_column(default=24, server_default="24")
-    # Phase 15: a suspended organization's credentials stop working; its data is untouched.
+    # A suspended organization's API keys, client tokens and reviewers stop working (Phase 15).
     active: Mapped[bool] = mapped_column(sa.Boolean, default=True, server_default=sa.true())
-    api_rate_limit_per_minute: Mapped[int] = mapped_column(default=120, server_default="120")
-    __table_args__ = (sa.CheckConstraint("pii_retention_days > 0 AND capture_retention_hours > 0 AND template_retention_hours > 0", name="retention_positive"),
-                      sa.CheckConstraint("api_rate_limit_per_minute BETWEEN 1 AND 100000", name="rate_limit_range"))
+    __table_args__ = (sa.CheckConstraint("pii_retention_days > 0 AND capture_retention_hours > 0 AND template_retention_hours > 0", name="retention_positive"),)
 
 
 class KYCSession(Record, Base):
@@ -80,13 +78,23 @@ class KYCSession(Record, Base):
     expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=now, onupdate=now)
     version: Mapped[int] = mapped_column(default=1, server_default="1")
+    # Phase 15: the credential that created the session, the client's Idempotency-Key with a
+    # fingerprint of the request it was first used with, and the session client token's hash.
+    created_by: Mapped[str | None] = mapped_column(sa.String(128))
+    idempotency_key: Mapped[str | None] = mapped_column(sa.String(128))
+    request_fingerprint: Mapped[str | None] = mapped_column(sa.String(64))
+    client_token_sha256: Mapped[str | None] = mapped_column(sa.String(64))
+    # Phase 17: set when the session's personal and biometric data was erased on request.
+    erased_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     __table_args__ = (
         sa.UniqueConstraint("organization_id", "id", name="uq_kyc_sessions_scope_id"),
+        sa.UniqueConstraint("organization_id", "idempotency_key", name="uq_kyc_sessions_idempotency_key"),
         sa.CheckConstraint("expires_at > created_at", name="expiry_after_creation"),
         sa.CheckConstraint("length(country) = 2 AND country = upper(country)", name="country_code"),
         sa.CheckConstraint("version > 0", name="version_positive"),
         sa.Index("ix_kyc_sessions_org_status_created", "organization_id", "status", "created_at"),
         sa.Index("ix_kyc_sessions_org_expires", "organization_id", "expires_at"),
+        sa.Index("ix_kyc_sessions_org_user", "organization_id", "user_id"),
     )
 
 
@@ -328,11 +336,13 @@ class ManualReview(SessionArtifact, Base):
     reviewer_id: Mapped[str] = mapped_column(sa.String(128))
     action: Mapped[ReviewAction] = mapped_column(enum_type(ReviewAction))
     reason_code: Mapped[str] = mapped_column(sa.String(80))
-    reason_ciphertext: Mapped[bytes] = mapped_column(sa.LargeBinary)   # the reviewer's note, encrypted
-    key_version: Mapped[str] = mapped_column(sa.String(256))
+    reason_ciphertext: Mapped[bytes | None] = mapped_column(sa.LargeBinary)   # cleared on personal-data erasure
+    key_version: Mapped[str | None] = mapped_column(sa.String(256))
     session_version: Mapped[int | None] = mapped_column(sa.Integer)     # the case version the reviewer saw
     risk_assessment_id: Mapped[UUID | None] = mapped_column(sa.Uuid)    # the assessment being resolved
     __table_args__ = artifact_constraints(__tablename__, sa.CheckConstraint("length(reason_code) > 0", name="reason_required"),
+                                          sa.CheckConstraint("(reason_ciphertext IS NULL) = (key_version IS NULL)",
+                                                             name="review_note_key_pair"),
                                           sa.Index("ix_manual_reviews_session_created", "organization_id", "session_id", "created_at"))
 
 
@@ -345,6 +355,8 @@ class Reviewer(Record, Base):
     role: Mapped[str] = mapped_column(sa.String(20))
     token_sha256: Mapped[str] = mapped_column(sa.String(64))
     active: Mapped[bool] = mapped_column(sa.Boolean, default=True, server_default=sa.true())
+    # Phase 17: tokens expire and are rotated by scripts/create_reviewer.py (NULL: issued before Phase 17).
+    expires_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     __table_args__ = (sa.UniqueConstraint("token_sha256", name="uq_reviewers_token_sha256"),
                       sa.UniqueConstraint("organization_id", "id", name="uq_reviewers_scope_id"),
                       sa.CheckConstraint("role IN ('REVIEWER', 'AUDITOR')", name="reviewer_role"),
@@ -352,35 +364,79 @@ class Reviewer(Record, Base):
 
 
 class ApiKey(Record, Base):
-    """A client application credential for one organization. Only a SHA-256 of the secret is stored."""
+    """An organization's API credential. Only a SHA-256 of the key is stored; scopes limit what it may do."""
 
     __tablename__ = "api_keys"
     organization_id: Mapped[UUID] = mapped_column(sa.Uuid, sa.ForeignKey("organizations.id", ondelete="RESTRICT"))
     name: Mapped[str] = mapped_column(sa.String(120))
-    key_prefix: Mapped[str] = mapped_column(sa.String(32))   # public part of the key, safe to show and log
-    secret_sha256: Mapped[str] = mapped_column(sa.String(64))
+    key_prefix: Mapped[str] = mapped_column(sa.String(16))
+    key_sha256: Mapped[str] = mapped_column(sa.String(64))
     scopes: Mapped[list] = mapped_column(JSON_VALUE, default=list)
+    rate_limit_per_minute: Mapped[int] = mapped_column(sa.Integer, default=600, server_default="600")
+    created_by: Mapped[str] = mapped_column(sa.String(128))
     expires_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     last_used_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
-    created_by: Mapped[str] = mapped_column(sa.String(128))
-    __table_args__ = (sa.UniqueConstraint("key_prefix", name="uq_api_keys_key_prefix"),
+    # Phase 17: CIDR allow-list; empty means any network.
+    allowed_cidrs: Mapped[list] = mapped_column(JSON_VALUE, default=list, server_default="[]")
+    __table_args__ = (sa.UniqueConstraint("key_sha256", name="uq_api_keys_key_sha256"),
                       sa.UniqueConstraint("organization_id", "id", name="uq_api_keys_scope_id"),
-                      sa.CheckConstraint("length(secret_sha256) = 64", name="secret_hash_length"),
+                      sa.CheckConstraint("length(key_sha256) = 64", name="key_hash_length"),
+                      sa.CheckConstraint("rate_limit_per_minute BETWEEN 1 AND 100000", name="rate_limit_range"),
                       sa.Index("ix_api_keys_org_created", "organization_id", "created_at"))
 
 
-class IdempotencyKey(Record, Base):
-    """Replays a session creation retried with the same Idempotency-Key instead of creating a second session."""
+class WebhookEndpoint(Record, Base):
+    """A customer URL that receives signed events. The signing secret is encrypted with the PII keyring."""
 
-    __tablename__ = "idempotency_keys"
+    __tablename__ = "webhook_endpoints"
     organization_id: Mapped[UUID] = mapped_column(sa.Uuid, sa.ForeignKey("organizations.id", ondelete="RESTRICT"))
-    idempotency_key: Mapped[str] = mapped_column(sa.String(128))
-    request_sha256: Mapped[str] = mapped_column(sa.String(64))
-    session_id: Mapped[UUID] = mapped_column(sa.Uuid)
-    __table_args__ = (sa.ForeignKeyConstraint(["organization_id", "session_id"], ["kyc_sessions.organization_id", "kyc_sessions.id"], ondelete="CASCADE"),
-                      sa.UniqueConstraint("organization_id", "idempotency_key", name="uq_idempotency_keys_org_key"),
-                      sa.Index("ix_idempotency_keys_org_created", "organization_id", "created_at"))
+    url: Mapped[str] = mapped_column(sa.String(2048))
+    description: Mapped[str | None] = mapped_column(sa.String(200))
+    event_types: Mapped[list] = mapped_column(JSON_VALUE, default=list)   # empty: every kyc.* event
+    secret_ciphertext: Mapped[bytes] = mapped_column(sa.LargeBinary)
+    key_version: Mapped[str] = mapped_column(sa.String(256))
+    # During a rotation the previous secret keeps signing until it expires.
+    previous_secret_ciphertext: Mapped[bytes | None] = mapped_column(sa.LargeBinary)
+    previous_key_version: Mapped[str | None] = mapped_column(sa.String(256))
+    previous_secret_expires_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    active: Mapped[bool] = mapped_column(sa.Boolean, default=True, server_default=sa.true())
+    created_by: Mapped[str] = mapped_column(sa.String(128))
+    disabled_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    consecutive_failures: Mapped[int] = mapped_column(sa.Integer, default=0, server_default="0")
+    __table_args__ = (sa.UniqueConstraint("organization_id", "id", name="uq_webhook_endpoints_scope_id"),
+                      sa.CheckConstraint("previous_secret_ciphertext IS NULL OR previous_key_version IS NOT NULL",
+                                         name="previous_key_required"),
+                      sa.Index("ix_webhook_endpoints_org_active", "organization_id", "active"))
+
+
+class WebhookDelivery(Record, Base):
+    """Transactional outbox row: one event for one endpoint, retried until delivered or abandoned."""
+
+    __tablename__ = "webhook_deliveries"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    endpoint_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    event_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    event_type: Mapped[str] = mapped_column(sa.String(64))
+    # Like audit logs, a delivery keeps the session reference after the session is purged.
+    session_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
+    status: Mapped[str] = mapped_column(sa.String(16), default="PENDING", server_default="PENDING")
+    attempts: Mapped[int] = mapped_column(sa.Integer, default=0, server_default="0")
+    next_attempt_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    last_attempt_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    last_status_code: Mapped[int | None] = mapped_column(sa.Integer)
+    last_error: Mapped[str | None] = mapped_column(sa.String(40))
+    delivered_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = (
+        sa.ForeignKeyConstraint(["organization_id", "endpoint_id"], ["webhook_endpoints.organization_id", "webhook_endpoints.id"],
+                                ondelete="CASCADE", name="fk_webhook_deliveries_endpoint"),
+        sa.UniqueConstraint("endpoint_id", "event_id", name="uq_webhook_deliveries_endpoint_event"),
+        sa.CheckConstraint("status IN ('PENDING', 'DELIVERED', 'ABANDONED')", name="delivery_status"),
+        sa.CheckConstraint("attempts >= 0", name="attempts_non_negative"),
+        sa.Index("ix_webhook_deliveries_due", "organization_id", "status", "next_attempt_at"),
+        sa.Index("ix_webhook_deliveries_endpoint_created", "organization_id", "endpoint_id", "created_at"),
+    )
 
 
 class Consent(SessionArtifact, Base):

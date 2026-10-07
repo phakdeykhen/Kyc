@@ -11,7 +11,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 
-from kyc.db.models import BiometricTemplate, DocumentImage, FaceQualityCheck, IdentityDocument, SelfieCapture
+from kyc.db.models import BiometricTemplate, DocumentImage, FaceQualityCheck, IdentityDocument, SelfieCapture, WebhookDelivery
 from kyc.db.session import set_tenant
 from kyc.storage.captures import CaptureStore
 
@@ -27,10 +27,11 @@ class PurgeReport:
     expired_selfies: int = 0
     expired_templates: int = 0
     expired_face_checks: int = 0
+    expired_webhook_deliveries: int = 0
 
 
 def purge_organization(factory: sessionmaker, store: CaptureStore, organization_id: UUID,
-                       now: datetime | None = None) -> PurgeReport:
+                       now: datetime | None = None, webhook_retention: timedelta = timedelta(days=30)) -> PurgeReport:
     now = now or datetime.now(timezone.utc)
     with factory() as db, db.begin():
         set_tenant(db, organization_id)
@@ -49,6 +50,10 @@ def purge_organization(factory: sessionmaker, store: CaptureStore, organization_
             counts.append(len(rows))
             for row in rows:
                 db.delete(row)
+        # Finished webhook deliveries (Phase 16); pending ones are kept until delivered or abandoned.
+        deliveries = db.execute(sa.delete(WebhookDelivery).where(
+            WebhookDelivery.organization_id == organization_id, WebhookDelivery.status != "PENDING",
+            WebhookDelivery.created_at <= now - webhook_retention)).rowcount
         db.flush()
         live = set(db.scalars(sa.select(DocumentImage.encrypted_object_ref)
                               .where(DocumentImage.organization_id == organization_id)).all())
@@ -61,4 +66,4 @@ def purge_organization(factory: sessionmaker, store: CaptureStore, organization_
             continue
         store.delete(ref)
         deleted += 1
-    return PurgeReport(len(expired), len(documents), deleted, *counts)
+    return PurgeReport(len(expired), len(documents), deleted, *counts, deliveries)

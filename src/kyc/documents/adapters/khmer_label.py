@@ -23,7 +23,7 @@ from kyc.engines.contracts import CheckEvidence
 from kyc.mrz import parser as mrz_parser
 from kyc.mrz.parser import clean_line as clean_mrz
 
-MRZ_LINE = re.compile(r"^[A-Z0-9<]{25,44}$")
+MRZ_LINE = re.compile(r"^[A-Z0-9<]{20,44}$")
 LATIN_NAME_LINE = re.compile(r"^[A-Z][A-Z' \-]{2,}$")
 _ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
 KINGDOM_CUES = ("ព្រះរាជាណាចក្រកម្ពុជា", "ជាតិ សាសនា ព្រះមហាក្សត្រ")
@@ -93,7 +93,12 @@ class CardLayout:
     important_fields: tuple[str, ...]
     multiline: dict[str, int] = field(default_factory=dict)
     validity_label: str | None = None                       # one label holding "issue … expiry"
-    back_marker: str | None = None                          # MRZ prefix printed on the back
+    back_marker: str | None = None                          # MRZ prefix that identifies the card's MRZ
+    mrz_on_front: bool = False                              # the MRZ shares the portrait side (real KH ID)
+    # Critical fields that a fully check-digit-valid MRZ makes non-blocking: their absence means
+    # REVIEW instead of recapture (e.g. a Khmer name the OCR cannot read when the MRZ identifies the card).
+    mrz_relieves: tuple[str, ...] = ()
+    mrz_name_surname_first: bool = False                    # print a name taken from the MRZ as "SURNAME GIVEN"
     expiry_printed: bool = True                             # False: a missing expiry is NOT_APPLICABLE
     sides: tuple[str, ...] = ("FRONT", "BACK")
     mrz_formats: tuple[str, ...] = ()                       # expected ICAO formats, e.g. ("TD1",)
@@ -175,10 +180,18 @@ class KhmerLabelAdapter:
         if not labels and not has_number:
             front = 0.0  # headings alone (often printed on the back too) do not make a front
         mrz = [clean_mrz(line.text) for line in mrz_candidates(lines)]
+        marked = bool(layout.back_marker) and any(item.startswith(layout.back_marker) for item in mrz)
         back = 0.0
-        if mrz:
-            back = 0.7 if layout.back_marker and any(item.startswith(layout.back_marker) for item in mrz) else 0.35
+        if mrz and layout.mrz_on_front:
+            # The card's own MRZ is printed under the portrait: evidence of the front, never of the back.
+            front += 0.4 if marked else 0.1
+        elif mrz:
+            back = 0.7 if marked else 0.35
         back += min(0.2, 0.1 * headers) if not labels else 0
+        if layout.mrz_on_front and not marked and len(labels) < 3:
+            # The front always carries the card's own MRZ (e.g. "IDKHM…"); MRZ-like noise does not count.
+            # A side with neither that MRZ nor most labels is the back.
+            front, back = 0.0, max(back, min(0.4, front))
         if front >= back and front > 0:
             side, confidence = "FRONT", min(1.0, front)
         elif back > 0:
@@ -293,6 +306,11 @@ class KhmerLabelAdapter:
         for line in front:
             if id(line) in labelled_lines or khmer.DATE_PATTERN.search(line.text):
                 continue
+            cleaned = clean_mrz(line.text)
+            if ("MRZ_PASS" in line.notes or MRZ_LINE.fullmatch(cleaned)
+                    or (self.layout.back_marker and cleaned.startswith(self.layout.back_marker))
+                    or cleaned.count("<") >= 2):
+                continue
             converted = khmer.digits_to_ascii(line.text)
             for match in re.finditer(rule.pattern, converted.value):
                 candidates.append((line.bbox[1], match.group(1), line, converted.flags, line.text))
@@ -328,7 +346,9 @@ class KhmerLabelAdapter:
         # Latin name: the uppercase Latin line nearest below the Khmer name label.
         anchor = values.get("full_name_local", (None, None, ()))[1]
         title_words = tuple(cue for cues in TITLE_CUES.values() for cue in cues) + LATIN_KINGDOM_CUES
-        latin = [line for line in front if layout.latin_name_line and LATIN_NAME_LINE.match(line.text)
+        # The dedicated MRZ pass never supplies the printed name line (it shares the front on KH IDs).
+        latin = [line for line in front if layout.latin_name_line and "MRZ_PASS" not in line.notes
+                 and LATIN_NAME_LINE.match(line.text)
                  and len(line.text.split()) >= 2 and not any(cue in line.text for cue in title_words)]
         if anchor is not None:
             below = [line for line in latin if line.bbox[1] >= anchor.bbox[1]]
@@ -351,6 +371,8 @@ class KhmerLabelAdapter:
             flags = tuple(parsed.flags) if parsed else ("MRZ_FORMAT_UNRECOGNIZED",)
             if parsed:
                 flags += ("CHECK_DIGITS_VALID",) if all(item["valid"] for item in parsed.check_digits.values()) else ("CHECK_DIGIT_FAILED",)
+                if all(parsed.check_digits.get(name, {}).get("valid") for name in mrz_parser.FIELD_CHECKS):
+                    flags += ("MRZ_FIELDS_VERIFIED",)  # number, birth and expiry each match their check digit
             used = []
             for assembled in parsed.lines if parsed else ():
                 matching = [line for line in mrz_lines if clean_mrz(line.text) == assembled
@@ -424,6 +446,9 @@ class KhmerLabelAdapter:
                       "expiry_date": (parsed.expiry_date and parsed.expiry_date.isoformat(), "expiry_date"),
                       "sex": (parsed.sex, None), "surname": (parsed.surname, None),
                       "given_names": (parsed.given_names, None), "full_name": (parsed.full_name, None)}
+        if self.layout.mrz_name_surname_first and parsed.surname:
+            # Match the card's own Latin name line, e.g. "SOK SOPHEA" rather than the MRZ's given-first form.
+            candidates["full_name"] = (" ".join(part for part in (parsed.surname, parsed.given_names) if part), None)
         if self.layout.latin_name_from:
             candidates.pop("full_name")  # compose after fallback, retaining visual name components
         if not self.layout.nationality:
@@ -433,7 +458,8 @@ class KhmerLabelAdapter:
             existing = next((item for item in fields if item.field == name), None)
             if value is None or (existing is not None and existing.normalized_value):
                 continue
-            trusted = parsed.check_digits.get(digit, {}).get("valid") if digit else parsed.mrz_valid
+            trusted = parsed.check_digits.get(digit, {}).get("valid") if digit else (
+                parsed.mrz_valid or mrz_parser._fields_verified(parsed))
             if not trusted:
                 continue
             name_line = 2 if parsed.format == "TD1" else 0
@@ -460,8 +486,12 @@ class KhmerLabelAdapter:
             by_name[name].normalized_value if name in by_name else None)
         checks: list[CheckEvidence] = []
 
-        missing_critical = [name for name in layout.critical_fields if not present(name)]
-        missing_important = [name for name in layout.important_fields if not present(name)]
+        mrz_field = by_name.get("mrz")
+        mrz_verified = bool(mrz_field and {"CHECK_DIGITS_VALID", "MRZ_FIELDS_VERIFIED"} & set(mrz_field.flags))
+        relieved = set(layout.mrz_relieves) if mrz_verified else set()
+        missing_critical = [name for name in layout.critical_fields if not present(name) and name not in relieved]
+        missing_important = [name for name in layout.important_fields if not present(name)] + \
+            [name for name in layout.critical_fields if not present(name) and name in relieved]
         if missing_critical:
             checks.append(CheckEvidence(CheckResult.FAIL, ("CRITICAL_FIELD_MISSING",), check_type="REQUIRED_FIELDS",
                                         details={"missing": missing_critical + missing_important}))

@@ -2,7 +2,8 @@
 // Reviewer dashboard. Every value from the API is rendered with textContent, never as HTML.
 // The token lives only in this object; nothing is written to storage.
 
-const state = { org: null, token: null, me: null, current: null, imageUrls: [] };
+const state = { org: null, token: null, me: null, current: null, imageUrls: [], all: { offset: 0, loaded: false } };
+const ALL_PAGE = 50;
 const $ = (id) => document.getElementById(id);
 
 function el(tag, attrs = {}, children = []) {
@@ -45,7 +46,7 @@ function since(iso) {
 
 // Sign in ---------------------------------------------------------------------------
 async function signIn(event) {
-  event.preventDefault();
+  if (event && event.preventDefault) event.preventDefault();
   state.org = $("org-id").value.trim();
   state.token = $("token").value.trim();
   $("token").value = "";
@@ -69,7 +70,10 @@ async function signIn(event) {
 
 function signOut() {
   clearImages();
-  Object.assign(state, { org: null, token: null, me: null, current: null });
+  Object.assign(state, { org: null, token: null, me: null, current: null, all: { offset: 0, loaded: false } });
+  $("all-list").replaceChildren();
+  $("all-count").textContent = "";
+  showTab("queue");
   $("workspace").hidden = true;
   $("who").hidden = true;
   $("sign-out").hidden = true;
@@ -79,8 +83,8 @@ function signOut() {
 }
 
 // Queue -----------------------------------------------------------------------------
-async function loadQueue() {
-  const result = await api("/v1/review/queue?limit=100");
+async function loadQueue(preferredCaseId) {
+  const result = await api("/v1/review/queue?limit=100&order=newest");
   if (!result.ok) return signOutOnAuth(result);
   const { items, total } = result.body;
   $("queue-count").textContent = `(${total})`;
@@ -99,6 +103,52 @@ async function loadQueue() {
     button.addEventListener("click", () => openCase(item.session_id));
     return el("li", {}, button);
   }));
+  const targetId = preferredCaseId || (state.current && state.current.session.session_id) || (items.length > 0 ? items[0].session_id : null);
+  if (targetId && (!state.current || state.current.session.session_id !== targetId)) {
+    await openCase(targetId);
+  }
+}
+
+// All sessions ----------------------------------------------------------------------
+function showTab(name) {
+  const all = name === "all";
+  $("tab-queue").setAttribute("aria-selected", String(!all));
+  $("tab-all").setAttribute("aria-selected", String(all));
+  $("queue-view").hidden = all;
+  $("all-view").hidden = !all;
+  if (all && !state.all.loaded) loadAll();
+}
+
+async function loadAll(append = false) {
+  const offset = append ? state.all.offset : 0;
+  const params = new URLSearchParams({ limit: String(ALL_PAGE), offset: String(offset) });
+  if ($("all-status").value) params.set("status", $("all-status").value);
+  if ($("all-user").value.trim()) params.set("user_id", $("all-user").value.trim());
+  const result = await api(`/v1/review/sessions?${params}`);
+  if (!result.ok) return signOutOnAuth(result);
+  const { items, total, counts } = result.body;
+  state.all = { offset: offset + items.length, loaded: true };
+  $("all-count").textContent = `(${Object.values(counts).reduce((sum, value) => sum + value, 0)})`;
+  const chosen = $("all-status").value;
+  $("all-status").replaceChildren(el("option", { value: "", text: "All statuses" }),
+    ...Object.entries(counts).map(([status, count]) => el("option", { value: status, text: `${status} (${count})` })));
+  $("all-status").value = chosen;
+  const rows = items.map((item) => {
+    const note = item.erased ? "data erased" : item.expired ? "expired" : `changed ${since(item.updated_at)} ago`;
+    const button = el("button", { type: "button", "data-id": item.session_id }, [
+      el("span", { class: "line" }, [el("span", { class: "id", text: short(item.session_id) }), pill(item.status)]),
+      el("span", { class: "line" }, [el("span", { class: "user", text: item.user_id }), el("span", { text: note })]),
+      el("span", { class: "line muted", text: `${item.expected_document_type} · ${item.country} · ${item.verification_level}` }),
+    ]);
+    if (state.current && state.current.session.session_id === item.session_id) button.setAttribute("aria-current", "true");
+    button.addEventListener("click", () => openCase(item.session_id));
+    return el("li", {}, button);
+  });
+  if (append) $("all-list").append(...rows);
+  else $("all-list").replaceChildren(...rows);
+  $("all-empty").hidden = total > 0;
+  $("all-more").hidden = state.all.offset >= total;
+  $("all-more").textContent = `Load more (${total - state.all.offset} left)`;
 }
 
 function signOutOnAuth(result) {
@@ -133,7 +183,8 @@ function renderCase(data) {
   $("case-title").textContent = `Case ${short(session.session_id)} · ${session.expected_document_type}`;
   $("case-meta").textContent = `${session.verification_level} · ${session.country} · customer ref ${session.user_id} · `
     + `${session.status === "MANUAL_REVIEW" ? "in review" : "last changed"} ${since(session.updated_at)} ago · `
-    + `expires ${new Date(session.expires_at).toLocaleString()}`;
+    + (session.status === "MANUAL_REVIEW" ? "does not expire while in review"
+      : `expires ${new Date(session.expires_at).toLocaleString()}`);
   $("case-decision").replaceWith(Object.assign(pill(session.status), { id: "case-decision" }));
   $("case-reasons").replaceChildren(...(risk ? risk.reason_codes : []).map((code) => el("code", { text: code })));
 
@@ -275,13 +326,58 @@ async function submitDecision(event) {
   }
   await openCase(result.body.session_id);
   await loadQueue();
+  if (state.all.loaded) await loadAll();
 }
 
 $("sign-in-form").addEventListener("submit", signIn);
 $("sign-out").addEventListener("click", signOut);
-$("refresh").addEventListener("click", loadQueue);
+$("refresh").addEventListener("click", () => loadQueue());
+$("tab-queue").addEventListener("click", () => showTab("queue"));
+$("tab-all").addEventListener("click", () => showTab("all"));
+$("all-filters").addEventListener("submit", (event) => { event.preventDefault(); loadAll(); });
+$("all-status").addEventListener("change", () => loadAll());
+$("all-clear").addEventListener("click", () => { $("all-status").value = ""; $("all-user").value = ""; loadAll(); });
+$("all-more").addEventListener("click", () => loadAll(true));
 $("actions").addEventListener("change", chooseAction);
 $("reason").addEventListener("change", updateSubmit);
 $("note").addEventListener("input", updateSubmit);
 $("decision").addEventListener("submit", submitDecision);
 window.addEventListener("pagehide", clearImages);
+
+function getParams() {
+  const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+  const params = new URLSearchParams(hash || window.location.search);
+  return {
+    org: params.get("org") || params.get("organization_id"),
+    token: params.get("token"),
+    caseId: params.get("case") || params.get("session_id"),
+  };
+}
+
+const searchInput = $("search-id");
+const openBtn = $("open-by-id");
+if (openBtn && searchInput) {
+  openBtn.addEventListener("click", () => {
+    const id = searchInput.value.trim();
+    if (id) openCase(id);
+  });
+  searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const id = searchInput.value.trim();
+      if (id) openCase(id);
+    }
+  });
+}
+
+window.addEventListener("DOMContentLoaded", async () => {
+  const params = getParams();
+  if (params.org) $("org-id").value = params.org;
+  if (params.token) $("token").value = params.token;
+  if (params.org && params.token) {
+    await signIn(new Event("submit"));
+    if (params.caseId) {
+      await openCase(params.caseId);
+    }
+  }
+});

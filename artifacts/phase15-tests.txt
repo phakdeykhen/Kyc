@@ -1,16 +1,26 @@
 test_configuration_errors_omit_secret_values (test_api.ConfigurationTests.test_configuration_errors_omit_secret_values) ... ok
 test_production_and_sqlite_development_are_rejected (test_api.ConfigurationTests.test_production_and_sqlite_development_are_rejected) ... ok
 test_short_credential_is_rejected (test_api.ConfigurationTests.test_short_credential_is_rejected) ... ok
-test_audit_metadata_omits_identity_fields (test_api.SessionAPITests.test_audit_metadata_omits_identity_fields) ... ok
-test_create_fetch_and_pending_result (test_api.SessionAPITests.test_create_fetch_and_pending_result) ... ok
-test_credentials_and_organization_binding (test_api.SessionAPITests.test_credentials_and_organization_binding) ... ok
-test_cross_tenant_session_is_not_visible (test_api.SessionAPITests.test_cross_tenant_session_is_not_visible) ... ok
-test_expiry_is_persisted_and_audited_once (test_api.SessionAPITests.test_expiry_is_persisted_and_audited_once) ... ok
-test_health_and_inventory_are_honest (test_api.SessionAPITests.test_health_and_inventory_are_honest) ... ok
-test_invalid_payload_and_client_status_assertions (test_api.SessionAPITests.test_invalid_payload_and_client_status_assertions) ... ok
-test_no_public_transition_endpoint (test_api.SessionAPITests.test_no_public_transition_endpoint) ... ok
-test_readiness_requires_the_expected_migration (test_api.SessionAPITests.test_readiness_requires_the_expected_migration) ... ok
-test_verified_terminal_session_does_not_expire (test_api.SessionAPITests.test_verified_terminal_session_does_not_expire) ... ok
+test_audit_metadata_omits_identity_fields (test_api.SessionAPITests.test_audit_metadata_omits_identity_fields) ... Executing <Task finished name='Task-1' coro=<SessionAPITests.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_api.py:34> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.154 seconds
+ok
+test_create_fetch_and_pending_result (test_api.SessionAPITests.test_create_fetch_and_pending_result) ... Executing <Task finished name='Task-8' coro=<SessionAPITests.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_api.py:34> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.137 seconds
+ok
+test_credentials_and_organization_binding (test_api.SessionAPITests.test_credentials_and_organization_binding) ... Executing <Task finished name='Task-15' coro=<SessionAPITests.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_api.py:34> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.102 seconds
+ok
+test_cross_tenant_session_is_not_visible (test_api.SessionAPITests.test_cross_tenant_session_is_not_visible) ... Executing <Task finished name='Task-25' coro=<SessionAPITests.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_api.py:34> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.105 seconds
+ok
+test_expiry_is_persisted_and_audited_once (test_api.SessionAPITests.test_expiry_is_persisted_and_audited_once) ... Executing <Task finished name='Task-31' coro=<SessionAPITests.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_api.py:34> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.197 seconds
+ok
+test_health_and_inventory_are_honest (test_api.SessionAPITests.test_health_and_inventory_are_honest) ... Executing <Task finished name='Task-38' coro=<SessionAPITests.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_api.py:34> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.168 seconds
+ok
+test_invalid_payload_and_client_status_assertions (test_api.SessionAPITests.test_invalid_payload_and_client_status_assertions) ... Executing <Task finished name='Task-44' coro=<SessionAPITests.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_api.py:34> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.141 seconds
+ok
+test_no_public_transition_endpoint (test_api.SessionAPITests.test_no_public_transition_endpoint) ... Executing <Task finished name='Task-56' coro=<SessionAPITests.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_api.py:34> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.113 seconds
+ok
+test_readiness_requires_the_expected_migration (test_api.SessionAPITests.test_readiness_requires_the_expected_migration) ... Executing <Task finished name='Task-64' coro=<SessionAPITests.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_api.py:34> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.109 seconds
+ok
+test_verified_terminal_session_does_not_expire (test_api.SessionAPITests.test_verified_terminal_session_does_not_expire) ... Executing <Task finished name='Task-70' coro=<SessionAPITests.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_api.py:34> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.152 seconds
+ok
 test_absent_or_uncomparable_codes (test_barcode.AssessmentTests.test_absent_or_uncomparable_codes) ... ok
 test_consistent_unsigned_code_passes_as_consistent_only (test_barcode.AssessmentTests.test_consistent_unsigned_code_passes_as_consistent_only) ... ok
 test_disagreement_with_the_printed_card_is_flagged (test_barcode.AssessmentTests.test_disagreement_with_the_printed_card_is_flagged) ... ok
@@ -31,35 +41,52 @@ test_tampering_is_rejected (test_biometric_storage.BiometricStorageTests.test_ta
 test_tenant_session_template_source_and_model_are_authenticated (test_biometric_storage.BiometricStorageTests.test_tenant_session_template_source_and_model_are_authenticated) ... ok
 test_accepted_selfie_records_review_evidence_and_waits_for_liveness (test_biometrics_api.BiometricAPITests.test_accepted_selfie_records_review_evidence_and_waits_for_liveness) ... ok
 test_authentication_and_stage_are_checked_before_face_processing (test_biometrics_api.BiometricAPITests.test_authentication_and_stage_are_checked_before_face_processing) ... ok
-test_biometric_encryption_is_required_before_engine_processing (test_biometrics_api.BiometricAPITests.test_biometric_encryption_is_required_before_engine_processing) ... ok
-test_calibrated_failed_match_remains_evidence_without_final_rejection (test_biometrics_api.BiometricAPITests.test_calibrated_failed_match_remains_evidence_without_final_rejection) ... ok
+test_biometric_encryption_is_required_before_engine_processing (test_biometrics_api.BiometricAPITests.test_biometric_encryption_is_required_before_engine_processing) ... Executing <Task finished name='Task-92' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.108 seconds
+ok
+test_calibrated_failed_match_remains_evidence_without_final_rejection (test_biometrics_api.BiometricAPITests.test_calibrated_failed_match_remains_evidence_without_final_rejection) ... Executing <Task finished name='Task-99' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.107 seconds
+ok
 test_cross_tenant_sessions_are_inaccessible (test_biometrics_api.BiometricAPITests.test_cross_tenant_sessions_are_inaccessible) ... ok
-test_declared_length_cannot_bypass_actual_multipart_body_limit (test_biometrics_api.BiometricAPITests.test_declared_length_cannot_bypass_actual_multipart_body_limit) ... ok
-test_document_face_level_advances_only_to_processing (test_biometrics_api.BiometricAPITests.test_document_face_level_advances_only_to_processing) ... Executing <Task finished name='Task-236' coro=<BiometricAPICase.asyncSetUp() done, defined at /home/user/Kyc/tests/test_biometrics_api.py:85> result=None created at /usr/lib/python3.12/asyncio/runners.py:100> took 0.158 seconds
+test_declared_length_cannot_bypass_actual_multipart_body_limit (test_biometrics_api.BiometricAPITests.test_declared_length_cannot_bypass_actual_multipart_body_limit) ... Executing <Task finished name='Task-113' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.108 seconds
 ok
-test_duplicate_success_is_closed_to_additional_selfies (test_biometrics_api.BiometricAPITests.test_duplicate_success_is_closed_to_additional_selfies) ... ok
-test_embedding_failure_does_not_persist_partial_templates (test_biometrics_api.BiometricAPITests.test_embedding_failure_does_not_persist_partial_templates) ... ok
+test_document_face_level_advances_only_to_processing (test_biometrics_api.BiometricAPITests.test_document_face_level_advances_only_to_processing) ... Executing <Task finished name='Task-121' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.101 seconds
+ok
+test_duplicate_success_is_closed_to_additional_selfies (test_biometrics_api.BiometricAPITests.test_duplicate_success_is_closed_to_additional_selfies) ... Executing <Task finished name='Task-128' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.108 seconds
+ok
+test_embedding_failure_does_not_persist_partial_templates (test_biometrics_api.BiometricAPITests.test_embedding_failure_does_not_persist_partial_templates) ... Executing <Task finished name='Task-136' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.101 seconds
+ok
 test_expired_reference_original_is_not_used_for_templates (test_biometrics_api.BiometricAPITests.test_expired_reference_original_is_not_used_for_templates) ... ok
-test_expired_session_persists_expiry_without_face_processing (test_biometrics_api.BiometricAPITests.test_expired_session_persists_expiry_without_face_processing) ... ok
-test_explicit_consent_is_required_before_face_processing (test_biometrics_api.BiometricAPITests.test_explicit_consent_is_required_before_face_processing) ... ok
+test_expired_session_persists_expiry_without_face_processing (test_biometrics_api.BiometricAPITests.test_expired_session_persists_expiry_without_face_processing) ... Executing <Task finished name='Task-150' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.112 seconds
+ok
+test_explicit_consent_is_required_before_face_processing (test_biometrics_api.BiometricAPITests.test_explicit_consent_is_required_before_face_processing) ... Executing <Task finished name='Task-157' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.107 seconds
+ok
 test_large_multipart_body_is_rejected_before_upload_parsing (test_biometrics_api.BiometricAPITests.test_large_multipart_body_is_rejected_before_upload_parsing) ... ok
-test_missing_original_reference_does_not_advance (test_biometrics_api.BiometricAPITests.test_missing_original_reference_does_not_advance) ... ok
-test_model_unavailability_does_not_create_or_advance_evidence (test_biometrics_api.BiometricAPITests.test_model_unavailability_does_not_create_or_advance_evidence) ... ok
-test_original_side_mapping_is_honored_for_swapped_card_captures (test_biometrics_api.BiometricAPITests.test_original_side_mapping_is_honored_for_swapped_card_captures) ... Executing <Task finished name='Task-343' coro=<BiometricAPICase.asyncSetUp() done, defined at /home/user/Kyc/tests/test_biometrics_api.py:85> result=None created at /usr/lib/python3.12/asyncio/runners.py:100> took 0.171 seconds
+test_missing_original_reference_does_not_advance (test_biometrics_api.BiometricAPITests.test_missing_original_reference_does_not_advance) ... Executing <Task finished name='Task-171' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.110 seconds
 ok
-test_quality_recapture_consumes_attempt_without_storing_capture_or_vectors (test_biometrics_api.BiometricAPITests.test_quality_recapture_consumes_attempt_without_storing_capture_or_vectors) ... ok
-test_reference_detection_failure_reopens_document_capture (test_biometrics_api.BiometricAPITests.test_reference_detection_failure_reopens_document_capture) ... ok
-test_result_excludes_quality_from_an_earlier_document_attempt (test_biometrics_api.BiometricAPITests.test_result_excludes_quality_from_an_earlier_document_attempt) ... ok
-test_result_hides_expired_templates_before_a_retention_sweep (test_biometrics_api.BiometricAPITests.test_result_hides_expired_templates_before_a_retention_sweep) ... ok
-test_retention_is_scoped_to_the_requested_organization (test_biometrics_api.BiometricAPITests.test_retention_is_scoped_to_the_requested_organization) ... ok
-test_retention_removes_biometric_copies_and_cascades_comparison (test_biometrics_api.BiometricAPITests.test_retention_removes_biometric_copies_and_cascades_comparison) ... ok
+test_model_unavailability_does_not_create_or_advance_evidence (test_biometrics_api.BiometricAPITests.test_model_unavailability_does_not_create_or_advance_evidence) ... Executing <Task finished name='Task-178' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.101 seconds
+ok
+test_original_side_mapping_is_honored_for_swapped_card_captures (test_biometrics_api.BiometricAPITests.test_original_side_mapping_is_honored_for_swapped_card_captures) ... Executing <Task finished name='Task-185' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.101 seconds
+ok
+test_quality_recapture_consumes_attempt_without_storing_capture_or_vectors (test_biometrics_api.BiometricAPITests.test_quality_recapture_consumes_attempt_without_storing_capture_or_vectors) ... Executing <Task finished name='Task-192' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.100 seconds
+ok
+test_reference_detection_failure_reopens_document_capture (test_biometrics_api.BiometricAPITests.test_reference_detection_failure_reopens_document_capture) ... Executing <Task finished name='Task-199' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.101 seconds
+ok
+test_result_excludes_quality_from_an_earlier_document_attempt (test_biometrics_api.BiometricAPITests.test_result_excludes_quality_from_an_earlier_document_attempt) ... Executing <Task finished name='Task-206' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.100 seconds
+ok
+test_result_hides_expired_templates_before_a_retention_sweep (test_biometrics_api.BiometricAPITests.test_result_hides_expired_templates_before_a_retention_sweep) ... Executing <Task finished name='Task-213' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.106 seconds
+ok
+test_retention_is_scoped_to_the_requested_organization (test_biometrics_api.BiometricAPITests.test_retention_is_scoped_to_the_requested_organization) ... Executing <Task finished name='Task-220' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.104 seconds
+ok
+test_retention_removes_biometric_copies_and_cascades_comparison (test_biometrics_api.BiometricAPITests.test_retention_removes_biometric_copies_and_cascades_comparison) ... Executing <Task finished name='Task-227' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.106 seconds
+ok
 test_retention_sweep_keeps_live_selfie_ciphertext (test_biometrics_api.BiometricAPITests.test_retention_sweep_keeps_live_selfie_ciphertext) ... ok
-test_tampered_reference_ciphertext_returns_retryable_failure (test_biometrics_api.BiometricAPITests.test_tampered_reference_ciphertext_returns_retryable_failure) ... Executing <Task finished name='Task-435' coro=<BiometricAPICase.asyncSetUp() done, defined at /home/user/Kyc/tests/test_biometrics_api.py:85> result=None created at /usr/lib/python3.12/asyncio/runners.py:100> took 0.193 seconds
+test_tampered_reference_ciphertext_returns_retryable_failure (test_biometrics_api.BiometricAPITests.test_tampered_reference_ciphertext_returns_retryable_failure) ... Executing <Task finished name='Task-241' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.259 seconds
 ok
-test_unreadable_input_and_pixel_bombs_are_bounded_before_detection (test_biometrics_api.BiometricAPITests.test_unreadable_input_and_pixel_bombs_are_bounded_before_detection) ... Executing <Task pending name='Task-447' coro=<BiometricAPITests.test_unreadable_input_and_pixel_bombs_are_bounded_before_detection() running at /home/user/Kyc/tests/test_biometrics_api.py:243> cb=[_run_until_complete_cb() at /usr/lib/python3.12/asyncio/base_events.py:182] created at /usr/lib/python3.12/asyncio/runners.py:100> took 0.186 seconds
+test_unreadable_input_and_pixel_bombs_are_bounded_before_detection (test_biometrics_api.BiometricAPITests.test_unreadable_input_and_pixel_bombs_are_bounded_before_detection) ... Executing <Task finished name='Task-248' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.100 seconds
+Executing <Task pending name='Task-249' coro=<BiometricAPITests.test_unreadable_input_and_pixel_bombs_are_bounded_before_detection() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:243> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.223 seconds
 ok
 test_valid_large_selfies_never_spool_plaintext_to_disk (test_biometrics_api.BiometricAPITests.test_valid_large_selfies_never_spool_plaintext_to_disk) ... ok
-test_recapture_attempts_are_limited_without_engine_calls_after_limit (test_biometrics_api.BiometricAttemptLimitTests.test_recapture_attempts_are_limited_without_engine_calls_after_limit) ... ok
+test_recapture_attempts_are_limited_without_engine_calls_after_limit (test_biometrics_api.BiometricAttemptLimitTests.test_recapture_attempts_are_limited_without_engine_calls_after_limit) ... Executing <Task finished name='Task-263' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.121 seconds
+ok
 test_exif_orientation_is_applied_and_metadata_dropped (test_capture_quality.DecodeTests.test_exif_orientation_is_applied_and_metadata_dropped) ... ok
 test_rejects_unusable_inputs (test_capture_quality.DecodeTests.test_rejects_unusable_inputs) ... ok
 test_dark_frames_are_not_misreported_as_motion_blur (test_capture_quality.QualityGateTests.test_dark_frames_are_not_misreported_as_motion_blur) ... ok
@@ -76,78 +103,136 @@ test_references_cannot_escape_the_storage_root (test_capture_store.CaptureStoreT
 test_rotated_keys_still_decrypt_older_objects (test_capture_store.CaptureStoreTests.test_rotated_keys_still_decrypt_older_objects) ... ok
 test_round_trip_is_encrypted_at_rest_with_private_permissions (test_capture_store.CaptureStoreTests.test_round_trip_is_encrypted_at_rest_with_private_permissions) ... ok
 test_tampered_ciphertext_fails_authentication (test_capture_store.CaptureStoreTests.test_tampered_ciphertext_fails_authentication) ... ok
-test_capture_page_is_served_with_a_strict_policy (test_captures_api.CaptureAPITests.test_capture_page_is_served_with_a_strict_policy) ... ok
-test_cross_tenant_session_cannot_receive_captures (test_captures_api.CaptureAPITests.test_cross_tenant_session_cannot_receive_captures) ... ok
-test_document_only_level_still_waits_for_the_document_engine (test_captures_api.CaptureAPITests.test_document_only_level_still_waits_for_the_document_engine) ... ok
-test_document_types_list_required_sides (test_captures_api.CaptureAPITests.test_document_types_list_required_sides) ... ok
-test_expired_session_is_persisted_as_expired (test_captures_api.CaptureAPITests.test_expired_session_is_persisted_as_expired) ... ok
-test_front_and_back_complete_capture_and_hand_off (test_captures_api.CaptureAPITests.test_front_and_back_complete_capture_and_hand_off) ... ok
-test_invalid_side_and_invalid_files (test_captures_api.CaptureAPITests.test_invalid_side_and_invalid_files) ... ok
-test_oversized_and_unbounded_uploads_are_refused_before_parsing (test_captures_api.CaptureAPITests.test_oversized_and_unbounded_uploads_are_refused_before_parsing) ... ok
+test_capture_page_is_served_with_a_strict_policy (test_captures_api.CaptureAPITests.test_capture_page_is_served_with_a_strict_policy) ... Executing <Task finished name='Task-272' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.231 seconds
+ok
+test_cross_tenant_session_cannot_receive_captures (test_captures_api.CaptureAPITests.test_cross_tenant_session_cannot_receive_captures) ... Executing <Task finished name='Task-278' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.103 seconds
+ok
+test_document_only_level_still_waits_for_the_document_engine (test_captures_api.CaptureAPITests.test_document_only_level_still_waits_for_the_document_engine) ... Executing <Task finished name='Task-285' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.127 seconds
+ok
+test_document_types_list_required_sides (test_captures_api.CaptureAPITests.test_document_types_list_required_sides) ... Executing <Task finished name='Task-293' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.128 seconds
+ok
+test_expired_session_is_persisted_as_expired (test_captures_api.CaptureAPITests.test_expired_session_is_persisted_as_expired) ... Executing <Task finished name='Task-299' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.129 seconds
+ok
+test_front_and_back_complete_capture_and_hand_off (test_captures_api.CaptureAPITests.test_front_and_back_complete_capture_and_hand_off) ... Executing <Task finished name='Task-308' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.148 seconds
+ok
+test_invalid_side_and_invalid_files (test_captures_api.CaptureAPITests.test_invalid_side_and_invalid_files) ... Executing <Task finished name='Task-318' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.126 seconds
+ok
+test_oversized_and_unbounded_uploads_are_refused_before_parsing (test_captures_api.CaptureAPITests.test_oversized_and_unbounded_uploads_are_refused_before_parsing) ... Executing <Task finished name='Task-328' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.130 seconds
+ok
 test_passport_uses_a_single_data_page (test_captures_api.CaptureAPITests.test_passport_uses_a_single_data_page) ... ok
-test_poor_capture_requests_recapture_and_stores_no_image (test_captures_api.CaptureAPITests.test_poor_capture_requests_recapture_and_stores_no_image) ... ok
-test_recapture_of_a_side_replaces_the_previous_image (test_captures_api.CaptureAPITests.test_recapture_of_a_side_replaces_the_previous_image) ... ok
-test_same_image_cannot_satisfy_both_sides (test_captures_api.CaptureAPITests.test_same_image_cannot_satisfy_both_sides) ... ok
-test_stored_capture_decrypts_to_the_original_upload (test_captures_api.CaptureAPITests.test_stored_capture_decrypts_to_the_original_upload) ... ok
-test_unauthenticated_upload_is_rejected (test_captures_api.CaptureAPITests.test_unauthenticated_upload_is_rejected) ... ok
-test_attempt_limit_is_enforced_and_audited (test_captures_api.CaptureLimitTests.test_attempt_limit_is_enforced_and_audited) ... ok
-test_expired_captures_and_orphans_are_purged_without_touching_live_ones (test_captures_api.RetentionTests.test_expired_captures_and_orphans_are_purged_without_touching_live_ones) ... Executing <Task finished name='Task-762' coro=<CaptureAPICase.asyncSetUp() done, defined at /home/user/Kyc/tests/test_captures_api.py:33> result=None created at /usr/lib/python3.12/asyncio/runners.py:100> took 0.190 seconds
+test_poor_capture_requests_recapture_and_stores_no_image (test_captures_api.CaptureAPITests.test_poor_capture_requests_recapture_and_stores_no_image) ... Executing <Task finished name='Task-344' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.126 seconds
 ok
-test_expired_document_cascades_to_its_images_and_checks (test_captures_api.RetentionTests.test_expired_document_cascades_to_its_images_and_checks) ... ok
-test_upload_is_unavailable_without_capture_keys (test_captures_api.UnconfiguredStorageTests.test_upload_is_unavailable_without_capture_keys) ... ok
+test_recapture_of_a_side_replaces_the_previous_image (test_captures_api.CaptureAPITests.test_recapture_of_a_side_replaces_the_previous_image) ... Executing <Task finished name='Task-352' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.124 seconds
+ok
+test_same_image_cannot_satisfy_both_sides (test_captures_api.CaptureAPITests.test_same_image_cannot_satisfy_both_sides) ... Executing <Task finished name='Task-361' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.101 seconds
+ok
+test_stored_capture_decrypts_to_the_original_upload (test_captures_api.CaptureAPITests.test_stored_capture_decrypts_to_the_original_upload) ... Executing <Task finished name='Task-370' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.117 seconds
+ok
+test_unauthenticated_upload_is_rejected (test_captures_api.CaptureAPITests.test_unauthenticated_upload_is_rejected) ... Executing <Task finished name='Task-378' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.136 seconds
+ok
+test_attempt_limit_is_enforced_and_audited (test_captures_api.CaptureLimitTests.test_attempt_limit_is_enforced_and_audited) ... Executing <Task finished name='Task-386' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.166 seconds
+ok
+test_expired_captures_and_orphans_are_purged_without_touching_live_ones (test_captures_api.RetentionTests.test_expired_captures_and_orphans_are_purged_without_touching_live_ones) ... Executing <Task finished name='Task-396' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.116 seconds
+ok
+test_expired_document_cascades_to_its_images_and_checks (test_captures_api.RetentionTests.test_expired_document_cascades_to_its_images_and_checks) ... Executing <Task finished name='Task-406' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.133 seconds
+ok
+test_upload_is_unavailable_without_capture_keys (test_captures_api.UnconfiguredStorageTests.test_upload_is_unavailable_without_capture_keys) ... Executing <Task pending name='Task-415' coro=<UnconfiguredStorageTests.test_upload_is_unavailable_without_capture_keys() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:303> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.103 seconds
+ok
 test_document_only_level_goes_straight_to_processing (test_documents_api.DocumentProcessingTests.test_document_only_level_goes_straight_to_processing) ... ok
-test_document_type_without_an_adapter_waits_honestly (test_documents_api.DocumentProcessingTests.test_document_type_without_an_adapter_waits_honestly) ... ok
-test_expired_card_is_accepted_as_evidence_and_flagged (test_documents_api.DocumentProcessingTests.test_expired_card_is_accepted_as_evidence_and_flagged) ... ok
-test_fields_are_encrypted_bound_and_absent_from_audit_and_checks (test_documents_api.DocumentProcessingTests.test_fields_are_encrypted_bound_and_absent_from_audit_and_checks) ... ok
-test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it (test_documents_api.DocumentProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it) ... Document processing failed for a session: OCRUnavailable
+test_document_type_without_an_adapter_waits_honestly (test_documents_api.DocumentProcessingTests.test_document_type_without_an_adapter_waits_honestly) ... Executing <Task finished name='Task-430' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.101 seconds
 ok
-test_processor_cannot_reach_another_tenants_session (test_documents_api.DocumentProcessingTests.test_processor_cannot_reach_another_tenants_session) ... Executing <Task finished name='Task-934' coro=<CaptureAPICase.asyncSetUp() done, defined at /home/user/Kyc/tests/test_captures_api.py:33> result=None created at /usr/lib/python3.12/asyncio/runners.py:100> took 0.212 seconds
+test_expired_card_is_accepted_as_evidence_and_flagged (test_documents_api.DocumentProcessingTests.test_expired_card_is_accepted_as_evidence_and_flagged) ... Executing <Task finished name='Task-439' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.126 seconds
 ok
-test_recapture_reasons (test_documents_api.DocumentProcessingTests.test_recapture_reasons) ... ok
-test_sides_uploaded_the_wrong_way_round_are_handled (test_documents_api.DocumentProcessingTests.test_sides_uploaded_the_wrong_way_round_are_handled) ... ok
-test_valid_card_is_extracted_and_session_advances_to_selfie (test_documents_api.DocumentProcessingTests.test_valid_card_is_extracted_and_session_advances_to_selfie) ... ok
-test_wrong_document_type_requests_recapture_and_clears_captures (test_documents_api.DocumentProcessingTests.test_wrong_document_type_requests_recapture_and_clears_captures) ... ok
-test_document_only_level_goes_straight_to_processing (test_documents_api.NSSFProcessingTests.test_document_only_level_goes_straight_to_processing) ... ok
-test_document_type_without_an_adapter_waits_honestly (test_documents_api.NSSFProcessingTests.test_document_type_without_an_adapter_waits_honestly) ... ok
-test_expired_card_is_accepted_as_evidence_and_flagged (test_documents_api.NSSFProcessingTests.test_expired_card_is_accepted_as_evidence_and_flagged) ... Executing <Task cancelling name='starlette.middleware.base.BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.coro' coro=<BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.coro() running at /home/user/Kyc/.venv/lib/python3.12/site-packages/starlette/middleware/base.py:144> wait_for=<Future pending cb=[Task.task_wakeup()] created at /usr/lib/python3.12/asyncio/base_events.py:449> cb=[TaskGroup._spawn.<locals>.task_done() at /home/user/Kyc/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py:821] created at /usr/lib/python3.12/asyncio/tasks.py:420> took 0.129 seconds
+test_fields_are_encrypted_bound_and_absent_from_audit_and_checks (test_documents_api.DocumentProcessingTests.test_fields_are_encrypted_bound_and_absent_from_audit_and_checks) ... Executing <Task finished name='Task-448' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.109 seconds
 ok
-test_fields_are_encrypted_bound_and_absent_from_audit_and_checks (test_documents_api.NSSFProcessingTests.test_fields_are_encrypted_bound_and_absent_from_audit_and_checks) ... ok
-test_nssf_card_is_extracted_without_expiry_or_mrz (test_documents_api.NSSFProcessingTests.test_nssf_card_is_extracted_without_expiry_or_mrz) ... ok
+test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it (test_documents_api.DocumentProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it) ... Executing <Task finished name='Task-457' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.129 seconds
+Document processing failed for a session: OCRUnavailable
+Executing <Task finished name='Task-458' coro=<DocumentProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:182> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 1.288 seconds
+ok
+test_processor_cannot_reach_another_tenants_session (test_documents_api.DocumentProcessingTests.test_processor_cannot_reach_another_tenants_session) ... Executing <Task finished name='Task-466' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.121 seconds
+ok
+test_recapture_reasons (test_documents_api.DocumentProcessingTests.test_recapture_reasons) ... Executing <Task pending name='starlette.middleware.base.BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.coro' coro=<BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.coro() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/.venv/lib/python3.13/site-packages/starlette/middleware/base.py:144> wait_for=<Future pending cb=[Task.task_wakeup()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:460> cb=[TaskGroup._spawn.<locals>.task_done() at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/.venv/lib/python3.13/site-packages/anyio/_backends/_asyncio.py:821] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/tasks.py:410> took 0.172 seconds
+ok
+test_sides_uploaded_the_wrong_way_round_are_handled (test_documents_api.DocumentProcessingTests.test_sides_uploaded_the_wrong_way_round_are_handled) ... Executing <Task finished name='Task-488' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.103 seconds
+ok
+test_valid_card_is_extracted_and_session_advances_to_selfie (test_documents_api.DocumentProcessingTests.test_valid_card_is_extracted_and_session_advances_to_selfie) ... Executing <Task finished name='Task-497' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.104 seconds
+ok
+test_wrong_document_type_requests_recapture_and_clears_captures (test_documents_api.DocumentProcessingTests.test_wrong_document_type_requests_recapture_and_clears_captures) ... Executing <Task finished name='Task-506' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.113 seconds
+ok
+test_document_only_level_goes_straight_to_processing (test_documents_api.NSSFProcessingTests.test_document_only_level_goes_straight_to_processing) ... Executing <Task finished name='Task-516' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.158 seconds
+ok
+test_document_type_without_an_adapter_waits_honestly (test_documents_api.NSSFProcessingTests.test_document_type_without_an_adapter_waits_honestly) ... Executing <Task finished name='Task-525' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.106 seconds
+ok
+test_expired_card_is_accepted_as_evidence_and_flagged (test_documents_api.NSSFProcessingTests.test_expired_card_is_accepted_as_evidence_and_flagged) ... Executing <Task finished name='Task-534' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.113 seconds
+ok
+test_fields_are_encrypted_bound_and_absent_from_audit_and_checks (test_documents_api.NSSFProcessingTests.test_fields_are_encrypted_bound_and_absent_from_audit_and_checks) ... Executing <Task finished name='Task-543' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.118 seconds
+ok
+test_nssf_card_is_extracted_without_expiry_or_mrz (test_documents_api.NSSFProcessingTests.test_nssf_card_is_extracted_without_expiry_or_mrz) ... Executing <Task finished name='Task-552' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.116 seconds
+ok
 test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it (test_documents_api.NSSFProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it) ... Document processing failed for a session: OCRUnavailable
+Executing <Task finished name='Task-562' coro=<DocumentProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:182> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 1.265 seconds
 ok
-test_processor_cannot_reach_another_tenants_session (test_documents_api.NSSFProcessingTests.test_processor_cannot_reach_another_tenants_session) ... ok
-test_recapture_reasons (test_documents_api.NSSFProcessingTests.test_recapture_reasons) ... ok
-test_sides_uploaded_the_wrong_way_round_are_handled (test_documents_api.NSSFProcessingTests.test_sides_uploaded_the_wrong_way_round_are_handled) ... ok
-test_valid_card_is_extracted_and_session_advances_to_selfie (test_documents_api.NSSFProcessingTests.test_valid_card_is_extracted_and_session_advances_to_selfie) ... ok
-test_wrong_document_type_requests_recapture_and_clears_captures (test_documents_api.NSSFProcessingTests.test_wrong_document_type_requests_recapture_and_clears_captures) ... Executing <Task finished name='Task-1334' coro=<CaptureAPICase.asyncSetUp() done, defined at /home/user/Kyc/tests/test_captures_api.py:33> result=None created at /usr/lib/python3.12/asyncio/runners.py:100> took 0.199 seconds
+test_processor_cannot_reach_another_tenants_session (test_documents_api.NSSFProcessingTests.test_processor_cannot_reach_another_tenants_session) ... Executing <Task finished name='Task-570' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.116 seconds
+ok
+test_recapture_reasons (test_documents_api.NSSFProcessingTests.test_recapture_reasons) ... Executing <Task finished name='Task-577' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.108 seconds
+ok
+test_sides_uploaded_the_wrong_way_round_are_handled (test_documents_api.NSSFProcessingTests.test_sides_uploaded_the_wrong_way_round_are_handled) ... Executing <Task finished name='Task-592' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.113 seconds
+ok
+test_valid_card_is_extracted_and_session_advances_to_selfie (test_documents_api.NSSFProcessingTests.test_valid_card_is_extracted_and_session_advances_to_selfie) ... Executing <Task finished name='Task-601' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.110 seconds
+ok
+test_wrong_document_type_requests_recapture_and_clears_captures (test_documents_api.NSSFProcessingTests.test_wrong_document_type_requests_recapture_and_clears_captures) ... Executing <Task finished name='Task-610' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.105 seconds
 ok
 test_wrong_khmer_card_for_the_claimed_type_is_sent_back (test_documents_api.NSSFProcessingTests.test_wrong_khmer_card_for_the_claimed_type_is_sent_back) ... ok
-test_bad_checksum_is_stored_as_review_with_visual_fields_preserved (test_documents_api.PassportProcessingTests.test_bad_checksum_is_stored_as_review_with_visual_fields_preserved) ... ok
-test_cambodian_passport_is_extracted_and_mrz_result_stored (test_documents_api.PassportProcessingTests.test_cambodian_passport_is_extracted_and_mrz_result_stored) ... ok
-test_document_only_level_goes_straight_to_processing (test_documents_api.PassportProcessingTests.test_document_only_level_goes_straight_to_processing) ... ok
+test_bad_checksum_is_stored_as_review_with_visual_fields_preserved (test_documents_api.PassportProcessingTests.test_bad_checksum_is_stored_as_review_with_visual_fields_preserved) ... Executing <Task finished name='Task-632' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.120 seconds
+ok
+test_cambodian_passport_is_extracted_and_mrz_result_stored (test_documents_api.PassportProcessingTests.test_cambodian_passport_is_extracted_and_mrz_result_stored) ... Executing <Task finished name='Task-640' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.107 seconds
+ok
+test_document_only_level_goes_straight_to_processing (test_documents_api.PassportProcessingTests.test_document_only_level_goes_straight_to_processing) ... Executing <Task finished name='Task-648' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.134 seconds
+ok
 test_document_type_without_an_adapter_waits_honestly (test_documents_api.PassportProcessingTests.test_document_type_without_an_adapter_waits_honestly) ... ok
 test_expired_card_is_accepted_as_evidence_and_flagged (test_documents_api.PassportProcessingTests.test_expired_card_is_accepted_as_evidence_and_flagged) ... ok
-test_fields_are_encrypted_bound_and_absent_from_audit_and_checks (test_documents_api.PassportProcessingTests.test_fields_are_encrypted_bound_and_absent_from_audit_and_checks) ... Executing <Task finished name='Task-1511' coro=<CaptureAPICase.asyncSetUp() done, defined at /home/user/Kyc/tests/test_captures_api.py:33> result=None created at /usr/lib/python3.12/asyncio/runners.py:100> took 0.196 seconds
+test_fields_are_encrypted_bound_and_absent_from_audit_and_checks (test_documents_api.PassportProcessingTests.test_fields_are_encrypted_bound_and_absent_from_audit_and_checks) ... ok
+test_foreign_passport_uses_the_generic_mrz_adapter (test_documents_api.PassportProcessingTests.test_foreign_passport_uses_the_generic_mrz_adapter) ... Executing <Task finished name='Task-684' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.121 seconds
 ok
-test_foreign_passport_uses_the_generic_mrz_adapter (test_documents_api.PassportProcessingTests.test_foreign_passport_uses_the_generic_mrz_adapter) ... ok
 test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it (test_documents_api.PassportProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it) ... Document processing failed for a session: OCRUnavailable
+Executing <Task finished name='Task-693' coro=<DocumentProcessingTests.test_ocr_failure_leaves_session_for_retry_and_the_worker_completes_it() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:182> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 1.172 seconds
 ok
-test_passport_shown_in_an_id_card_session_is_sent_back (test_documents_api.PassportProcessingTests.test_passport_shown_in_an_id_card_session_is_sent_back) ... ok
+test_passport_shown_in_an_id_card_session_is_sent_back (test_documents_api.PassportProcessingTests.test_passport_shown_in_an_id_card_session_is_sent_back) ... Executing <Task finished name='Task-701' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.362 seconds
+ok
 test_processor_cannot_reach_another_tenants_session (test_documents_api.PassportProcessingTests.test_processor_cannot_reach_another_tenants_session) ... ok
 test_raw_mrz_is_encrypted_and_evidence_contains_no_identity_values (test_documents_api.PassportProcessingTests.test_raw_mrz_is_encrypted_and_evidence_contains_no_identity_values) ... ok
-test_recapture_reasons (test_documents_api.PassportProcessingTests.test_recapture_reasons) ... ok
-test_sides_uploaded_the_wrong_way_round_are_handled (test_documents_api.PassportProcessingTests.test_sides_uploaded_the_wrong_way_round_are_handled) ... ok
-test_unreadable_mrz_on_a_foreign_passport_means_recapture (test_documents_api.PassportProcessingTests.test_unreadable_mrz_on_a_foreign_passport_means_recapture) ... ok
-test_valid_card_is_extracted_and_session_advances_to_selfie (test_documents_api.PassportProcessingTests.test_valid_card_is_extracted_and_session_advances_to_selfie) ... ok
-test_visual_mrz_disagreement_reaches_the_result_as_a_review_flag (test_documents_api.PassportProcessingTests.test_visual_mrz_disagreement_reaches_the_result_as_a_review_flag) ... ok
-test_wrong_document_type_requests_recapture_and_clears_captures (test_documents_api.PassportProcessingTests.test_wrong_document_type_requests_recapture_and_clears_captures) ... ok
-test_extraction_is_unavailable_and_nothing_is_stored (test_documents_api.ProcessingWithoutPIIKeysTests.test_extraction_is_unavailable_and_nothing_is_stored) ... ok
-test_card_without_identity_text_is_sent_back (test_documents_api.RealOCREndToEndTests.test_card_without_identity_text_is_sent_back) ... skipped 'Tesseract with khm+eng and Khmer fonts are required for the real OCR test.'
-test_photographed_cambodian_passport_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_cambodian_passport_is_read_by_real_ocr) ... skipped 'Tesseract with khm+eng and Khmer fonts are required for the real OCR test.'
-test_photographed_foreign_id_card_is_read_front_and_back (test_documents_api.RealOCREndToEndTests.test_photographed_foreign_id_card_is_read_front_and_back) ... skipped 'Tesseract with khm+eng and Khmer fonts are required for the real OCR test.'
-test_photographed_foreign_passport_is_read_from_its_mrz (test_documents_api.RealOCREndToEndTests.test_photographed_foreign_passport_is_read_from_its_mrz) ... skipped 'Tesseract with khm+eng and Khmer fonts are required for the real OCR test.'
-test_photographed_nssf_specimen_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_nssf_specimen_is_read_by_real_ocr) ... skipped 'Tesseract with khm+eng and Khmer fonts are required for the real OCR test.'
-test_photographed_specimen_card_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_specimen_card_is_read_by_real_ocr) ... skipped 'Tesseract with khm+eng and Khmer fonts are required for the real OCR test.'
+test_recapture_reasons (test_documents_api.PassportProcessingTests.test_recapture_reasons) ... Executing <Task finished name='Task-725' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.111 seconds
+ok
+test_sides_uploaded_the_wrong_way_round_are_handled (test_documents_api.PassportProcessingTests.test_sides_uploaded_the_wrong_way_round_are_handled) ... Executing <Task finished name='Task-740' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.119 seconds
+ok
+test_unreadable_mrz_on_a_foreign_passport_means_recapture (test_documents_api.PassportProcessingTests.test_unreadable_mrz_on_a_foreign_passport_means_recapture) ... Executing <Task finished name='Task-749' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.131 seconds
+ok
+test_valid_card_is_extracted_and_session_advances_to_selfie (test_documents_api.PassportProcessingTests.test_valid_card_is_extracted_and_session_advances_to_selfie) ... Executing <Task finished name='Task-757' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.153 seconds
+ok
+test_visual_mrz_disagreement_reaches_the_result_as_a_review_flag (test_documents_api.PassportProcessingTests.test_visual_mrz_disagreement_reaches_the_result_as_a_review_flag) ... Executing <Task finished name='Task-766' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.123 seconds
+ok
+test_wrong_document_type_requests_recapture_and_clears_captures (test_documents_api.PassportProcessingTests.test_wrong_document_type_requests_recapture_and_clears_captures) ... Executing <Task finished name='Task-774' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.116 seconds
+ok
+test_extraction_is_unavailable_and_nothing_is_stored (test_documents_api.ProcessingWithoutPIIKeysTests.test_extraction_is_unavailable_and_nothing_is_stored) ... Executing <Task finished name='Task-784' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.105 seconds
+ok
+test_card_without_identity_text_is_sent_back (test_documents_api.RealOCREndToEndTests.test_card_without_identity_text_is_sent_back) ... Executing <Task finished name='Task-793' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.116 seconds
+ok
+test_photographed_cambodian_passport_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_cambodian_passport_is_read_by_real_ocr) ... Executing <Task finished name='Task-802' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.123 seconds
+Executing <Task pending name='Task-803' coro=<RealOCREndToEndTests.test_photographed_cambodian_passport_is_read_by_real_ocr() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:417> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.160 seconds
+ok
+test_photographed_foreign_id_card_is_read_front_and_back (test_documents_api.RealOCREndToEndTests.test_photographed_foreign_id_card_is_read_front_and_back) ... Executing <Task finished name='Task-810' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.141 seconds
+Executing <Task pending name='Task-811' coro=<RealOCREndToEndTests.test_photographed_foreign_id_card_is_read_front_and_back() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:449> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.128 seconds
+Executing <Task pending name='Task-811' coro=<RealOCREndToEndTests.test_photographed_foreign_id_card_is_read_front_and_back() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:449> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.156 seconds
+ok
+test_photographed_foreign_passport_is_read_from_its_mrz (test_documents_api.RealOCREndToEndTests.test_photographed_foreign_passport_is_read_from_its_mrz) ... Executing <Task finished name='Task-819' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.128 seconds
+Executing <Task pending name='Task-820' coro=<RealOCREndToEndTests.test_photographed_foreign_passport_is_read_from_its_mrz() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:434> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.121 seconds
+ok
+test_photographed_nssf_specimen_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_nssf_specimen_is_read_by_real_ocr) ... Executing <Task finished name='Task-827' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.166 seconds
+Executing <Task pending name='Task-828' coro=<RealOCREndToEndTests.test_photographed_nssf_specimen_is_read_by_real_ocr() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:394> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.127 seconds
+ok
+test_photographed_specimen_card_is_read_by_real_ocr (test_documents_api.RealOCREndToEndTests.test_photographed_specimen_card_is_read_by_real_ocr) ... Executing <Task finished name='Task-836' coro=<CaptureAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_captures_api.py:33> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.114 seconds
+Executing <Task pending name='Task-837' coro=<RealOCREndToEndTests.test_photographed_specimen_card_is_read_by_real_ocr() running at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_documents_api.py:369> cb=[_run_until_complete_cb() at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py:181, WorkerThread.stop()] created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.213 seconds
+ok
 test_calibrated_policy_pass_review_and_fail (test_face_engines.EmbeddingTests.test_calibrated_policy_pass_review_and_fail) ... ok
 test_invalid_dimension_nonfinite_zero_and_unnormalized_embeddings (test_face_engines.EmbeddingTests.test_invalid_dimension_nonfinite_zero_and_unnormalized_embeddings) ... ok
 test_invalid_provenance_is_rejected (test_face_engines.EmbeddingTests.test_invalid_provenance_is_rejected) ... ok
@@ -179,7 +264,8 @@ test_resolution_cap_scales_boxes_and_landmarks_back_to_original (test_face_engin
 test_rgb_is_converted_to_bgr_before_alignment_and_features_are_normalized (test_face_engines.NativeAdapterTests.test_rgb_is_converted_to_bgr_before_alignment_and_features_are_normalized) ... ok
 test_runtime_does_not_attempt_network_or_fetch (test_face_engines.NativeAdapterTests.test_runtime_does_not_attempt_network_or_fetch) ... ok
 test_sha256_verifies_every_model_byte (test_face_engines.NativeAdapterTests.test_sha256_verifies_every_model_byte) ... ok
-setUpClass (test_face_engines.NativeModelSmokeTests) ... skipped 'Pinned native face models and public fixture are not installed'
+test_real_cpu_detection_alignment_embedding_and_default_review (test_face_engines.NativeModelSmokeTests.test_real_cpu_detection_alignment_embedding_and_default_review) ... ok
+test_real_detector_rejects_blank_and_multiple_face_capture (test_face_engines.NativeModelSmokeTests.test_real_detector_rejects_blank_and_multiple_face_capture) ... ok
 test_outlier_against_agreeing_signed_sources (test_fraud.CrossCheckTests.test_outlier_against_agreeing_signed_sources) ... ok
 test_spec_example_dob_disagreement_is_reported_never_resolved (test_fraud.CrossCheckTests.test_spec_example_dob_disagreement_is_reported_never_resolved) ... ok
 test_states_other_than_match_or_mismatch_and_multiple_barcodes (test_fraud.CrossCheckTests.test_states_other_than_match_or_mismatch_and_multiple_barcodes) ... ok
@@ -191,12 +277,19 @@ test_duplicates (test_fraud.DetectorTests.test_duplicates) ... ok
 test_metadata_and_portrait (test_fraud.DetectorTests.test_metadata_and_portrait) ... ok
 test_validity_codes_become_signals_only_from_review_or_fail_checks (test_fraud.DetectorTests.test_validity_codes_become_signals_only_from_review_or_fail_checks) ... ok
 test_accepted_document_runs_the_analysis_after_commit (test_fraud.DocumentOnlyTriggerTests.test_accepted_document_runs_the_analysis_after_commit) ... ok
-test_chip_from_another_passport_raises_high_consistency_signals (test_fraud.FraudAPITests.test_chip_from_another_passport_raises_high_consistency_signals) ... ok
-test_cloned_chip_is_tamper_and_fails_the_fraud_check (test_fraud.FraudAPITests.test_cloned_chip_is_tamper_and_fails_the_fraud_check) ... ok
-test_duplicates_replays_tenant_scope_and_rerun (test_fraud.FraudAPITests.test_duplicates_replays_tenant_scope_and_rerun) ... ok
-test_genuine_matching_chip_is_consistent_and_clean (test_fraud.FraudAPITests.test_genuine_matching_chip_is_consistent_and_clean) ... ok
-test_mrz_and_barcode_are_compared_with_each_other (test_fraud.FraudAPITests.test_mrz_and_barcode_are_compared_with_each_other) ... ok
-test_printed_portrait_that_differs_from_the_chip_portrait (test_fraud.FraudAPITests.test_printed_portrait_that_differs_from_the_chip_portrait) ... ok
+test_chip_from_another_passport_raises_high_consistency_signals (test_fraud.FraudAPITests.test_chip_from_another_passport_raises_high_consistency_signals) ... Executing <Task finished name='Task-845' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.214 seconds
+ok
+test_cloned_chip_is_tamper_and_fails_the_fraud_check (test_fraud.FraudAPITests.test_cloned_chip_is_tamper_and_fails_the_fraud_check) ... Executing <Task finished name='Task-854' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.505 seconds
+ok
+test_duplicates_replays_tenant_scope_and_rerun (test_fraud.FraudAPITests.test_duplicates_replays_tenant_scope_and_rerun) ... Executing <Task finished name='Task-863' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.546 seconds
+Executing <Task finished name='Task-864' coro=<FraudAPITests.test_duplicates_replays_tenant_scope_and_rerun() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_fraud.py:232> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.146 seconds
+ok
+test_genuine_matching_chip_is_consistent_and_clean (test_fraud.FraudAPITests.test_genuine_matching_chip_is_consistent_and_clean) ... Executing <Task finished name='Task-869' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.206 seconds
+ok
+test_mrz_and_barcode_are_compared_with_each_other (test_fraud.FraudAPITests.test_mrz_and_barcode_are_compared_with_each_other) ... Executing <Task finished name='Task-878' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.199 seconds
+ok
+test_printed_portrait_that_differs_from_the_chip_portrait (test_fraud.FraudAPITests.test_printed_portrait_that_differs_from_the_chip_portrait) ... Executing <Task finished name='Task-884' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.206 seconds
+ok
 test_editor_screenshot_and_capture_date_are_the_only_facts_read (test_fraud.MetadataReaderTests.test_editor_screenshot_and_capture_date_are_the_only_facts_read) ... ok
 test_alpha3_table_covers_every_supported_country_once (test_generic_documents.CountryCodeTests.test_alpha3_table_covers_every_supported_country_once) ... ok
 test_icao_specific_issuer_codes (test_generic_documents.CountryCodeTests.test_icao_specific_issuer_codes) ... ok
@@ -241,14 +334,19 @@ test_challenges_are_random_distinct_and_hash_their_nonce (test_liveness.Challeng
 test_a_tilted_photo_cannot_fake_a_head_turn_even_under_perspective (test_liveness.GeometryTests.test_a_tilted_photo_cannot_fake_a_head_turn_even_under_perspective) ... ok
 test_flat_faces_keep_their_coordinates_under_any_affine_transform (test_liveness.GeometryTests.test_flat_faces_keep_their_coordinates_under_any_affine_transform) ... ok
 test_real_head_movements_move_the_nose_in_the_expected_direction (test_liveness.GeometryTests.test_real_head_movements_move_the_nose_in_the_expected_direction) ... ok
-test_a_new_challenge_voids_the_previous_one (test_liveness.LivenessAPITests.test_a_new_challenge_voids_the_previous_one) ... ok
-test_attempt_limit_and_state_rules (test_liveness.LivenessAPITests.test_attempt_limit_and_state_rules) ... Executing <Task finished name='Task-1942' coro=<BiometricAPICase.asyncSetUp() done, defined at /home/user/Kyc/tests/test_biometrics_api.py:85> result=None created at /usr/lib/python3.12/asyncio/runners.py:100> took 0.248 seconds
+test_a_new_challenge_voids_the_previous_one (test_liveness.LivenessAPITests.test_a_new_challenge_voids_the_previous_one) ... Executing <Task finished name='Task-893' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.601 seconds
 ok
-test_challenge_then_live_frames_record_evidence_and_advance (test_liveness.LivenessAPITests.test_challenge_then_live_frames_record_evidence_and_advance) ... ok
-test_challenges_are_single_use_bound_to_their_nonce_and_expire (test_liveness.LivenessAPITests.test_challenges_are_single_use_bound_to_their_nonce_and_expire) ... ok
-test_flat_photo_attack_is_recorded_as_fail_and_handed_to_assessment (test_liveness.LivenessAPITests.test_flat_photo_attack_is_recorded_as_fail_and_handed_to_assessment) ... ok
-test_other_tenants_cannot_use_a_challenge (test_liveness.LivenessAPITests.test_other_tenants_cannot_use_a_challenge) ... ok
-test_moving_and_tilting_a_photo_never_completes_the_challenge (test_liveness.NativePhotoAttackTests.test_moving_and_tilting_a_photo_never_completes_the_challenge) ... skipped 'Native face models and the public OpenCV sample face are not installed.'
+test_attempt_limit_and_state_rules (test_liveness.LivenessAPITests.test_attempt_limit_and_state_rules) ... Executing <Task finished name='Task-904' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.126 seconds
+ok
+test_challenge_then_live_frames_record_evidence_and_advance (test_liveness.LivenessAPITests.test_challenge_then_live_frames_record_evidence_and_advance) ... Executing <Task finished name='Task-916' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.102 seconds
+ok
+test_challenges_are_single_use_bound_to_their_nonce_and_expire (test_liveness.LivenessAPITests.test_challenges_are_single_use_bound_to_their_nonce_and_expire) ... Executing <Task finished name='Task-925' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.112 seconds
+ok
+test_flat_photo_attack_is_recorded_as_fail_and_handed_to_assessment (test_liveness.LivenessAPITests.test_flat_photo_attack_is_recorded_as_fail_and_handed_to_assessment) ... Executing <Task finished name='Task-938' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.107 seconds
+ok
+test_other_tenants_cannot_use_a_challenge (test_liveness.LivenessAPITests.test_other_tenants_cannot_use_a_challenge) ... Executing <Task finished name='Task-947' coro=<BiometricAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_biometrics_api.py:85> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.198 seconds
+ok
+test_moving_and_tilting_a_photo_never_completes_the_challenge (test_liveness.NativePhotoAttackTests.test_moving_and_tilting_a_photo_never_completes_the_challenge) ... ok
 test_a_single_corrupted_digit_is_caught (test_mrz.ParserTests.test_a_single_corrupted_digit_is_caught) ... ok
 test_best_block_is_chosen_across_ocr_passes (test_mrz.ParserTests.test_best_block_is_chosen_across_ocr_passes) ... ok
 test_century_inference_uses_full_birth_date_and_supplied_today (test_mrz.ParserTests.test_century_inference_uses_full_birth_date_and_supplied_today) ... ok
@@ -282,16 +380,22 @@ test_ecdsa_plain_signature (test_nfc.ActiveAuthenticationTests.test_ecdsa_plain_
 test_rsa_iso9796_2 (test_nfc.ActiveAuthenticationTests.test_rsa_iso9796_2) ... ok
 test_data_groups_parse (test_nfc.LDSTests.test_data_groups_parse) ... ok
 test_long_lengths_and_malformed_input (test_nfc.LDSTests.test_long_lengths_and_malformed_input) ... ok
-test_challenge_replay_expiry_and_attempt_limit (test_nfc.NFCAPITests.test_challenge_replay_expiry_and_attempt_limit) ... ok
-test_chip_from_another_passport_is_a_mismatch (test_nfc.NFCAPITests.test_chip_from_another_passport_is_a_mismatch) ... Executing <Task finished name='Task-2119' coro=<NFCAPICase.asyncSetUp() done, defined at /home/user/Kyc/tests/test_nfc.py:138> result=None created at /usr/lib/python3.12/asyncio/runners.py:100> took 0.247 seconds
+test_challenge_replay_expiry_and_attempt_limit (test_nfc.NFCAPITests.test_challenge_replay_expiry_and_attempt_limit) ... Executing <Task finished name='Task-956' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.364 seconds
 ok
-test_client_reported_outcomes_retry_then_record (test_nfc.NFCAPITests.test_client_reported_outcomes_retry_then_record) ... ok
-test_cloned_chip_fails_active_authentication (test_nfc.NFCAPITests.test_cloned_chip_fails_active_authentication) ... ok
-test_genuine_chip_is_verified_matched_and_never_stored (test_nfc.NFCAPITests.test_genuine_chip_is_verified_matched_and_never_stored) ... ok
-test_ocr_noise_in_the_unprotected_name_line_is_not_a_mismatch (test_nfc.NFCAPITests.test_ocr_noise_in_the_unprotected_name_line_is_not_a_mismatch) ... ok
-test_state_and_level_rules (test_nfc.NFCAPITests.test_state_and_level_rules) ... Executing <Task finished name='Task-2222' coro=<NFCAPICase.asyncSetUp() done, defined at /home/user/Kyc/tests/test_nfc.py:138> result=None created at /usr/lib/python3.12/asyncio/runners.py:100> took 0.264 seconds
+test_chip_from_another_passport_is_a_mismatch (test_nfc.NFCAPITests.test_chip_from_another_passport_is_a_mismatch) ... Executing <Task finished name='Task-970' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.142 seconds
 ok
-test_untrusted_issuer_is_read_not_verified (test_nfc.NFCAPITests.test_untrusted_issuer_is_read_not_verified) ... ok
+test_client_reported_outcomes_retry_then_record (test_nfc.NFCAPITests.test_client_reported_outcomes_retry_then_record) ... Executing <Task finished name='Task-979' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.117 seconds
+ok
+test_cloned_chip_fails_active_authentication (test_nfc.NFCAPITests.test_cloned_chip_fails_active_authentication) ... Executing <Task finished name='Task-988' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.164 seconds
+ok
+test_genuine_chip_is_verified_matched_and_never_stored (test_nfc.NFCAPITests.test_genuine_chip_is_verified_matched_and_never_stored) ... Executing <Task finished name='Task-997' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.207 seconds
+ok
+test_ocr_noise_in_the_unprotected_name_line_is_not_a_mismatch (test_nfc.NFCAPITests.test_ocr_noise_in_the_unprotected_name_line_is_not_a_mismatch) ... Executing <Task finished name='Task-1006' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.303 seconds
+ok
+test_state_and_level_rules (test_nfc.NFCAPITests.test_state_and_level_rules) ... Executing <Task finished name='Task-1014' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.173 seconds
+ok
+test_untrusted_issuer_is_read_not_verified (test_nfc.NFCAPITests.test_untrusted_issuer_is_read_not_verified) ... Executing <Task finished name='Task-1023' coro=<NFCAPICase.asyncSetUp() done, defined at /Users/mac/Documents/1.1 OPS Sulotion/6-KYC/tests/test_nfc.py:138> result=None created at /usr/local/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py:101> took 0.165 seconds
+ok
 test_altered_data_group_and_forged_signature_are_tampering (test_nfc.PassiveAuthenticationTests.test_altered_data_group_and_forged_signature_are_tampering) ... ok
 test_data_group_not_listed_and_garbage (test_nfc.PassiveAuthenticationTests.test_data_group_not_listed_and_garbage) ... ok
 test_expired_document_signer (test_nfc.PassiveAuthenticationTests.test_expired_document_signer) ... ok
@@ -315,6 +419,16 @@ test_unprotected_fields_and_missing_visual_comparison_are_reported_truthfully (t
 test_valid_khmer_mrz_alone_identifies_a_data_page_and_foreign_mrz_is_a_different_type (test_passport_regressions.PassportTrustRegressions.test_valid_khmer_mrz_alone_identifies_a_data_page_and_foreign_mrz_is_a_different_type) ... ok
 test_wrong_document_layout_cannot_supply_canonical_fallback_fields (test_passport_regressions.PassportTrustRegressions.test_wrong_document_layout_cannot_supply_canonical_fallback_fields) ... ok
 test_migration_and_database_enforced_tenant_isolation (test_postgres.PostgreSQLIsolationTests.test_migration_and_database_enforced_tenant_isolation) ... INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_phase1, Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Running upgrade 0001_phase1 -> 0002_phase2, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running upgrade 0002_phase2 -> 0003_phase3, Phase 3 document extraction: field provenance/flags and document processing metadata.
+INFO  [alembic.runtime.migration] Running upgrade 0003_phase3 -> 0004_phase8_9, Phases 8-9: face quality, encrypted selfie captures and biometric provenance.
+INFO  [alembic.runtime.migration] Running upgrade 0004_phase8_9 -> 0005_phase10, Phase 10: single-use liveness challenges and liveness evidence metadata.
+INFO  [alembic.runtime.migration] Running upgrade 0005_phase10 -> 0006_phase11, Phase 11: ePassport Active Authentication challenges and NFC result fields.
+INFO  [alembic.runtime.migration] Running upgrade 0006_phase11 -> 0007_phase12, Phase 12: fraud signal categories and duplicate-capture lookups.
+INFO  [alembic.runtime.migration] Running upgrade 0007_phase12 -> 0008_phase14, Phase 14: reviewer accounts and review decision context.
+INFO  [alembic.runtime.migration] Running upgrade 0008_phase14 -> 0009_phase15, Phase 15: tenant API keys, organization suspension, idempotent sessions and session client tokens.
 ok
 test_review_and_client_credentials_never_cross (test_review.ReviewAccessTests.test_review_and_client_credentials_never_cross) ... ok
 test_tokens_are_scoped_to_one_organization_and_can_be_revoked (test_review.ReviewAccessTests.test_tokens_are_scoped_to_one_organization_and_can_be_revoked) ... ok
@@ -347,8 +461,59 @@ test_ciphertext_requires_a_key_version (test_schema.SchemaTests.test_ciphertext_
 test_cross_session_document_link_fails (test_schema.SchemaTests.test_cross_session_document_link_fails) ... ok
 test_cross_tenant_artifact_link_fails_at_database_layer (test_schema.SchemaTests.test_cross_tenant_artifact_link_fails_at_database_layer) ... ok
 test_frozen_migration_upgrade_downgrade_and_model_alignment (test_schema.SchemaTests.test_frozen_migration_upgrade_downgrade_and_model_alignment) ... INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_phase1, Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Running upgrade 0001_phase1 -> 0002_phase2, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running upgrade 0002_phase2 -> 0003_phase3, Phase 3 document extraction: field provenance/flags and document processing metadata.
+INFO  [alembic.runtime.migration] Running upgrade 0003_phase3 -> 0004_phase8_9, Phases 8-9: face quality, encrypted selfie captures and biometric provenance.
+INFO  [alembic.runtime.migration] Running upgrade 0004_phase8_9 -> 0005_phase10, Phase 10: single-use liveness challenges and liveness evidence metadata.
+INFO  [alembic.runtime.migration] Running upgrade 0005_phase10 -> 0006_phase11, Phase 11: ePassport Active Authentication challenges and NFC result fields.
+INFO  [alembic.runtime.migration] Running upgrade 0006_phase11 -> 0007_phase12, Phase 12: fraud signal categories and duplicate-capture lookups.
+INFO  [alembic.runtime.migration] Running upgrade 0007_phase12 -> 0008_phase14, Phase 14: reviewer accounts and review decision context.
+INFO  [alembic.runtime.migration] Running upgrade 0008_phase14 -> 0009_phase15, Phase 15: tenant API keys, organization suspension, idempotent sessions and session client tokens.
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.schemas
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.tables
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.types
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.constraints
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.defaults
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.comments
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running downgrade 0009_phase15 -> 0008_phase14, Phase 15: tenant API keys, organization suspension, idempotent sessions and session client tokens.
+INFO  [alembic.runtime.migration] Running downgrade 0008_phase14 -> 0007_phase12, Phase 14: reviewer accounts and review decision context.
+INFO  [alembic.runtime.migration] Running downgrade 0007_phase12 -> 0006_phase11, Phase 12: fraud signal categories and duplicate-capture lookups.
+INFO  [alembic.runtime.migration] Running downgrade 0006_phase11 -> 0005_phase10, Phase 11: ePassport Active Authentication challenges and NFC result fields.
+INFO  [alembic.runtime.migration] Running downgrade 0005_phase10 -> 0004_phase8_9, Phase 10: single-use liveness challenges and liveness evidence metadata.
+INFO  [alembic.runtime.migration] Running downgrade 0004_phase8_9 -> 0003_phase3, Phases 8-9: face quality, encrypted selfie captures and biometric provenance.
+INFO  [alembic.runtime.migration] Running downgrade 0003_phase3 -> 0002_phase2, Phase 3 document extraction: field provenance/flags and document processing metadata.
+INFO  [alembic.runtime.migration] Running downgrade 0002_phase2 -> 0001_phase1, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running downgrade 0001_phase1 -> , Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_phase1, Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Running upgrade 0001_phase1 -> 0002_phase2, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running upgrade 0002_phase2 -> 0003_phase3, Phase 3 document extraction: field provenance/flags and document processing metadata.
+INFO  [alembic.runtime.migration] Running upgrade 0003_phase3 -> 0004_phase8_9, Phases 8-9: face quality, encrypted selfie captures and biometric provenance.
+INFO  [alembic.runtime.migration] Running upgrade 0004_phase8_9 -> 0005_phase10, Phase 10: single-use liveness challenges and liveness evidence metadata.
+INFO  [alembic.runtime.migration] Running upgrade 0005_phase10 -> 0006_phase11, Phase 11: ePassport Active Authentication challenges and NFC result fields.
+INFO  [alembic.runtime.migration] Running upgrade 0006_phase11 -> 0007_phase12, Phase 12: fraud signal categories and duplicate-capture lookups.
+INFO  [alembic.runtime.migration] Running upgrade 0007_phase12 -> 0008_phase14, Phase 14: reviewer accounts and review decision context.
+INFO  [alembic.runtime.migration] Running upgrade 0008_phase14 -> 0009_phase15, Phase 15: tenant API keys, organization suspension, idempotent sessions and session client tokens.
 ok
 test_postgres_sql_contains_tenant_policies_and_native_types (test_schema.SchemaTests.test_postgres_sql_contains_tenant_policies_and_native_types) ... INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Generating static SQL
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_phase1, Phase 1 frozen identity-platform schema and PostgreSQL tenant policies.
+INFO  [alembic.runtime.migration] Running upgrade 0001_phase1 -> 0002_phase2, Phase 2 capture pipeline: capture key/media/policy metadata and one image per side.
+INFO  [alembic.runtime.migration] Running upgrade 0002_phase2 -> 0003_phase3, Phase 3 document extraction: field provenance/flags and document processing metadata.
+INFO  [alembic.runtime.migration] Running upgrade 0003_phase3 -> 0004_phase8_9, Phases 8-9: face quality, encrypted selfie captures and biometric provenance.
+INFO  [alembic.runtime.migration] Running upgrade 0004_phase8_9 -> 0005_phase10, Phase 10: single-use liveness challenges and liveness evidence metadata.
+INFO  [alembic.runtime.migration] Running upgrade 0005_phase10 -> 0006_phase11, Phase 11: ePassport Active Authentication challenges and NFC result fields.
+INFO  [alembic.runtime.migration] Running upgrade 0006_phase11 -> 0007_phase12, Phase 12: fraud signal categories and duplicate-capture lookups.
+INFO  [alembic.runtime.migration] Running upgrade 0007_phase12 -> 0008_phase14, Phase 14: reviewer accounts and review decision context.
+INFO  [alembic.runtime.migration] Running upgrade 0008_phase14 -> 0009_phase15, Phase 15: tenant API keys, organization suspension, idempotent sessions and session client tokens.
 ok
 test_all_active_states_can_expire (test_state_machine.StateMachineTests.test_all_active_states_can_expire) ... ok
 test_all_supported_verification_paths (test_state_machine.StateMachineTests.test_all_supported_verification_paths) ... ok
@@ -359,27 +524,26 @@ test_levels_cannot_accept_unrequested_capture_stages (test_state_machine.StateMa
 test_review_recapture_and_failure_paths (test_state_machine.StateMachineTests.test_review_recapture_and_failure_paths) ... ok
 test_skip_and_out_of_order_events_are_rejected (test_state_machine.StateMachineTests.test_skip_and_out_of_order_events_are_rejected) ... ok
 test_terminal_states_are_immutable (test_state_machine.StateMachineTests.test_terminal_states_are_immutable) ... ok
-test_issued_key_creates_and_reads_sessions_in_its_own_organization_only (test_tenancy.ApiKeyAuthenticationTests.test_issued_key_creates_and_reads_sessions_in_its_own_organization_only) ... ok
-test_last_used_is_recorded (test_tenancy.ApiKeyAuthenticationTests.test_last_used_is_recorded) ... ok
-test_only_a_hash_of_the_secret_is_stored (test_tenancy.ApiKeyAuthenticationTests.test_only_a_hash_of_the_secret_is_stored) ... ok
-test_suspended_organization_is_refused_with_a_valid_key (test_tenancy.ApiKeyAuthenticationTests.test_suspended_organization_is_refused_with_a_valid_key) ... ok
-test_wrong_revoked_expired_and_malformed_keys_are_refused (test_tenancy.ApiKeyAuthenticationTests.test_wrong_revoked_expired_and_malformed_keys_are_refused) ... ok
-test_development_key_can_be_disabled (test_tenancy.DevelopmentKeyTests.test_development_key_can_be_disabled) ... ok
-test_empty_development_key_means_disabled (test_tenancy.DevelopmentKeyTests.test_empty_development_key_means_disabled) ... ok
-test_expired_idempotency_record_allows_a_new_session (test_tenancy.IdempotencyTests.test_expired_idempotency_record_allows_a_new_session) ... ok
-test_invalid_idempotency_key_is_rejected (test_tenancy.IdempotencyTests.test_invalid_idempotency_key_is_rejected) ... ok
-test_retry_with_the_same_key_returns_the_same_session (test_tenancy.IdempotencyTests.test_retry_with_the_same_key_returns_the_same_session) ... ok
-test_a_key_cannot_grant_scopes_it_lacks (test_tenancy.KeyManagementTests.test_a_key_cannot_grant_scopes_it_lacks) ... ok
-test_issue_list_and_revoke (test_tenancy.KeyManagementTests.test_issue_list_and_revoke) ... ok
-test_keys_of_another_organization_are_invisible (test_tenancy.KeyManagementTests.test_keys_of_another_organization_are_invisible) ... ok
-test_rotation_keeps_the_old_key_for_the_grace_period_only (test_tenancy.KeyManagementTests.test_rotation_keeps_the_old_key_for_the_grace_period_only) ... ok
-test_per_key_limit_from_the_organization (test_tenancy.RateLimitTests.test_per_key_limit_from_the_organization) ... ok
+test_organization_profile_reports_the_credential (test_tenancy.ApiKeyAuthenticationTests.test_organization_profile_reports_the_credential) ... ok
+test_provisioned_key_works_only_in_its_own_organization (test_tenancy.ApiKeyAuthenticationTests.test_provisioned_key_works_only_in_its_own_organization) ... ok
+test_reviewer_tokens_are_not_client_credentials (test_tenancy.ApiKeyAuthenticationTests.test_reviewer_tokens_are_not_client_credentials) ... ok
+test_revoked_expired_and_unknown_keys_are_refused (test_tenancy.ApiKeyAuthenticationTests.test_revoked_expired_and_unknown_keys_are_refused) ... ok
+test_scopes_are_enforced_per_route (test_tenancy.ApiKeyAuthenticationTests.test_scopes_are_enforced_per_route) ... ok
+test_suspended_organization_is_refused (test_tenancy.ApiKeyAuthenticationTests.test_suspended_organization_is_refused) ... ok
+test_reissue_revokes_and_expiry_ends_the_token (test_tenancy.ClientTokenTests.test_reissue_revokes_and_expiry_ends_the_token) ... ok
+test_token_is_limited_to_its_session_and_to_capture_and_status (test_tenancy.ClientTokenTests.test_token_is_limited_to_its_session_and_to_capture_and_status) ... ok
+test_development_key_is_optional_and_cannot_mimic_provisioned_credentials (test_tenancy.ConfigurationTests.test_development_key_is_optional_and_cannot_mimic_provisioned_credentials) ... ok
+test_keys_are_scoped_per_organization_and_validated (test_tenancy.IdempotencyTests.test_keys_are_scoped_per_organization_and_validated) ... ok
+test_retried_creation_returns_the_same_session (test_tenancy.IdempotencyTests.test_retried_creation_returns_the_same_session) ... ok
+test_identity_is_masked_without_the_identity_scope (test_tenancy.MaskingTests.test_identity_is_masked_without_the_identity_scope) ... ok
+test_suspended_organization_blocks_reviewers (test_tenancy.MaskingTests.test_suspended_organization_blocks_reviewers) ... ok
+test_each_credential_has_its_own_window (test_tenancy.RateLimitTests.test_each_credential_has_its_own_window) ... ok
 test_window_resets (test_tenancy.RateLimitTests.test_window_resets) ... ok
-test_each_endpoint_requires_its_scope (test_tenancy.ScopeTests.test_each_endpoint_requires_its_scope) ... ok
-test_me_describes_the_caller (test_tenancy.ScopeTests.test_me_describes_the_caller) ... ok
-test_unknown_scopes_are_rejected (test_tenancy.ScopeTests.test_unknown_scopes_are_rejected) ... ok
+test_create_list_use_and_revoke_a_key (test_tenancy.SelfServiceKeyTests.test_create_list_use_and_revoke_a_key) ... ok
+test_keys_cannot_escalate_scopes_or_limits (test_tenancy.SelfServiceKeyTests.test_keys_cannot_escalate_scopes_or_limits) ... ok
+test_keys_of_another_organization_cannot_be_revoked (test_tenancy.SelfServiceKeyTests.test_keys_of_another_organization_cannot_be_revoked) ... ok
 
 ----------------------------------------------------------------------
-Ran 361 tests in 72.330s
+Ran 362 tests in 167.993s
 
-OK (skipped=8)
+OK

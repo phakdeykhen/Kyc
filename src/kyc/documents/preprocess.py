@@ -42,7 +42,7 @@ def prepare_side(pixels: np.ndarray, aspect: float, engine: HeuristicDocumentQua
     """Returns the OCR-ready side image and whether a document quadrilateral was found."""
     engine = engine or HeuristicDocumentQualityEngine()
     image = Image.fromarray(pixels)
-    corners = engine.locate_corners(pixels)
+    corners = engine.locate_corners(pixels, aspect)
     if corners is None:
         return normalize(image), False
     return normalize(rectify(image, corners, aspect)), True
@@ -61,5 +61,5 @@ def prepare_portrait_side(pixels: np.ndarray, aspect: float,
     """
     engine = engine or HeuristicDocumentQualityEngine()
     image = Image.fromarray(pixels).convert("RGB")
-    corners = engine.locate_corners(pixels)
+    corners = engine.locate_corners(pixels, aspect)
     return (rectify(image, corners, aspect), True) if corners is not None else (image, False)
