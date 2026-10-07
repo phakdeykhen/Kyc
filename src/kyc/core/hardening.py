@@ -92,4 +92,11 @@ def production_problems(settings) -> list[str]:
         problems.append("REQUIRE_DOCUMENT_CONSENT must be true.")
     if settings.enable_capture_client:
         problems.append("ENABLE_CAPTURE_CLIENT must be false; the /capture page is a development client.")
+    # Biometric decisions need measured evidence, not a configuration flag (deployment blockers).
+    if settings.face_match_calibration_file is None:
+        problems.append("FACE_MATCH_CALIBRATION_FILE is required: face thresholds must come from a measured calibration report.")
+    if settings.liveness_validation_file is None:
+        problems.append("LIVENESS_VALIDATION_FILE is required: liveness must be validated against presentation attacks.")
+    if settings.nfc_enabled and settings.nfc_csca_trust_store is None:
+        problems.append("NFC_CSCA_TRUST_STORE is required while NFC_ENABLED is true (or set NFC_ENABLED=false).")
     return problems

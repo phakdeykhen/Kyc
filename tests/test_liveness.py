@@ -214,6 +214,18 @@ class AssessorTests(unittest.TestCase):
         self.assertEqual((outcome.result, outcome.attack_type), (CheckResult.REVIEW, "POSSIBLE_FACE_SWAP"))
         self.assertFalse(outcome.retryable)
 
+    def test_a_completed_challenge_without_the_selfie_template_is_never_a_pass(self):
+        outcome = self.run_frames(self.live(), ActiveLivenessPolicy(calibrated=True), reference=None)
+        self.assertEqual(outcome.result, CheckResult.REVIEW)
+        self.assertIn("IDENTITY_CONTINUITY_NOT_CHECKED", outcome.reason_codes)
+
+    def test_calibrated_identity_change_mid_challenge_fails(self):
+        frames = self.live()
+        frames[3] = (2, real_head("LOOK_UP"), 1, 7)
+        self.match = FaceMatchPolicy(version="test-calibrated", calibrated=True, calibration_reference="test")
+        outcome = self.run_frames(frames, ActiveLivenessPolicy(calibrated=True))
+        self.assertEqual((outcome.result, outcome.reason_codes), (CheckResult.FAIL, ["LIVENESS_IDENTITY_CHANGED"]))
+
     def test_more_than_one_face_or_no_baseline_retries(self):
         frames = self.live()
         frames[2] = (1, real_head("TURN_LEFT"), 2)

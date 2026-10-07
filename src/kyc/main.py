@@ -1,14 +1,16 @@
 from contextlib import asynccontextmanager
+import hmac
 import ipaddress
 import logging
 from pathlib import Path
 import re
+import time
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.formparsers import MultiPartParser
 import sqlalchemy as sa
@@ -23,6 +25,8 @@ from kyc.biometrics import FaceMatchPolicy, OpenCVFaceEngine
 from kyc.core.admission import AdmissionControl
 from kyc.core.config import Settings, get_settings
 from kyc.core.hardening import allowed_host_list
+from kyc.core.metrics import REGISTRY, install as install_metrics
+from kyc.core.health import HealthCache, as_json as health_json, readiness
 from kyc.core.observability import configure_logging, route_label, security_event
 from kyc.db.session import build_engine
 from kyc.core.crypto import FieldCipher, decode_key
@@ -154,6 +158,9 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
         engine = database_engine if database_engine is not None else build_engine(configuration)
         application.state.session_factory = sessionmaker(engine, expire_on_commit=False)
         application.state.rate_limiter = RateLimiter()
+        application.state.health = HealthCache()
+        install_metrics()
+        REGISTRY.gauge("kyc_db_pool_checked_out", lambda: engine.pool.checkedout())
         application.state.capture_store = build_capture_store(configuration)
         application.state.quality_engine = HeuristicDocumentQualityEngine()
         application.state.field_cipher = build_field_cipher(configuration)
@@ -228,12 +235,26 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
         return await call_next(request)
 
     @application.middleware("http")
+    async def request_metrics(request: Request, call_next):
+        started = time.perf_counter()
+        status_class = "5xx"
+        try:
+            response = await call_next(request)
+            status_class = f"{response.status_code // 100}xx"
+            return response
+        finally:
+            route = route_label(request)
+            REGISTRY.inc("kyc_http_requests_total", route=route, method=request.method, status=status_class)
+            REGISTRY.observe("kyc_http_request_seconds", time.perf_counter() - started, route=route)
+
+    @application.middleware("http")
     async def request_context(request: Request, call_next):
         request.state.request_id = uuid4()
         request.state.security_reason = None
         settings_now = request.app.state.settings
         path = request.url.path
-        if not path.startswith("/health/") and not host_allowed(request.headers.get("host"),
+        # Probes and the token-protected metrics scrape arrive with internal Host values.
+        if not (path.startswith("/health/") or path == "/metrics") and not host_allowed(request.headers.get("host"),
                                                                  allowed_host_list(settings_now.allowed_hosts)):
             request.state.security_reason = "HOST_NOT_ALLOWED"
             response = JSONResponse(status_code=400, content={"detail": "Invalid host header."})
@@ -292,14 +313,31 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
 
     @application.get("/health/ready", tags=["health"])
     def ready():
-        try:
-            with application.state.session_factory() as db:
-                revision = db.execute(sa.text("SELECT version_num FROM alembic_version")).scalar_one()
-                if revision != __schema_revision__:
-                    return JSONResponse(status_code=503, content={"status": "not_ready"})
-            return {"status": "ready"}
-        except sa.exc.SQLAlchemyError:
-            return JSONResponse(status_code=503, content={"status": "not_ready"})
+        dependencies = application.state.health.get(application.state)
+        ok, blocking = readiness(dependencies, application.state.settings.environment == "production")
+        if not ok:
+            return JSONResponse(status_code=503, content={"status": "not_ready", "blocking": blocking})
+        return {"status": "ready"}
+
+    @application.get("/metrics", include_in_schema=False)
+    def metrics(request: Request):
+        token = application.state.settings.metrics_token
+        if token is None and application.state.settings.environment == "production":
+            raise HTTPException(404, detail="Not Found")
+        if token is not None:
+            supplied = request.headers.get("authorization", "")
+            if not hmac.compare_digest(supplied.encode(), f"Bearer {token.get_secret_value()}".encode()):
+                raise HTTPException(401, detail="Metrics token required.")
+        return PlainTextResponse(REGISTRY.render(), media_type="text/plain; version=0.0.4")
+
+    @application.get("/health/dependencies", tags=["health"])
+    def dependencies():
+        """Every dependency with UP / DOWN / NOT_CONFIGURED / NOT_IMPLEMENTED; no versions, paths or secrets."""
+        found = application.state.health.get(application.state)
+        ok, blocking = readiness(found, application.state.settings.environment == "production")
+        return JSONResponse(status_code=200 if ok else 503,
+                            content={"status": "ready" if ok else "not_ready", "blocking": blocking,
+                                     "dependencies": health_json(found)})
 
     application.include_router(router)
     application.include_router(review_router)

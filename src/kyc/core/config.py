@@ -64,8 +64,12 @@ class Settings(BaseSettings):
     max_liveness_bytes: int = Field(default=16 * 1024 * 1024, ge=500_000, le=64 * 1024 * 1024)
     liveness_policy_version: str = Field(default="ACTIVE-GEOMETRY-2026.10.2", min_length=1, max_length=80)
     liveness_calibrated: bool = False
+    # Measured liveness validation report (scripts/calibrate_liveness.py). Required in production.
+    liveness_validation_file: Path | None = None
     # Phase 11 ePassport chip. Directory of trusted CSCA certificates (PEM/DER), e.g. from the ICAO PKD.
     nfc_csca_trust_store: Path | None = None
+    # Offer the DOCUMENT_FACE_LIVENESS_NFC level. Production needs a CSCA trust store while it is on.
+    nfc_enabled: bool = True
     nfc_challenge_ttl_seconds: int = Field(default=120, ge=30, le=600)
     max_nfc_attempts: int = Field(default=3, ge=1, le=10)
     max_nfc_bytes: int = Field(default=512 * 1024, ge=16 * 1024, le=4 * 1024 * 1024)
@@ -80,6 +84,9 @@ class Settings(BaseSettings):
     face_match_calibration_reference: str | None = Field(default=None, min_length=1, max_length=200)
     face_match_pass_threshold: float = Field(default=0.363, ge=-1, le=1, allow_inf_nan=False)
     face_match_fail_threshold: float = Field(default=0.20, ge=-1, le=1, allow_inf_nan=False)
+    # Measured face calibration report (scripts/calibrate_face.py). When set, its thresholds and
+    # version replace the values above. Required in production: thresholds are never typed in.
+    face_match_calibration_file: Path | None = None
     # Phase 17 hardening. Webhook signing secrets get their own keyring (the PII keyring still
     # opens secrets sealed before it existed). Production refuses to start without these controls.
     webhook_secret_keys: SecretStr | None = None
@@ -90,6 +97,9 @@ class Settings(BaseSettings):
     document_consent_policy_version: str = Field(default="DOCUMENT-CONSENT-2026.10.1", min_length=1, max_length=80)
     reviewer_token_max_days: int = Field(default=90, ge=1, le=365)
     log_format: Literal["text", "json"] | None = None  # default: json in production
+    # GET /metrics (Prometheus text). Requires "Authorization: Bearer <token>" when set; in
+    # production the endpoint stays off (404) until a token is configured.
+    metrics_token: SecretStr | None = None
     # Deployment interfaces reserved for later approved phases.
     redis_url: SecretStr | None = None
     gcp_project_id: str | None = None
@@ -111,6 +121,7 @@ class Settings(BaseSettings):
             self.enable_capture_client = not production
         if self.log_format is None:
             self.log_format = "json" if production else "text"
+        self._apply_calibration_reports()
         if production:
             problems = production_problems(self)
             if problems:
@@ -148,6 +159,26 @@ class Settings(BaseSettings):
                                          or "UNCALIBRATED" in self.face_match_policy_version.upper()):
             raise ValueError("Calibrated face matching requires a calibration reference and a calibrated policy version.")
         return self
+
+
+    def _apply_calibration_reports(self) -> None:
+        # Imported here: the biometrics package loads OpenCV, which plain configuration does not need.
+        from kyc.biometrics.calibration import CalibrationError, load_face_calibration, load_liveness_validation
+        from kyc.biometrics.types import SFACE_NAME, SFACE_SHA256, SFACE_VERSION
+        try:
+            if self.face_match_calibration_file is not None:
+                calibration = load_face_calibration(self.face_match_calibration_file, {
+                    "name": SFACE_NAME, "version": SFACE_VERSION, "sha256": SFACE_SHA256})
+                self.face_match_calibrated = True
+                self.face_match_policy_version = calibration.version
+                self.face_match_pass_threshold = calibration.match_threshold
+                self.face_match_fail_threshold = calibration.no_match_threshold
+                self.face_match_calibration_reference = calibration.reference
+            if self.liveness_validation_file is not None:
+                load_liveness_validation(self.liveness_validation_file, self.liveness_policy_version)
+                self.liveness_calibrated = True
+        except (OSError, CalibrationError) as error:
+            raise ValueError(f"Calibration report refused: {error}") from None
 
 
 @lru_cache

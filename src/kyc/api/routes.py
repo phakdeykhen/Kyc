@@ -8,7 +8,7 @@ from kyc.api.dependencies import AnyApiKey, Capture, Database, Eraser, SessionRe
 from kyc.api.schemas import COUNTRY_CODES, CaptureError, CaptureResponse, ClientTokenResponse, ConsentRequest, ConsentResponse, DocumentSide, SessionCreate, SessionResponse, SessionResult, SelfieResponse, VerifyResponse
 from kyc.documents.adapters import adapter_for
 from kyc.documents.requirements import requirement_for
-from kyc.domain.enums import DocumentType
+from kyc.domain.enums import DocumentType, VerificationLevel
 from kyc.services.captures import CaptureLimits, submit_capture
 from kyc.services.consent import DOCUMENT_SCOPE, active_consent, record_document_consent
 from kyc.services.erasure import delete_objects, erase_session
@@ -39,6 +39,10 @@ def start_session(body: SessionCreate, request: Request, response: Response, ten
                   idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key", min_length=8, max_length=128,
                                                                 pattern=r"^[A-Za-z0-9._:-]+$")] = None):
     """Create a session. Send an Idempotency-Key so that retrying after a timeout cannot create a duplicate."""
+    if body.verification_level == VerificationLevel.DOCUMENT_FACE_LIVENESS_NFC and not request.app.state.settings.nfc_enabled:
+        # Never accept a level whose evidence this deployment cannot verify.
+        return JSONResponse(status_code=422, content={"detail": "ePassport chip verification is not offered here.",
+                                                      "reason_code": "NFC_NOT_SUPPORTED"})
     record, replayed = create_session(db, tenant, body, request.app.state.settings.session_ttl_seconds,
                                       request.state.request_id, idempotency_key)
     if replayed:

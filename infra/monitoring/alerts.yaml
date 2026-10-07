@@ -1,0 +1,61 @@
+# Prometheus alerting rules for the KYC API (metrics from GET /metrics, probes from /health/*).
+# Thresholds are starting points: tune them on the pilot's real traffic before paging anyone.
+# Rates are ratios of counters, summed over every API/worker process.
+groups:
+  - name: kyc-availability
+    rules:
+      - alert: KycHigh5xxRate
+        expr: sum(rate(kyc_http_requests_total{status="5xx"}[5m])) / clamp_min(sum(rate(kyc_http_requests_total[5m])), 1e-9) > 0.02
+        for: 5m
+        labels: {severity: page}
+        annotations: {summary: "More than 2% of KYC API requests fail with 5xx."}
+      - alert: KycNotReady
+        # From the blackbox/uptime probe of /health/ready (503 when PostgreSQL, OCR, face models,
+        # storage or keys are unavailable in production).
+        expr: probe_success{job="kyc-ready"} == 0
+        for: 2m
+        labels: {severity: page}
+        annotations: {summary: "A KYC instance reports not_ready; see /health/dependencies for the blocking dependency."}
+      - alert: KycApiLatencyP95High
+        expr: histogram_quantile(0.95, sum by (le) (rate(kyc_http_request_seconds_bucket[5m]))) > 2
+        for: 10m
+        labels: {severity: ticket}
+        annotations: {summary: "KYC API p95 latency above 2 s."}
+      - alert: KycDbPoolSaturated
+        expr: max(kyc_db_pool_checked_out) >= 9
+        for: 5m
+        labels: {severity: ticket}
+        annotations: {summary: "Database pool nearly exhausted (DB_POOL_SIZE + DB_MAX_OVERFLOW defaults to 10)."}
+  - name: kyc-engines
+    rules:
+      - alert: KycOcrFailureSpike
+        expr: sum(rate(kyc_ocr_total{result="FAILURE"}[15m])) / clamp_min(sum(rate(kyc_ocr_total[15m])), 1e-9) > 0.10
+        for: 10m
+        labels: {severity: page}
+        annotations: {summary: "More than 10% of document extractions fail for technical reasons."}
+      - alert: KycTechnicalErrors
+        expr: sum by (stage) (increase(kyc_technical_error_total[15m])) > 5
+        labels: {severity: page}
+        annotations: {summary: "Technical errors in stage {{ $labels.stage }} (face, liveness, OCR, risk...)."}
+      - alert: KycOcrSlow
+        expr: histogram_quantile(0.95, sum by (le) (rate(kyc_ocr_seconds_bucket[10m]))) > 10
+        for: 10m
+        labels: {severity: ticket}
+        annotations: {summary: "OCR p95 above 10 s; document workers are the capacity limit."}
+  - name: kyc-decisions
+    rules:
+      - alert: KycReviewSpike
+        expr: sum(increase(kyc_review_total[1h])) > 3 * sum(increase(kyc_review_total[1h] offset 1d)) and sum(increase(kyc_review_total[1h])) > 20
+        labels: {severity: ticket}
+        annotations: {summary: "Manual reviews tripled versus the same hour yesterday."}
+      - alert: KycFailSpike
+        expr: sum(increase(kyc_fail_total[1h])) > 3 * sum(increase(kyc_fail_total[1h] offset 1d)) and sum(increase(kyc_fail_total[1h])) > 10
+        labels: {severity: page}
+        annotations: {summary: "Rejections tripled versus the same hour yesterday: check for an engine regression before an attack."}
+      - alert: KycRecaptureSpike
+        expr: sum(rate(kyc_recapture_total[1h])) / clamp_min(sum(rate(kyc_sessions_total[1h])), 1e-9) > 1.5
+        for: 30m
+        labels: {severity: ticket}
+        annotations: {summary: "More than 1.5 recaptures per session: capture guidance or a quality threshold may be wrong."}
+# Not covered by these rules yet (needs worker-side metrics or GCP monitoring): queue stuck,
+# webhook backlog, storage failure, KMS failure and certificate/trust-store expiry.

@@ -25,6 +25,7 @@ def configuration(organization_id, **extra):
                 "face_match_calibrated": False, "face_match_calibration_reference": None,
                 "face_match_policy_version": "SFACE-COSINE-UNCALIBRATED-2026.10.1",
                 "face_match_pass_threshold": 0.363, "face_match_fail_threshold": 0.20,
+                "face_match_calibration_file": None, "liveness_validation_file": None,
                 "document_processing_mode": "inline", "tesseract_cmd": "tesseract", "ocr_languages": "khm,eng",
                 "webhook_delivery_mode": "worker", "webhook_allow_private_targets": False}
     return Settings(_env_file=None, environment="test", database_url="sqlite://",
@@ -131,6 +132,16 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(code, 422, body)
             self.assertNotIn("external-customer", json.dumps(body))
 
+    async def test_nfc_level_is_refused_where_chips_cannot_be_verified(self):
+        self.app.state.settings.nfc_enabled = False
+        try:
+            code, body, _ = await call(self.app, "/v1/kyc/sessions", "POST",
+                                       self.payload | {"verification_level": "DOCUMENT_FACE_LIVENESS_NFC"}, self.headers)
+            self.assertEqual((code, body["reason_code"]), (422, "NFC_NOT_SUPPORTED"))
+            await self.create()  # other levels are unaffected
+        finally:
+            self.app.state.settings.nfc_enabled = True
+
     async def test_audit_metadata_omits_identity_fields(self):
         await self.create()
         with Session(self.engine) as db:
@@ -180,6 +191,29 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(code, 200)
         self.assertEqual(body["status"], "ready")
 
+
+    async def test_dependencies_are_reported_honestly_and_production_needs_them_all(self):
+        with self.engine.begin() as connection:
+            connection.execute(sa.text("CREATE TABLE alembic_version (version_num VARCHAR(32) PRIMARY KEY)"))
+            connection.execute(sa.text("INSERT INTO alembic_version VALUES (:revision)"), {"revision": __schema_revision__})
+        code, body, _ = await call(self.app, "/health/dependencies")
+        self.assertEqual(code, 200)  # development: only the database decides readiness
+        found = {item["name"]: item for item in body["dependencies"]}
+        self.assertEqual(found["postgresql"]["status"], "UP")
+        self.assertEqual((found["face_model"]["status"], found["liveness_model"]["status"]), ("DOWN", "DOWN"))
+        self.assertEqual(found["pii_encryption"]["status"], "NOT_CONFIGURED")
+        self.assertEqual(found["kms"]["status"], "NOT_IMPLEMENTED")
+        self.assertIn(found["ocr_khmer_digit_model"]["status"], ("UP", "DOWN"))
+        self.assertFalse(found["ocr_khmer_digit_model"]["critical"])
+        self.assertNotIn("UP", {found[name]["status"] for name in ("object_storage", "biometric_encryption")})
+        self.app.state.settings.environment = "production"
+        try:
+            code, body, _ = await call(self.app, "/health/ready")
+            self.assertEqual((code, body["status"]), (503, "not_ready"))
+            self.assertTrue({"face_model", "pii_encryption", "object_storage"} <= set(body["blocking"]))
+            self.assertNotIn("kms", body["blocking"])  # reported, not yet a runtime dependency
+        finally:
+            self.app.state.settings.environment = "test"
 
 class ConfigurationTests(unittest.TestCase):
     def test_production_and_sqlite_development_are_rejected(self):
