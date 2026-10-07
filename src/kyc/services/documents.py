@@ -23,7 +23,8 @@ from kyc.core.crypto import FieldCipher
 from kyc.db.models import AuditLog, BarcodeResult, DocumentCheck, DocumentField, DocumentImage, IdentityDocument, KYCSession, MRZResult
 from kyc.db.session import set_tenant
 from kyc.documents.adapters import adapter_for
-from kyc.documents.preprocess import prepare_side
+from kyc.documents.preprocess import normalize, prepare_side
+from kyc.documents.field_ocr import read_khmer_fields
 from kyc.documents.refine import refine_numeric_words
 from kyc.documents.requirements import requirement_for
 from kyc.domain.enums import CheckResult, SessionStatus
@@ -130,6 +131,7 @@ class DocumentProcessor:
             return self._recapture(db, record, tenant, document, images, request_id, ("CAPTURES_INCOMPLETE",))
 
         lines: dict[str, list[OCRLine]] = {}
+        prepared_images = {}
         located: dict[str, bool] = {}
         barcodes: dict[str, list] = {}
         for side in sides:
@@ -137,7 +139,8 @@ class DocumentProcessor:
             data = self.store.get(image.encrypted_object_ref, record.organization_id, record.id, image.id)
             capture = decode_capture(data, max_bytes=len(data), max_pixels=self.max_pixels)
             barcodes[side] = barcode_engine.decode(capture.pixels)
-            prepared, located[side] = prepare_side(capture.pixels, aspect, self.quality)
+            prepared_images[side], located[side] = prepare_side(capture.pixels, aspect, self.quality, normalize_text=False)
+            prepared = normalize(prepared_images[side])
             layout = getattr(adapter, "layout", None)
             viz = layout.viz_regions.get(side) if layout else None
             languages = self.languages
@@ -179,6 +182,10 @@ class DocumentProcessor:
         if len(sides) > 1 and classifications[sides[1]].document_side == sides[0]:
             return self._recapture(db, record, tenant, document, images, request_id, (f"{sides[1]}_SIDE_EXPECTED",), classifications)
 
+        if layout and layout.khmer_field_regions:
+            actual_side = capture_sides[sides[0]]
+            lines[sides[0]] += read_khmer_fields(self.ocr, prepared_images[actual_side], adapter,
+                                               lines[sides[0]], located[actual_side])
         extracted = adapter.extract_fields(lines)
         checks = adapter.validate_fields(extracted, today)
         if any(check.check_type == "REQUIRED_FIELDS" and check.result == CheckResult.FAIL for check in checks):

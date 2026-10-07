@@ -9,6 +9,7 @@ import SelfieStage from "@/pages/verify/components/SelfieStage";
 import LivenessStage from "@/pages/verify/components/LivenessStage";
 import NfcStage from "@/pages/verify/components/NfcStage";
 import ProcessingStage from "@/pages/verify/components/ProcessingStage";
+import ApplicantGovernmentVerification from "@/pages/verify/components/ApplicantGovernmentVerification";
 import { kycApi, type Client } from "@/api/client";
 import { ApiError } from "@/api/http";
 import type { KycSession, SessionStatus, VerificationLevel } from "@/api/types";
@@ -187,6 +188,11 @@ export default function VerificationSession() {
             <Stepper steps={steps} current={current} />
           </div>
           <div className="mt-4 rounded-lg border border-background-200 bg-background-50 p-5 md:p-6">{stage}</div>
+          {["SELFIE_REQUIRED", "LIVENESS_REQUIRED", "NFC_REQUIRED", "PROCESSING"].includes(session.status) && (
+            <div className="mt-4">
+              <ApplicantGovernmentVerification credential={credential} sessionId={sessionId} version={session.version} />
+            </div>
+          )}
           <p className="mt-4 flex items-start gap-2 font-label text-xs text-foreground-500">
             <i className="ri-shield-check-line mt-0.5 text-sm leading-none"></i>
             Your photos are encrypted and only used to verify you. Face data is never shared through the API and is deleted after the retention period.

@@ -13,6 +13,7 @@ from PIL import Image
 
 from kyc.biometrics import compare_embeddings
 from kyc.biometrics.types import FaceEmbedding, FaceMatchPolicy
+from kyc.biometrics.quality import assess_face_quality
 from kyc.domain.enums import CheckResult
 from kyc.liveness.challenge import BASELINE
 from kyc.liveness.geometry import PoseSample, pose
@@ -35,13 +36,14 @@ COVERAGE = {
 
 @dataclass(frozen=True)
 class ActiveLivenessPolicy:
-    version: str = "ACTIVE-GEOMETRY-2026.10.3"
+    version: str = "ACTIVE-GEOMETRY-2026.10.4"
     calibrated: bool = False
     movement: float = 0.08           # minimum directed change of a/b (≈10° head turn)
     planar_deformation: float = 0.12  # eye/mouth triangle aspect change that should move the nose
     planar_invariance: float = 0.06   # …while the nose stays within this (flat-face signature)
     min_frames: int = 4
     max_frames: int = 12
+    stable_frames_per_step: int = 2
 
 
 @dataclass
@@ -101,24 +103,36 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
                                metrics={"frames": len(frames), "unique_frames": 1})
 
     samples: dict[int, list[PoseSample]] = {}
+    observed: dict[int, list[PoseSample | None]] = {}
     detections = []
     reasons: list[str] = []
     for index, image, _ in frames:
         faces = engine.detect(image)
         if len(faces) != 1:
+            observed.setdefault(index, []).append(None)
             reasons.append("MULTIPLE_FACES" if faces else "NO_FACE_IN_FRAME")
             continue
         try:
             sample = pose(faces[0].landmarks)
         except ValueError:
+            observed.setdefault(index, []).append(None)
             reasons.append("LANDMARKS_UNUSABLE")
             continue
         samples.setdefault(index, []).append(sample)
+        observed.setdefault(index, []).append(sample)
         detections.append((index, image, faces[0]))
     if "MULTIPLE_FACES" in reasons:
         return _retry(["MULTIPLE_FACES"], instructions=["ONLY_YOU_IN_FRAME"])
     if 0 not in samples:
         return _retry(sorted(set(reasons)) or ["BASELINE_NOT_CAPTURED"], instructions=["LOOK_STRAIGHT", "MORE_LIGHT"])
+
+    if len(samples[0]) < policy.stable_frames_per_step:
+        return _retry(["BASELINE_NOT_STABLE"], instructions=["HOLD_STILL", "LOOK_STRAIGHT"])
+    for index, image, face in detections:
+        if index == 0:
+            quality = assess_face_quality(image, [face])
+            if not quality.accepted:
+                return _retry(["BASELINE_QUALITY_UNUSABLE"], instructions=quality.instructions)
 
     baseline = PoseSample(a=statistics.median(s.a for s in samples[0]), b=statistics.median(s.b for s in samples[0]),
                           aspect=statistics.median(s.aspect for s in samples[0]),
@@ -126,8 +140,13 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
     step_results = [{"step": BASELINE, "completed": True}]
     for index, name in enumerate(steps[1:], start=1):
         axis, sign = DIRECTIONS[name]
-        moves = [sign * (getattr(sample, axis) - getattr(baseline, axis)) for sample in samples.get(index, [])]
-        step_results.append({"step": name, "completed": bool(moves) and max(moves) >= policy.movement,
+        moves = [sign * (getattr(sample, axis) - getattr(baseline, axis)) if sample else float("-inf")
+                 for sample in observed.get(index, [])]
+        held, longest = 0, 0
+        for move in moves:
+            held = held + 1 if move >= policy.movement else 0
+            longest = max(longest, held)
+        step_results.append({"step": name, "completed": longest >= policy.stable_frames_per_step,
                              "frames": len(moves)})
 
     # Possible flat geometry: expression and landmark error can produce the same measurements.
@@ -165,6 +184,9 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
                                    attack_type="POSSIBLE_FACE_SWAP", steps=step_results, metrics=metrics)
     else:
         metrics["identity_frames"] = 0
+        return LivenessOutcome(CheckResult.REVIEW, score=1.0,
+                               reason_codes=["CHALLENGE_COMPLETED", "IDENTITY_CONTINUITY_NOT_ESTABLISHED"],
+                               retryable=False, steps=step_results, metrics=metrics)
     if len(set(hashes)) < len(hashes):
         reasons.append("DUPLICATE_FRAMES")
     score = round(completed / (len(steps) - 1), 3)

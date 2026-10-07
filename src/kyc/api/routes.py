@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, File, Form, Header, HTTPExceptio
 from fastapi.responses import JSONResponse
 
 from kyc.api.dependencies import AnyApiKey, Capture, Database, Eraser, SessionReader, SessionWriter, StatusReader, TenantContext
-from kyc.api.schemas import COUNTRY_CODES, CaptureError, CaptureResponse, ClientTokenResponse, ConsentRequest, ConsentResponse, DocumentSide, SessionCreate, SessionResponse, SessionResult, SelfieResponse, VerifyResponse
+from kyc.api.schemas import COUNTRY_CODES, CaptureError, CaptureResponse, ClientTokenResponse, ConsentRequest, ConsentResponse, DocumentSide, ResultGovernmentVerification, SessionCreate, SessionResponse, SessionResult, SelfieResponse, VerifyResponse
 from kyc.documents.adapters import adapter_for
 from kyc.documents.requirements import requirement_for
 from kyc.domain.enums import DocumentType
@@ -13,9 +13,10 @@ from kyc.services.captures import CaptureLimits, submit_capture
 from kyc.services.consent import DOCUMENT_SCOPE, active_consent, record_document_consent
 from kyc.services.erasure import delete_objects, erase_session
 from kyc.services.biometrics import SelfieLimits, submit_selfie
-from kyc.services.liveness import LivenessLimits, guide_step, issue_challenge, submit_liveness
+from kyc.services.liveness import LivenessLimits, guide_step, issue_challenge, position_face, submit_liveness
 from kyc.services.nfc import NFCLimits, issue_nfc_challenge, submit_nfc
 from kyc.services.results import build_result
+from kyc.services.government import build_government_verification
 from kyc.services.risk import verify_session
 from kyc.services.sessions import aware, create_session, get_session, issue_client_token, respond
 
@@ -71,6 +72,14 @@ def read_result(session_id: UUID, request: Request, tenant: SessionReader, db: D
     """Identity fields are masked unless the credential holds the results:identity scope."""
     record = get_session(db, tenant, session_id, request.state.request_id)
     return build_result(db, record, request.app.state.field_cipher, reveal_identity="results:identity" in tenant.scopes)
+
+
+@router.get("/kyc/{session_id}/government-verification", response_model=ResultGovernmentVerification)
+def read_government_verification(session_id: UUID, request: Request, tenant: StatusReader, db: Database):
+    """Official QR handoff for this applicant; reading a link never marks the card government-verified."""
+    record = get_session(db, tenant, session_id, request.state.request_id)
+    reveal_link = tenant.session_id == record.id or "results:identity" in tenant.scopes
+    return build_government_verification(db, record, request.app.state.field_cipher, reveal_link=reveal_link)
 
 
 @router.post("/kyc/{session_id}/consent", response_model=ConsentResponse, responses={
@@ -189,6 +198,23 @@ def _liveness_limits(settings) -> LivenessLimits:
     per_frame = min(settings.max_selfie_bytes, settings.max_liveness_bytes)
     return LivenessLimits(settings.liveness_challenge_ttl_seconds, settings.max_liveness_attempts, per_frame,
                           settings.max_selfie_pixels)
+
+
+@router.post("/kyc/{session_id}/liveness/position", responses={
+    409: {"model": CaptureError, "description": "Session is not waiting for liveness."},
+    413: {"description": "Frame exceeds the size limit."},
+    503: {"description": "Face models unavailable."},
+})
+def position_liveness(session_id: UUID, request: Request, tenant: Capture, db: Database,
+                      frame: Annotated[UploadFile, File(description="Raw camera frame for positioning")]):
+    """Position one usable face before consuming a liveness attempt; frames are discarded."""
+    state = request.app.state
+    limits = _liveness_limits(state.settings)
+    data = frame.file.read(limits.max_frame_bytes + 1)
+    if len(data) > limits.max_frame_bytes:
+        raise HTTPException(413, detail="Frame is too large.")
+    return position_face(db, tenant, session_id, data, state.face_engine, state.liveness_policy, limits,
+                         request.state.request_id)
 
 
 @router.post("/kyc/{session_id}/liveness/challenge", responses={

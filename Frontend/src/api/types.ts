@@ -128,6 +128,7 @@ export interface ReviewCase {
     authenticity_sources: string[];
   };
   checks: Record<string, CheckValue>;
+  government_verification?: GovernmentVerification | null;
   fraud_signals: CaseSignal[];
   document: null | {
     type: string;
@@ -262,6 +263,13 @@ export interface LivenessResult {
   calibrated: boolean;
 }
 
+export interface FacePosition {
+  face: string;
+  state: "READY" | "POSITIONING";
+  instructions: string[];
+  attempts_remaining: number;
+}
+
 export interface NfcResult {
   session_id: string;
   status: SessionStatus;
@@ -281,6 +289,14 @@ export interface VerifyResult {
   decision: RiskDecisionView;
 }
 
+export interface GovernmentVerification {
+  provider: "VERIFY_GOV_KH";
+  status: "PENDING" | "LINK_AVAILABLE" | "LINK_RESTRICTED" | "NO_OFFICIAL_QR" | "UNAVAILABLE" | "LINK_EXPIRED" | "ERASED";
+  verified: false;
+  verification_url: string | null;
+  portal_url: "https://verify.gov.kh/";
+}
+
 export interface SessionResult {
   session_id: string;
   status: SessionStatus;
@@ -298,6 +314,7 @@ export interface SessionResult {
     nationality: string | null;
   };
   identity_masked: boolean;
+  government_verification?: GovernmentVerification | null;
   mrz: null | {
     format: string;
     mrz_valid: boolean;

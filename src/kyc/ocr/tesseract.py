@@ -23,10 +23,12 @@ class OCRUnavailable(RuntimeError):
 
 
 class TesseractOCREngine:
-    def __init__(self, command: str = "tesseract", timeout_seconds: float = 20.0, page_segmentation_mode: int = 6):
+    def __init__(self, command: str = "tesseract", timeout_seconds: float = 20.0, page_segmentation_mode: int = 6,
+                 tessdata_dir: str | None = None):
         self.command = command
         self.timeout = timeout_seconds
         self.psm = page_segmentation_mode
+        self.tessdata_dir = tessdata_dir
 
     @cached_property
     def engine_version(self) -> str:
@@ -47,6 +49,8 @@ class TesseractOCREngine:
 
     def _run(self, arguments: list[str], payload: bytes) -> str:
         environment = {**os.environ, "OMP_THREAD_LIMIT": "1"}
+        if self.tessdata_dir:
+            environment["TESSDATA_PREFIX"] = self.tessdata_dir
         try:
             completed = subprocess.run(arguments, input=payload, capture_output=True, timeout=self.timeout,
                                        check=True, env=environment)
@@ -62,7 +66,8 @@ class TesseractOCREngine:
     def read_lines(self, image: Image.Image, languages: Sequence[str]) -> list[OCRLine]:
         buffer = BytesIO()
         image.save(buffer, "PNG")
-        tsv = self._run([self.command, "stdin", "stdout", "-l", "+".join(languages), "--psm", str(self.psm), "tsv"],
+        tsv = self._run([self.command, "stdin", "stdout", "-l", "+".join(languages), "--psm", str(self.psm),
+                         "-c", "tessedit_create_tsv=1"],
                         buffer.getvalue())
         return self._lines_from_tsv(tsv, image.size)
 
@@ -103,7 +108,7 @@ class TesseractOCREngine:
         buffer = BytesIO()
         crop.save(buffer, "PNG")
         tsv = self._run([self.command, "stdin", "stdout", "-l", "+".join(languages), "--psm", str(mode),
-                         "-c", f"tessedit_char_whitelist={alphabet}", "tsv"], buffer.getvalue())
+                         "-c", f"tessedit_char_whitelist={alphabet}", "-c", "tessedit_create_tsv=1"], buffer.getvalue())
         words = [(parts[11].strip(), float(parts[10])) for parts in (row.split("\t") for row in tsv.splitlines()[1:])
                  if len(parts) == 12 and parts[0] == "5" and parts[11].strip() and float(parts[10]) >= 0]
         if not words:
@@ -119,7 +124,8 @@ class TesseractOCREngine:
         buffer = BytesIO()
         crop.save(buffer, "PNG")
         options = ["-c", f"tessedit_char_whitelist={alphabet}"] if alphabet else []
-        tsv = self._run([self.command, "stdin", "stdout", "-l", "+".join(languages), "--psm", str(mode), *options, "tsv"],
+        tsv = self._run([self.command, "stdin", "stdout", "-l", "+".join(languages), "--psm", str(mode), *options,
+                         "-c", "tessedit_create_tsv=1"],
                         buffer.getvalue())
         lines = self._lines_from_tsv(tsv, crop.size)
         scale_x, scale_y = crop.size[0] / width, crop.size[1] / height

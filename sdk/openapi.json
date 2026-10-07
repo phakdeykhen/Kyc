@@ -275,6 +275,68 @@
         "title": "ApiKeyView",
         "type": "object"
       },
+      "Body_guide_liveness_v1_kyc__session_id__liveness_guide_post": {
+        "properties": {
+          "baseline": {
+            "anyOf": [
+              {
+                "contentMediaType": "application/octet-stream",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The frame accepted for step 0",
+            "title": "Baseline"
+          },
+          "challenge_id": {
+            "format": "uuid",
+            "title": "Challenge Id",
+            "type": "string"
+          },
+          "frame": {
+            "contentMediaType": "application/octet-stream",
+            "description": "Current raw (unmirrored) camera frame",
+            "title": "Frame",
+            "type": "string"
+          },
+          "nonce": {
+            "maxLength": 128,
+            "title": "Nonce",
+            "type": "string"
+          },
+          "step": {
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Step",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "challenge_id",
+          "nonce",
+          "step",
+          "frame"
+        ],
+        "title": "Body_guide_liveness_v1_kyc__session_id__liveness_guide_post",
+        "type": "object"
+      },
+      "Body_position_liveness_v1_kyc__session_id__liveness_position_post": {
+        "properties": {
+          "frame": {
+            "contentMediaType": "application/octet-stream",
+            "description": "Raw camera frame for positioning",
+            "title": "Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "frame"
+        ],
+        "title": "Body_position_liveness_v1_kyc__session_id__liveness_position_post",
+        "type": "object"
+      },
       "Body_upload_back_v1_kyc__session_id__documents_back_post": {
         "properties": {
           "file": {
@@ -1387,6 +1449,59 @@
         "title": "ResultDocument",
         "type": "object"
       },
+      "ResultGovernmentVerification": {
+        "properties": {
+          "portal_url": {
+            "const": "https://verify.gov.kh/",
+            "default": "https://verify.gov.kh/",
+            "title": "Portal Url",
+            "type": "string"
+          },
+          "provider": {
+            "const": "VERIFY_GOV_KH",
+            "default": "VERIFY_GOV_KH",
+            "title": "Provider",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "LINK_AVAILABLE",
+              "LINK_RESTRICTED",
+              "NO_OFFICIAL_QR",
+              "UNAVAILABLE",
+              "LINK_EXPIRED",
+              "ERASED"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "verification_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Private official QR link; shown only to the applicant or a caller with identity access.",
+            "title": "Verification Url"
+          },
+          "verified": {
+            "const": false,
+            "default": false,
+            "description": "A decoded link is not an official verification result.",
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ResultGovernmentVerification",
+        "type": "object"
+      },
       "ResultIdentity": {
         "properties": {
           "date_of_birth": {
@@ -1821,6 +1936,16 @@
             },
             "title": "Fraud Signals",
             "type": "array"
+          },
+          "government_verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResultGovernmentVerification"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "identity": {
             "anyOf": [
@@ -3359,6 +3484,105 @@
         "summary": "Erase"
       }
     },
+    "/v1/kyc/{session_id}/government-verification": {
+      "get": {
+        "description": "Official QR handoff for this applicant; reading a link never marks the card government-verified.",
+        "operationId": "read_government_verification_v1_kyc__session_id__government_verification_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultGovernmentVerification"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "ApiKey": [],
+            "Organization": []
+          },
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
+        "summary": "Read Government Verification"
+      }
+    },
     "/v1/kyc/{session_id}/liveness": {
       "post": {
         "description": "Verify the challenge from 4\u201312 frames. Frames are assessed in memory and never stored.",
@@ -3590,6 +3814,225 @@
           }
         ],
         "summary": "Liveness Challenge"
+      }
+    },
+    "/v1/kyc/{session_id}/liveness/guide": {
+      "post": {
+        "description": "Live feedback while the person follows one step: is the face visible, and is the movement done?\n\nAdvisory only. It does not use up the challenge or record evidence, and frames are not stored;\nPOST /liveness judges the submitted frames again with the same geometry.",
+        "operationId": "guide_liveness_v1_kyc__session_id__liveness_guide_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_guide_liveness_v1_kyc__session_id__liveness_guide_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureError"
+                }
+              }
+            },
+            "description": "Challenge unknown, used or expired, or session not waiting for liveness."
+          },
+          "413": {
+            "description": "Upload exceeds the size limit."
+          },
+          "422": {
+            "description": "Unreadable frame, unknown step, or a baseline frame without exactly one face."
+          },
+          "503": {
+            "description": "Face models unavailable."
+          }
+        },
+        "summary": "Guide Liveness"
+      }
+    },
+    "/v1/kyc/{session_id}/liveness/position": {
+      "post": {
+        "description": "Position one usable face before consuming a liveness attempt; frames are discarded.",
+        "operationId": "position_liveness_v1_kyc__session_id__liveness_position_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_position_liveness_v1_kyc__session_id__liveness_position_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureError"
+                }
+              }
+            },
+            "description": "Session is not waiting for liveness."
+          },
+          "413": {
+            "description": "Frame exceeds the size limit."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Face models unavailable."
+          }
+        },
+        "summary": "Position Liveness"
       }
     },
     "/v1/kyc/{session_id}/nfc": {
@@ -4305,7 +4748,7 @@
     },
     "/v1/review/queue": {
       "get": {
-        "description": "Cases waiting in MANUAL_REVIEW, longest-waiting first.",
+        "description": "Cases waiting in MANUAL_REVIEW.",
         "operationId": "review_queue_v1_review_queue_get",
         "parameters": [
           {
@@ -4330,6 +4773,20 @@
               "minimum": 0,
               "title": "Offset",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "oldest",
+              "enum": [
+                "oldest",
+                "newest"
+              ],
+              "title": "Order",
+              "type": "string"
             }
           },
           {
@@ -4392,6 +4849,134 @@
           }
         ],
         "summary": "Review Queue",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/v1/review/sessions": {
+      "get": {
+        "description": "Every session of the organization, newest change first, by status and the client's user ID.",
+        "operationId": "all_sessions_v1_review_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SessionStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "user_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "Organization": [],
+            "ReviewerToken": []
+          }
+        ],
+        "summary": "All Sessions",
         "tags": [
           "review"
         ]

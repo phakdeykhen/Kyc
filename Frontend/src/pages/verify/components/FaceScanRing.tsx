@@ -16,6 +16,8 @@ interface FaceScanRingProps {
   complete?: boolean;
   /** Face held in the circle during the baseline step. */
   aligned?: boolean;
+  /** Overall progress from confirmed steps and the current server movement measurement. */
+  progress?: number;
   showCamera: boolean;
   /** Arrow pointing where to move. */
   cue?: Direction | null;
@@ -46,7 +48,7 @@ function nearest(angle: number): { direction: Direction; offset: number } {
 }
 
 export default function FaceScanRing({ videoRef, cameraState, arcs, complete = false, aligned = false, showCamera,
-                                       cue = null, theme, center }: FaceScanRingProps) {
+                                       progress, cue = null, theme, center }: FaceScanRingProps) {
   const dark = theme === "dark";
   const idle = dark ? (aligned ? "stroke-background-50/70" : "stroke-background-50/25") : "stroke-foreground-300";
   const ticks = Array.from({ length: TICKS }, (_, index) => {
@@ -55,7 +57,7 @@ export default function FaceScanRing({ videoRef, cameraState, arcs, complete = f
     const arc = arcs[direction];
     let tone = idle;
     let long = false;
-    if (complete || arc?.status === "done") {
+    if (complete || (progress !== undefined ? index < Math.floor(Math.min(1, Math.max(0, progress)) * TICKS) : arc?.status === "done")) {
       tone = "stroke-primary-400";
       long = true;
     } else if (arc?.status === "active") {
@@ -65,15 +67,15 @@ export default function FaceScanRing({ videoRef, cameraState, arcs, complete = f
     }
     return (
       <line key={index} x1="100" y1="16" x2="100" y2={long ? 4 : 9} transform={`rotate(${angle} 100 100)`}
-            strokeWidth="2.4" strokeLinecap="round" className={`transition-colors duration-300 ${tone}`} />
+            strokeWidth="2.4" strokeLinecap="round" className={`transition-all duration-300 motion-reduce:transition-none ${tone}`} />
     );
   });
 
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-[340px]">
+    <div className="relative mx-auto aspect-square w-full max-w-[340px] shrink-0">
       <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full" aria-hidden="true">{ticks}</svg>
       <div className={`absolute left-[11%] top-[11%] h-[78%] w-[78%] overflow-hidden rounded-full ${dark ? "bg-foreground-900" : "bg-background-100"}`}>
-        <video ref={videoRef} playsInline muted
+        <video ref={videoRef} autoPlay playsInline muted
                className={`h-full w-full -scale-x-100 object-cover transition-opacity duration-500 ${
                  showCamera && cameraState === "live" ? "opacity-100" : "opacity-0"}`} />
         {center && <div className="absolute inset-0 flex items-center justify-center">{center}</div>}

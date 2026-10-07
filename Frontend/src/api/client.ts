@@ -1,7 +1,7 @@
 import { apiJson, type Credential } from "@/api/http";
 import type {
   ApiKeyCreated, ApiKeyInfo, CaptureResult, ClientToken, ConsentRecord, CountryRegistry, DocumentSide, DocumentTypeCode,
-  DocumentTypeInfo, ErasureReport, KycSession, LivenessChallenge, LivenessGuide, LivenessResult, NfcResult,
+  DocumentTypeInfo, ErasureReport, FacePosition, GovernmentVerification, KycSession, LivenessChallenge, LivenessGuide, LivenessResult, NfcResult,
   OrganizationInfo, SelfieResult, SessionResult, VerificationLevel, VerifyResult, WebhookDeliveryInfo,
   WebhookEndpointInfo, WebhookEndpointWithSecret,
 } from "@/api/types";
@@ -40,6 +40,8 @@ export const kycApi = {
   // Backend or device ---------------------------------------------------------------------------
   getSession: (credential: SessionCaller, id: string, signal?: AbortSignal) =>
     apiJson<KycSession>(credential, session(id), { signal }),
+  governmentVerification: (credential: SessionCaller, id: string, signal?: AbortSignal) =>
+    apiJson<GovernmentVerification>(credential, `${session(id)}/government-verification`, { signal }),
   consent: (credential: SessionCaller, id: string) =>
     apiJson<ConsentRecord>(credential, `${session(id)}/consent`, {
       method: "POST", json: { scope: "DOCUMENT_PROCESSING", granted: true } }),
@@ -55,8 +57,13 @@ export const kycApi = {
     form.append("file", file, "selfie.jpg");
     return apiJson<SelfieResult>(credential, `${session(id)}/selfie`, { method: "POST", form });
   },
-  livenessChallenge: (credential: SessionCaller, id: string) =>
-    apiJson<LivenessChallenge>(credential, `${session(id)}/liveness/challenge`, { method: "POST", json: {} }),
+  livenessPosition: (credential: SessionCaller, id: string, frame: Blob, signal?: AbortSignal) => {
+    const form = new FormData();
+    form.append("frame", frame, "frame.jpg");
+    return apiJson<FacePosition>(credential, `${session(id)}/liveness/position`, { method: "POST", form, signal });
+  },
+  livenessChallenge: (credential: SessionCaller, id: string, signal?: AbortSignal) =>
+    apiJson<LivenessChallenge>(credential, `${session(id)}/liveness/challenge`, { method: "POST", json: {}, signal }),
   livenessGuide: (credential: SessionCaller, id: string, challenge: LivenessChallenge, step: number, frame: Blob,
                   baseline: Blob | null, signal?: AbortSignal) => {
     const form = new FormData();

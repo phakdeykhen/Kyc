@@ -5,6 +5,7 @@ import { kycApi, type Client } from "@/api/client";
 import { ApiError } from "@/api/http";
 import type { KycSession } from "@/api/types";
 import { readApplicantCredential } from "@/pages/verify/applicantLink";
+import ApplicantGovernmentVerification from "@/pages/verify/components/ApplicantGovernmentVerification";
 
 // The person's view of the outcome. Reason codes, scores and reviewer notes stay with the
 // integrating service (GET /result with an API key, and webhooks); none of them are shown here.
@@ -85,6 +86,9 @@ export default function VerificationResult() {
   return (
     <ApplicantShell>
       <ApplicantMessage icon={outcome.icon} tone={outcome.tone} title={outcome.title} text={outcome.text} />
+      <div className="mt-4">
+        <ApplicantGovernmentVerification credential={credential} sessionId={sessionId} version={session.version} />
+      </div>
     </ApplicantShell>
   );
 }

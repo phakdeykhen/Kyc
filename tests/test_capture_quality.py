@@ -3,6 +3,7 @@ import unittest
 
 import numpy as np
 from PIL import Image, ImageFilter
+from unittest.mock import patch
 
 from kyc.documents.requirements import ID1_ASPECT, TD3_ASPECT
 from kyc.engines.capture_quality import SCORE_NAMES, CaptureRejected, DocumentQualityPolicy, HeuristicDocumentQualityEngine, decode_capture
@@ -16,6 +17,12 @@ def assess(image, aspect=ID1_ASPECT, fmt="JPEG", **options):
 
 
 class QualityGateTests(unittest.TestCase):
+    def test_printed_region_with_wrong_aspect_is_not_used_as_a_card_quadrilateral(self):
+        engine = HeuristicDocumentQualityEngine()
+        ink = (np.array([[0, 0], [340, 0], [385, 60], [30, 140]], dtype=np.float32), .35, 2, False)
+        with patch.object(engine, "_locate", return_value=ink):
+            self.assertIsNone(engine.locate_corners(np.asarray(images.card(1280)), ID1_ASPECT))
+
     def test_usable_captures_are_accepted(self):
         for name, image, aspect in [("card", images.good(), ID1_ASPECT),
                                     ("passport", images.passport_page(), TD3_ASPECT),

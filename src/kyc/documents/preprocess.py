@@ -38,14 +38,16 @@ def normalize(image: Image.Image) -> Image.Image:
     return gray.filter(ImageFilter.UnsharpMask(radius=1.5, percent=60, threshold=2))
 
 
-def prepare_side(pixels: np.ndarray, aspect: float, engine: HeuristicDocumentQualityEngine | None = None) -> tuple[Image.Image, bool]:
+def prepare_side(pixels: np.ndarray, aspect: float, engine: HeuristicDocumentQualityEngine | None = None,
+                 normalize_text: bool = True) -> tuple[Image.Image, bool]:
     """Returns the OCR-ready side image and whether a document quadrilateral was found."""
     engine = engine or HeuristicDocumentQualityEngine()
     image = Image.fromarray(pixels)
     corners = engine.locate_corners(pixels, aspect)
     if corners is None:
-        return normalize(image), False
-    return normalize(rectify(image, corners, aspect)), True
+        return (normalize(image) if normalize_text else image), False
+    corrected = rectify(image, corners, aspect)
+    return (normalize(corrected) if normalize_text else corrected), True
 
 
 def rotate_half_turn(image: Image.Image) -> Image.Image:

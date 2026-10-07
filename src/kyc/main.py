@@ -121,7 +121,7 @@ def build_field_cipher(settings: Settings) -> FieldCipher | None:
 
 
 def build_document_processor(settings: Settings, factory, store, cipher) -> DocumentProcessor:
-    ocr = TesseractOCREngine(settings.tesseract_cmd, settings.ocr_timeout_seconds)
+    ocr = TesseractOCREngine(settings.tesseract_cmd, settings.ocr_timeout_seconds, tessdata_dir=settings.ocr_tessdata_dir)
     languages = tuple(item.strip() for item in settings.ocr_languages.split(",") if item.strip())
     processor = DocumentProcessor(factory, store, cipher, ocr, languages, settings.max_capture_pixels)
     processor.trust_store = TrustStore.load(settings.barcode_trust_store)

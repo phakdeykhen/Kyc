@@ -6,7 +6,7 @@ import type { LivenessChallenge, LivenessResult, SessionStatus } from "@/api/typ
 import { instructionText } from "@/lib/catalog";
 import { useCamera, useLightHint } from "@/lib/useCamera";
 import FaceScanRing from "@/pages/verify/components/FaceScanRing";
-import type { ArcState, Direction } from "@/pages/verify/components/FaceScanRing";
+import type { Direction } from "@/pages/verify/components/FaceScanRing";
 
 interface LivenessStageProps {
   credential: Client;
@@ -66,9 +66,12 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, Math.m
 export default function LivenessStage({ credential, sessionId, onSessionChanged }: LivenessStageProps) {
   const camera = useCamera("user");
   const runRef = useRef<Run | null>(null);
+  const preflightRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
   const [running, setRunning] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [step, setStep] = useState<{ text: string; kind: Kind | "checking"; index: number; total: number } | null>(null);
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
+  const [step, setStep] = useState<{ text: string; kind: Kind | "checking" | "complete"; index: number; total: number } | null>(null);
   const [coach, setCoach] = useState<{ text: string; progress: number | null; good: boolean }>({ text: "", progress: null, good: false });
   const [dots, setDots] = useState<{ steps: string[]; current: number; done: number } | null>(null);
   const [help, setHelp] = useState<string[] | null>(null);
@@ -77,8 +80,11 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
   const { start, stop: stopCamera, grab } = camera;
 
   useEffect(() => {
+    mountedRef.current = true;
     start();
     return () => {
+      mountedRef.current = false;
+      preflightRef.current?.abort();
       const run = runRef.current;
       if (run) {
         run.stopped = "CANCELLED";
@@ -86,6 +92,13 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
       }
     };
   }, [start]);
+
+  useEffect(() => {
+    if (!running) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [running]);
 
   const showStep = useCallback((run: Run, index: number, kind: Kind) => {
     const steps = run.challenge.steps;
@@ -127,7 +140,7 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
             held = [];
             setCoach({ text: FACE_TEXT[body.face] ?? FACE_TEXT.UNCLEAR, progress: 0, good: false });
           } else {
-            satisfied = kind === "baseline" || body.state === (kind === "center" ? "CENTERED" : "DONE");
+            satisfied = body.state === (kind === "move" ? "DONE" : "CENTERED");
             const elapsed = Date.now() - started;
             const hint = satisfied ? (held.length + 1 >= HOLD_FRAMES ? "Done!" : "Hold it there…")
               : body.state === "WRONG_DIRECTION" ? text.wrong ?? "Other way."
@@ -163,6 +176,7 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
 
   const finish = () => {
     runRef.current = null;
+    preflightRef.current = null;
     setRunning(false);
     setHelp(null);
     setStep(null);
@@ -170,7 +184,8 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
     setCoach({ text: "", progress: null, good: false });
   };
 
-  const show = (result: LivenessResult) => {
+  const show = async (result: LivenessResult) => {
+    setAttemptsRemaining(result.attempts_remaining);
     const retry = result.retry_allowed && result.status === "LIVENESS_REQUIRED";
     setOutcome({
       tone: result.result === "PASS" ? "ok" : "retry",
@@ -180,35 +195,84 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
       instructions: result.instructions ?? [],
     });
     if (!retry) {
+      if (result.result !== "FAIL") {
+        setRunning(true);
+        setStep({ text: "Face scan complete", kind: "complete", index: 0, total: 0 });
+        setCoach({ text: "Your capture is complete.", progress: 1, good: true });
+        await wait(900);
+        if (!mountedRef.current) return;
+        finish();
+      }
       stopCamera();
       onSessionChanged(result.status);
     }
   };
 
   const run = async (): Promise<void> => {
-    if (running || camera.state !== "live") return;
+    if (runRef.current || preflightRef.current || camera.state !== "live" || attemptsRemaining === 0) return;
     setOutcome(null);
     setRunning(true);
+    setStep({ text: "Position your face in the circle", kind: "baseline", index: 0, total: 0 });
+    setCoach({ text: "Look straight at the camera and hold still.", progress: 0, good: false });
+    const preflight = new AbortController();
+    preflightRef.current = preflight;
+    let baseline: Blob[] = [];
     let challenge: LivenessChallenge;
     try {
-      challenge = await kycApi.livenessChallenge(credential, sessionId);
+      // Positioning and technical retries happen before a challenge consumes an attempt or starts its TTL.
+      const started = Date.now();
+      let lastFrame = Date.now();
+      while (baseline.length < HOLD_FRAMES) {
+        if (preflight.signal.aborted) throw new LivenessStop("CANCELLED");
+        const tick = Date.now();
+        const blob = await grab(640, 0.85);
+        if (blob) {
+          lastFrame = Date.now();
+          const body = await kycApi.livenessPosition(credential, sessionId, blob, preflight.signal);
+          if (preflight.signal.aborted) throw new LivenessStop("CANCELLED");
+          setAttemptsRemaining(body.attempts_remaining);
+          if (body.state === "READY") baseline.push(blob);
+          else baseline = [];
+          const positionText: Record<string, string> = {
+            MOVE_CLOSER: "Move closer to the camera.", MOVE_BACK: "Move back so your whole face fits in the circle.",
+            CENTER_FACE: "Center your face in the circle.", HOLD_STILL: "Hold still for a clear picture.",
+          };
+          setCoach({ text: body.state === "READY" ? "Hold still…" : FACE_TEXT[body.face]
+            ?? positionText[body.instructions[0]] ?? instructionText(body.instructions[0] ?? "FACE_CAMERA"),
+            progress: baseline.length / HOLD_FRAMES, good: body.state === "READY" });
+        } else if (Date.now() - lastFrame > 5000) {
+          throw new ApiError(0, "The camera stopped. Restart the camera and try again.", "CAMERA_STOPPED", null);
+        }
+        if (Date.now() - started > HELP_AFTER_MS) setHelp([
+          "Hold the phone at eye level and fit your whole face inside the circle.",
+          "Find even light and keep the camera still.",
+        ]);
+        if (baseline.length < HOLD_FRAMES) await wait(GUIDE_INTERVAL_MS - (Date.now() - tick));
+      }
+      setHelp(null);
+      challenge = await kycApi.livenessChallenge(credential, sessionId, preflight.signal);
+      if (preflight.signal.aborted || !mountedRef.current) throw new LivenessStop("CANCELLED");
+      setAttemptsRemaining(challenge.attempts_remaining);
     } catch (caught) {
+      if (!mountedRef.current) return;
       finish();
+      if (preflight.signal.aborted || caught instanceof LivenessStop) return;
       const failure = caught as ApiError;
       if (failure.status === 409) return onSessionChanged("LIVENESS_REQUIRED");
-      setOutcome({ tone: "retry", title: failure.status === 429 ? "No attempts left" : "Could not start the check",
-                   detail: failure.status === 429 ? "Ask the service that sent you for a new link." : failure.message, instructions: [] });
+      const exhausted = failure.reasonCode === "LIVENESS_ATTEMPTS_EXCEEDED";
+      if (exhausted) setAttemptsRemaining(0);
+      setOutcome({ tone: "retry", title: exhausted ? "No attempts left" : "Could not start the check",
+                   detail: exhausted ? "Ask the service that sent you for a new verification link." : failure.message, instructions: [] });
       return;
     }
-    const current: Run = { challenge, baseline: null, stopped: null, abort: new AbortController() };
+    preflightRef.current = null;
+    const current: Run = { challenge, baseline: baseline[baseline.length - 1], stopped: null, abort: new AbortController() };
     runRef.current = current;
     const stepNames = challenge.steps.map((item) => item.step);
     const frames: Blob[] = [];
     const indexes: number[] = [];
     try {
       setDots({ steps: stepNames, current: 0, done: 0 });
-      const baseline = await followStep(current, 0, "baseline");
-      current.baseline = baseline[0];
       baseline.forEach((blob) => { frames.push(blob); indexes.push(0); });
       for (let index = 1; index < challenge.steps.length; index++) {
         setDots({ steps: stepNames, current: index, done: index });
@@ -218,13 +282,15 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
         if (index < challenge.steps.length - 1) await followStep(current, 0, "center");
       }
     } catch (caught) {
+      if (!mountedRef.current) return;
       const stop = caught instanceof LivenessStop ? caught : new LivenessStop("ERROR");
       current.abort.abort();
       finish();
       if (stop.reason === "RESTART") return run();
       if (stop.reason === "CHALLENGE_CLOSED") {
         setOutcome({ tone: "retry", title: "Time ran out for this check",
-                     detail: `Press "I'm ready" to start a new check. ${challenge.attempts_remaining} attempts left.`, instructions: [] });
+                     detail: challenge.attempts_remaining > 0 ? "Try again when you are ready."
+                       : "Ask the service that sent you for a new verification link.", instructions: [] });
       } else if (stop.reason === "ERROR") {
         setOutcome({ tone: "retry", title: "Something went wrong", detail: stop.failure?.message ?? "Try again.", instructions: [] });
       }
@@ -236,7 +302,7 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
     try {
       const result = await kycApi.submitLiveness(credential, sessionId, challenge, frames, indexes);
       finish();
-      show(result);
+      await show(result);
     } catch (caught) {
       finish();
       const failure = caught as ApiError;
@@ -247,6 +313,10 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
   };
 
   const stopRun = (reason: StopReason) => {
+    if (preflightRef.current) {
+      preflightRef.current.abort();
+      return;
+    }
     const current = runRef.current;
     if (!current) return;
     current.stopped = reason;
@@ -254,21 +324,18 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
     setHelp(null);
   };
 
-  // Ring arcs: one per movement in this challenge, filled as each is completed.
-  const arcs: Partial<Record<Direction, ArcState>> = {};
-  dots?.steps.forEach((name, index) => {
-    if (index === 0 || !(name in STEP_TEXT)) return;
-    const active = index === dots.current && step?.kind === "move";
-    arcs[name as Direction] = { status: index < dots.done ? "done" : active ? "active" : "todo",
-                                progress: active ? coach.progress ?? 0 : 0 };
-  });
+  // Confirmed steps fill the whole circumference; only the current direction is shown.
+  const moves = dots ? dots.steps.length - 1 : 0;
+  const confirmed = Math.max(0, (dots?.done ?? 0) - 1);
+  const ringProgress = moves ? (confirmed + (step?.kind === "move" && step.index === dots?.current ? coach.progress ?? 0 : 0)) / moves : 0;
   const cue = running && step?.kind === "move" && !coach.good ? dots?.steps[step.index] as Direction : null;
   const checkingNow = step?.kind === "checking";
+  const complete = step?.kind === "complete";
 
   // One ring (and so one <video> holding the camera stream) stays mounted; only the panel around it changes.
   return (
     <div className="flex flex-col gap-4">
-      <div className={running ? "flex flex-col gap-4 rounded-2xl bg-foreground-950 px-5 pb-7 pt-4"
+      <div className={running ? "fixed inset-0 z-[100] flex flex-col gap-5 overflow-y-auto bg-foreground-950 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:relative sm:z-auto sm:rounded-2xl sm:px-5 sm:py-5"
                               : "flex flex-col items-center gap-5 px-2 py-4 text-center"}>
         {running && (
           <div className="flex items-center justify-between">
@@ -276,16 +343,20 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
                     className="font-label text-[15px] text-primary-300 hover:text-primary-200 disabled:opacity-40">Cancel</button>
             {step && step.kind !== "checking" && step.total > 0 && (
               <span className="font-label text-xs text-background-50/60">
-                {Math.min(dots?.done ?? 0, step.total)} of {step.total} done
+                {Math.min(Math.max(0, (dots?.done ?? 0) - 1), step.total)} of {step.total} done
               </span>
             )}
           </div>
         )}
-        <FaceScanRing videoRef={camera.videoRef} cameraState={camera.state} arcs={running ? arcs : {}}
-                      theme={running ? "dark" : "light"} showCamera={running} complete={checkingNow}
+        <FaceScanRing videoRef={camera.videoRef} cameraState={camera.state} arcs={{}} progress={running ? ringProgress : 0}
+                      theme={running ? "dark" : "light"} showCamera complete={checkingNow || complete}
                       aligned={running && step?.kind !== "move" && coach.good} cue={cue}
-                      center={!running ? <i className="ri-emotion-happy-line text-[7rem] leading-none text-foreground-300"></i>
-                        : checkingNow ? (
+                      center={camera.state !== "live" ? <i className={`${camera.state === "starting" ? "ri-loader-4-line animate-spin" : "ri-camera-off-line"} text-5xl leading-none text-foreground-400`}></i>
+                        : complete ? (
+                          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-500">
+                            <i className="ri-check-line text-5xl leading-none text-background-50"></i>
+                          </span>
+                        ) : checkingNow ? (
                           <span className="flex h-20 w-20 items-center justify-center rounded-full bg-foreground-950/60">
                             <i className="ri-loader-4-line animate-spin text-4xl leading-none text-background-50"></i>
                           </span>
@@ -331,9 +402,9 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
                 </button>
               </div>
             ) : (
-              <button type="button" onClick={run} disabled={camera.state !== "live"}
+              <button type="button" onClick={run} disabled={camera.state !== "live" || attemptsRemaining === 0}
                       className="w-full max-w-sm rounded-full bg-primary-500 px-6 py-3.5 font-label text-base font-semibold text-background-50 transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
-                {outcome ? "Try again" : "Get Started"}
+                {attemptsRemaining === 0 ? "New verification link needed" : outcome ? "Try again" : "Start face scan"}
               </button>
             )}
           </>

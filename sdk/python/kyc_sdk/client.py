@@ -93,6 +93,10 @@ class _Base:
     def get_session(self, session_id: str) -> dict:
         return self._request("GET", f"/v1/kyc/{session_id}")
 
+    def government_verification(self, session_id: str) -> dict:
+        """Return the official QR handoff; this does not perform government verification."""
+        return self._request("GET", f"/v1/kyc/{session_id}/government-verification")
+
     def give_document_consent(self, session_id: str) -> dict:
         """Record consent to document processing. Call only after the person agreed on their device,
         and before upload_document (required when the platform enforces consent, as in production)."""

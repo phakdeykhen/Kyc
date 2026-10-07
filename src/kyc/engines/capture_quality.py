@@ -11,6 +11,7 @@ from io import BytesIO
 import math
 import warnings
 
+import cv2
 import numpy as np
 from PIL import Image, ImageOps, UnidentifiedImageError
 
@@ -320,9 +321,56 @@ class HeuristicDocumentQualityEngine:
         if expected_aspect is not None and self._precropped(height, width, found, expected_aspect):
             return np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype=np.float32)
         if found is None:
-            return None
+            return self._edge_corners(pixels, expected_aspect) if expected_aspect is not None else None
+        if expected_aspect is not None:
+            corners = found[0]
+            top, right, bottom, left = [float(np.linalg.norm(corners[(i + 1) % 4] - corners[i])) for i in range(4)]
+            horizontal, vertical = (top + bottom) / 2, (left + right) / 2
+            aspect = max(horizontal, vertical) / max(1e-6, min(horizontal, vertical))
+            if abs(aspect / expected_aspect - 1) > self.policy.aspect_tolerance:
+                # Printed ink/portraits on a light scanner crop can be the foreground component.
+                # Warping that component as a card discards fields and destroys glyph proportions.
+                return self._edge_corners(pixels, expected_aspect)
         factor = max(pixels.shape[:2]) / max(small.shape[:2])
         return found[0] * factor
+
+    def _edge_corners(self, pixels: np.ndarray, expected_aspect: float) -> np.ndarray | None:
+        """Geometry fallback for complex phone backgrounds and cropped scanner images.
+
+        Only large convex quadrilaterals of the expected shape qualify. Text blocks,
+        portraits and MRZ bands cannot become a document merely by being dark.
+        """
+        small = _resize(pixels, 800)
+        gray = cv2.cvtColor(small, cv2.COLOR_RGB2GRAY)
+        edges = cv2.Canny(cv2.GaussianBlur(gray, (5, 5), 0), 40, 120)
+        edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+        contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        candidates = []
+        image_area = small.shape[0] * small.shape[1]
+        for contour in contours:
+            area = cv2.contourArea(contour)
+            if area < self.policy.min_coverage * image_area:
+                continue
+            polygon = cv2.approxPolyDP(contour, .025 * cv2.arcLength(contour, True), True)
+            if len(polygon) != 4 or not cv2.isContourConvex(polygon):
+                continue
+            points = polygon[:, 0].astype(np.float32)
+            sums, differences = points.sum(axis=1), points[:, 0] - points[:, 1]
+            corners = np.array([points[sums.argmin()], points[differences.argmax()],
+                                points[sums.argmax()], points[differences.argmin()]])
+            if len(np.unique(corners, axis=0)) != 4:
+                continue
+            top, right, bottom, left = [float(np.linalg.norm(corners[(i + 1) % 4] - corners[i])) for i in range(4)]
+            horizontal, vertical = (top + bottom) / 2, (left + right) / 2
+            aspect = max(horizontal, vertical) / max(1e-6, min(horizontal, vertical))
+            if abs(aspect / expected_aspect - 1) > self.policy.aspect_tolerance:
+                continue
+            if min(top, bottom) / max(top, bottom) * min(left, right) / max(left, right) < self.policy.min_perspective:
+                continue
+            candidates.append((area, corners))
+        if not candidates:
+            return None
+        return max(candidates, key=lambda item: item[0])[1] * (max(pixels.shape[:2]) / max(small.shape[:2]))
 
     def _precropped(self, height: int, width: int, document, expected_aspect: float) -> bool:
         """The image is the document itself: the frame has the document's shape, and either the

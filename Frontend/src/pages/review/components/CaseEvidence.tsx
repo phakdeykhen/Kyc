@@ -113,7 +113,8 @@ export function CaseFields({ data }: { data: ReviewCase }) {
                     {f.flags.length > 0 && <div className="mt-0.5 font-mono text-[10px] text-accent-700">{f.flags.join(", ")}</div>}
                   </td>
                   <td className={`px-4 py-3 text-sm ${f.name === "mrz" ? "font-mono text-xs" : "font-label"} ${canSee ? "text-foreground-950" : "italic text-foreground-400"}`}>
-                    <span className="whitespace-pre-wrap break-all">{canSee ? (f.value ?? "—") : "hidden"}</span>
+                    <span lang={f.value && /[\u1780-\u17ff]/.test(f.value) ? "km" : undefined}
+                          className="whitespace-pre-wrap break-words leading-relaxed">{canSee ? (f.value ?? "—") : "hidden"}</span>
                   </td>
                   <td className="px-4 py-3 font-label text-xs text-foreground-600">{f.source}{f.side ? ` · ${humanize(f.side)}` : ""}</td>
                   <td className="px-4 py-3">

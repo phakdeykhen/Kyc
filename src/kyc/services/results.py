@@ -11,6 +11,7 @@ from kyc.core.crypto import FieldCipher
 from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceComparison, FaceQualityCheck, FraudSignal, IdentityDocument, KYCSession, LivenessCheck, ManualReview, MRZResult, NFCResult, RiskAssessmentRecord
 from kyc.domain.enums import CheckResult
 from kyc.services.captures import side_progress
+from kyc.services.government import build_government_verification
 
 # NFC_VERIFIED means signed by a trusted issuer and unaltered; it is still evidence, not a decision.
 NFC_CHECK = {"NFC_VERIFIED": "PASS", "NFC_READ": "REVIEW", "NFC_FAILED": "FAIL", "NFC_NOT_AVAILABLE": "REVIEW",
@@ -21,7 +22,7 @@ CHECK_GROUPS = {"CLASSIFICATION": "document_classification", "EXPIRY": "expiry",
                 "MRZ_CONSISTENCY": "mrz_consistency", "BARCODE": "barcode", "ISSUING_COUNTRY": "issuing_country",
                 "CROSS_CHECK": "cross_check", "FRAUD_ANALYSIS": "fraud"}
 DATA_CHECKS = {"REQUIRED_FIELDS", "DOCUMENT_NUMBER_FORMAT", "NATIONAL_ID_NUMBER_FORMAT", "DATE_CONSISTENCY",
-               "OCR_CONFIDENCE", "SCRIPT_CONSISTENCY"}
+               "OCR_CONFIDENCE", "SCRIPT_CONSISTENCY", "KHMER_NAME", "KHMER_TEXT"}
 
 
 def mask(value: str | None) -> str | None:
@@ -171,10 +172,11 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None, re
                                                  evidence.signals, evidence.document)
     decision, review = latest_decision(db, record), latest_review(db, record)
     erased_at = record.erased_at.replace(tzinfo=record.erased_at.tzinfo or timezone.utc) if record.erased_at else None
+    government = build_government_verification(db, record, cipher, reveal_link=reveal_identity)
     if document is None or cipher is None:
         return SessionResult(session_id=record.id, status=record.status, checks=checks, fraud_signals=signals,
                              face_comparison=summary, review_flags=sorted(set(flags)), decision=decision, review=review,
-                             erased_at=erased_at)
+                             erased_at=erased_at, government_verification=government)
 
     values: dict[str, str] = {}
     for field in db.scalars(sa.select(DocumentField).where(DocumentField.organization_id == record.organization_id,
@@ -199,6 +201,6 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None, re
         ResultIdentity(full_name=mask_name(values.get("full_name")), full_name_local=mask_name(values.get("full_name_local")),
                        date_of_birth=mask_date(values.get("date_of_birth")), sex=values.get("sex"),
                        nationality=values.get("nationality")),
-        identity_masked=not reveal_identity,
+        identity_masked=not reveal_identity, government_verification=government,
         mrz=ResultMRZ(format=mrz.format, mrz_valid=mrz.mrz_valid, check_digit_results=mrz.check_digit_results,
                       field_consistency=mrz.field_consistency) if mrz else None)

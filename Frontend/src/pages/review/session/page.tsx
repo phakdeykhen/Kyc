@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppHeader from "@/components/feature/AppHeader";
 import SiteFooter from "@/components/feature/SiteFooter";
+import GovernmentVerificationPanel from "@/components/feature/GovernmentVerificationPanel";
 import StatusBadge from "@/components/base/StatusBadge";
 import SignalList from "@/pages/review/components/SignalList";
 import AuditTrail from "@/pages/review/components/AuditTrail";
@@ -174,6 +175,7 @@ export default function ReviewSessionPage() {
               </div>
               <div className="flex min-w-0 flex-col gap-4">
                 <RiskPanel data={data} />
+                <GovernmentVerificationPanel data={data.government_verification} />
                 <SignalList signals={data.fraud_signals} />
                 <BiometricPanel data={data} />
               </div>

@@ -37,7 +37,8 @@ TITLE_CUES: dict[DocumentType, tuple[str, ...]] = {
 }
 FLAG_PENALTY = {"MIXED_DIGIT_SCRIPTS": 0.6, "FUZZY_LABEL": 0.9, "AMBIGUOUS_CANDIDATES": 0.7,
                 "NON_NAME_CHARACTERS_REMOVED": 0.85, "EXPECTED_KHMER_SCRIPT": 0.6, "VALUE_ON_NEXT_LINE": 0.95,
-                "OCR_PASSES_DISAGREED": 0.9, "NUMERIC_REREAD_REJECTED": 0.8}
+                "OCR_PASSES_DISAGREED": 0.9, "NUMERIC_REREAD_REJECTED": 0.8,
+                "FIELD_UNCERTAIN": 0.8, "OCR_NOISE_DETECTED": 0.5, "KHMER_ORDERING_UNCERTAIN": 0.6}
 # Cambodian cards print Khmer numerals; numeric words get a second read restricted to them.
 KHMER_NUMERIC_REFINEMENT = NumericRefinement(languages=("script/Khmer",), alphabet=khmer.KHMER_DIGITS + "./")
 NORMALIZERS = {"khmer": khmer.khmer_text, "date": khmer.parse_date_any, "sex": khmer.parse_sex,
@@ -113,10 +114,18 @@ class CardLayout:
     ocr_languages: tuple[str, ...] | None = None              # visual-zone OCR models; None → service default
     barcode_expected: bool = False                            # True: a missing barcode is a REVIEW signal
     portrait_regions: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)
+    khmer_field_regions: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)
 
 
 def _similar(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b, autojunk=False).ratio()
+
+
+def is_mrz_line(line: OCRLine) -> bool:
+    """Noisy/fused MRZ reads must never become Khmer address continuation lines."""
+    text = clean_mrz(line.text)
+    return ("MRZ_PASS" in line.notes or ("<" in text and bool(MRZ_LINE.fullmatch(text))) or text.count("<") >= 2
+            or bool(re.search(r"(?:ID|P[<])KHM[A-Z0-9<]", text)))
 
 
 def find_label(text: str, label: str, threshold: float) -> tuple[int, int, bool] | None:
@@ -269,13 +278,13 @@ class KhmerLabelAdapter:
                 following_text = lines[index + 1].text if index + 1 < len(lines) else ""
                 if not value and following_text and index + 1 not in label_lines \
                         and not (latin_guard and LATIN_NAME_LINE.match(following_text)) \
-                        and not MRZ_LINE.match(following_text.replace(" ", "")):
+                        and not is_mrz_line(lines[index + 1]):
                     source, value, flags = lines[index + 1], following_text.strip(" :;"), flags + ("VALUE_ON_NEXT_LINE",)
                 for extra in range(1, self.layout.multiline.get(name, 0) + 1):
                     follow = index + extra + (1 if "VALUE_ON_NEXT_LINE" in flags else 0)
                     if follow >= len(lines) or follow in label_lines \
                             or (latin_guard and LATIN_NAME_LINE.match(lines[follow].text)) \
-                            or MRZ_LINE.match(lines[follow].text.replace(" ", "")):
+                            or is_mrz_line(lines[follow]):
                         break
                     value = f"{value} {lines[follow].text}".strip()
                     following = lines[follow]
@@ -326,10 +335,17 @@ class KhmerLabelAdapter:
         primary_side = layout.sides[0]
         front = lines_by_side.get(primary_side, [])
         back = [line for side, lines in lines_by_side.items() if side != primary_side for line in lines]
-        occurrences = self._labelled_occurrences([line for line in front if "MRZ_PASS" not in line.notes])
+        visual = [line for line in front if not is_mrz_line(line) and not any(note.startswith("FIELD_ROI:") for note in line.notes)]
+        occurrences = self._labelled_occurrences(visual)
         values = {name: entries[0] for name, entries in occurrences.items()}
         fields: list[OCRField] = []
         for label, output, normalizer in layout.text_fields:
+            dedicated = next((line for line in front if f"FIELD_ROI:{output}" in line.notes), None)
+            if dedicated is not None:
+                normalized = NORMALIZERS[normalizer](dedicated.text)
+                flags = tuple(note for note in dedicated.notes if not note.startswith("FIELD_ROI:"))
+                fields.append(self._field(output, dedicated.raw_text or dedicated.text, normalized, dedicated, primary_side, flags))
+                continue
             raw, line, flags = values.get(label, (None, None, ()))
             normalized = NORMALIZERS[normalizer](raw) if raw else khmer.Normalized(None, ("NOT_FOUND",))
             fields.append(self._field(output, raw, normalized, line, primary_side, flags))
@@ -545,6 +561,18 @@ class KhmerLabelAdapter:
         checks.append(CheckEvidence(CheckResult.REVIEW if mixed else CheckResult.PASS,
                                     ("MIXED_DIGIT_SCRIPTS",) if mixed else ("SCRIPT_CONSISTENT",),
                                     check_type="SCRIPT_CONSISTENCY", details={"fields": mixed}))
+
+        khmer_name = by_name.get("full_name_local")
+        if "full_name_local" in layout.critical_fields and (khmer_name is None or not khmer_name.normalized_value
+                                                           or khmer_name.confidence < p.min_field_confidence):
+            checks.append(CheckEvidence(CheckResult.REVIEW,
+                ("KHMER_NAME_NOT_DETECTED" if khmer_name is None or not khmer_name.normalized_value
+                 else "KHMER_NAME_LOW_CONFIDENCE",), check_type="KHMER_NAME"))
+        noisy = sorted(name for name, item in by_name.items() if "OCR_NOISE_DETECTED" in item.flags
+                       or "FIELD_UNCERTAIN" in item.flags or "KHMER_ORDERING_UNCERTAIN" in item.flags)
+        if noisy:
+            checks.append(CheckEvidence(CheckResult.REVIEW, ("OCR_NOISE_DETECTED", "LOW_OCR_CONFIDENCE"),
+                                        check_type="KHMER_TEXT", details={"fields": noisy}))
 
         checks.extend(self._mrz_checks(document, today))
         checks.append(self.parse_barcode(b""))  # replaced by barcode.evaluate when the service decodes codes

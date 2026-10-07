@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from kyc.api.dependencies import TenantContext
 from kyc.biometrics.embeddings import deserialize_embedding
 from kyc.biometrics.types import FaceEngineUnavailable
+from kyc.biometrics.quality import assess_face_quality
 from kyc.db.models import AuditLog, BiometricTemplate, KYCSession, LivenessChallenge, LivenessCheck
 from kyc.domain.enums import CheckResult, SessionStatus, VerificationLevel
 from kyc.domain.state_machine import Event
@@ -128,6 +129,38 @@ def _single_face(engine, data: bytes, limits: LivenessLimits):
         return "OK", pose(faces[0].landmarks)
     except ValueError:
         return "UNCLEAR", None
+
+
+def position_face(db: Session, tenant: TenantContext, session_id: UUID, frame: bytes, engine,
+                  policy: ActiveLivenessPolicy, limits: LivenessLimits, request_id: UUID) -> dict | JSONResponse:
+    """Check positioning before issuing a challenge. No attempt or biometric evidence is stored."""
+    record, problem = _session(db, tenant, session_id, request_id)
+    if problem:
+        return problem
+    remaining = max(0, limits.max_attempts - _attempts(db, record))
+    if remaining == 0:
+        return _error(429, "LIVENESS_ATTEMPTS_EXCEEDED", "Too many liveness attempts. Create a new session.", 0)
+    reason = engine.unavailable_reason() if engine is not None else "FACE_MODELS_UNAVAILABLE"
+    if reason:
+        return _error(503, reason, "Face checking is unavailable. Retry later.", remaining)
+    try:
+        capture = decode_capture(frame, max_bytes=limits.max_frame_bytes, max_pixels=limits.max_frame_pixels)
+        image = Image.fromarray(capture.pixels)
+        faces = engine.detect(image)
+        quality = assess_face_quality(image, faces)
+        face = "OK" if len(faces) == 1 else "MULTIPLE_FACES" if faces else "NO_FACE"
+        instructions = list(quality.instructions)
+        ready = quality.accepted
+        if ready and abs(pose(faces[0].landmarks).a) > policy.movement / 2:
+            ready, instructions = False, ["LOOK_STRAIGHT"]
+    except CaptureRejected as rejected:
+        return _error(422, rejected.reason_code, str(rejected), remaining)
+    except ValueError:
+        face, ready, instructions = "UNCLEAR", False, ["FACE_CAMERA"]
+    except FaceEngineUnavailable:
+        return _error(503, "FACE_MODELS_UNAVAILABLE", "Face checking is unavailable. Retry later.", remaining)
+    return {"face": face, "state": "READY" if ready else "POSITIONING", "instructions": instructions,
+            "attempts_remaining": remaining}
 
 
 def guide_step(db: Session, tenant: TenantContext, session_id: UUID, challenge_id: UUID, nonce: str, step_index: int,

@@ -23,6 +23,7 @@ class OCRLine(BaseModel):
     bbox: tuple[float, float, float, float]
     words: tuple[OCRWord, ...] = ()
     notes: tuple[str, ...] = ()
+    raw_text: str | None = None  # multi-pass raw readings; encrypted with the field, never logged
 
 
 class OCRField(BaseModel):
