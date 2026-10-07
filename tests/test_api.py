@@ -25,6 +25,7 @@ def configuration(organization_id, **extra):
                 "face_match_calibrated": False, "face_match_calibration_reference": None,
                 "face_match_policy_version": "SFACE-COSINE-UNCALIBRATED-2026.10.1",
                 "face_match_pass_threshold": 0.363, "face_match_fail_threshold": 0.20,
+                "face_match_calibration_file": None, "liveness_validation_file": None,
                 "document_processing_mode": "inline", "tesseract_cmd": "tesseract", "ocr_languages": "khm,eng",
                 "webhook_delivery_mode": "worker", "webhook_allow_private_targets": False}
     return Settings(_env_file=None, environment="test", database_url="sqlite://",
@@ -130,6 +131,16 @@ class SessionAPITests(unittest.IsolatedAsyncioTestCase):
             code, body, _ = await call(self.app, "/v1/kyc/sessions", "POST", self.payload | extra, self.headers)
             self.assertEqual(code, 422, body)
             self.assertNotIn("external-customer", json.dumps(body))
+
+    async def test_nfc_level_is_refused_where_chips_cannot_be_verified(self):
+        self.app.state.settings.nfc_enabled = False
+        try:
+            code, body, _ = await call(self.app, "/v1/kyc/sessions", "POST",
+                                       self.payload | {"verification_level": "DOCUMENT_FACE_LIVENESS_NFC"}, self.headers)
+            self.assertEqual((code, body["reason_code"]), (422, "NFC_NOT_SUPPORTED"))
+            await self.create()  # other levels are unaffected
+        finally:
+            self.app.state.settings.nfc_enabled = True
 
     async def test_audit_metadata_omits_identity_fields(self):
         await self.create()

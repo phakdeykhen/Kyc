@@ -68,6 +68,19 @@ class RiskEngineTests(unittest.TestCase):
         self.assertEqual(run(level=L.DOCUMENT_ONLY, liveness=None, face_match=None, nfc=None).reason_codes,
                          ["DOCUMENT_VALID", "NO_FRAUD_SIGNALS"])
 
+    def test_uncalibrated_face_pass_is_never_a_match(self):
+        outcome = run(calibrated=False)
+        self.assertEqual((outcome.decision, outcome.reason_codes), ("REVIEW", ["FACE_MATCH_UNCALIBRATED"]))
+        self.assertFalse(outcome.evidence.policy_pass)
+
+    def test_same_evidence_and_policy_always_give_the_same_decision(self):
+        variants = [{}, {"document_data": "REVIEW"}, {"liveness": "FAIL"}, {"nfc": None},
+                    {"face_match": "REVIEW", "calibrated": False}]
+        for changes in variants:
+            with self.subTest(changes=changes):
+                outcomes = {(o.decision, tuple(o.reason_codes), repr(o.trace)) for o in (run(**changes) for _ in range(25))}
+                self.assertEqual(len(outcomes), 1)
+
     def test_reading_is_not_authenticating(self):
         outcome = run(sources=())
         self.assertEqual((outcome.decision, outcome.reason_codes), ("REVIEW", ["DOCUMENT_AUTHENTICITY_UNVERIFIED"]))

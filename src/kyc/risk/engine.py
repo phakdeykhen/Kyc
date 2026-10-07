@@ -68,7 +68,8 @@ def evaluate(inputs: RiskInputs, policy: ResolvedPolicy) -> RiskOutcome:
             hit("REVIEW", f"CHECK_{name.upper()}_{value}", f"check:{key}")
     if not inputs.authenticity_sources:
         hit("REVIEW", "DOCUMENT_AUTHENTICITY_UNVERIFIED", "authenticity:none")
-    if inputs.checks.get("face_match") == "REVIEW" and not inputs.face_match_calibrated:
+    if inputs.checks.get("face_match") in ("REVIEW", "PASS") and not inputs.face_match_calibrated:
+        # Defence in depth: a PASS from an uncalibrated threshold is not a match (spec: never MATCH uncalibrated).
         hit("REVIEW", "FACE_MATCH_UNCALIBRATED", "calibration:face_match")
 
     # 3. Fraud signals.
