@@ -5,7 +5,8 @@ import { ApiError } from "@/api/http";
 import type { LivenessChallenge, LivenessResult, SessionStatus } from "@/api/types";
 import { instructionText } from "@/lib/catalog";
 import { useCamera, useLightHint } from "@/lib/useCamera";
-import CameraView from "@/pages/verify/components/CameraView";
+import FaceScanRing from "@/pages/verify/components/FaceScanRing";
+import type { ArcState, Direction } from "@/pages/verify/components/FaceScanRing";
 
 interface LivenessStageProps {
   credential: Client;
@@ -18,21 +19,21 @@ interface LivenessStageProps {
 // and moves on once HOLD_FRAMES frames in a row show it. Raw frames are then submitted with their step
 // index; the server judges them again, in memory, and keeps none.
 
-const STEP_TEXT: Record<string, { say: string; cue: string; more?: string; wrong?: string }> = {
-  LOOK_STRAIGHT: { say: "Look straight at the camera", cue: "" },
-  TURN_LEFT: { say: "Turn your head to your left", cue: "ri-arrow-left-line",
+const STEP_TEXT: Record<string, { say: string; more?: string; wrong?: string }> = {
+  LOOK_STRAIGHT: { say: "Look straight at the camera" },
+  TURN_LEFT: { say: "Turn your head to your left",
     more: "Turn further, as if looking over your left shoulder.", wrong: "That's the other way. Turn to your left." },
-  TURN_RIGHT: { say: "Turn your head to your right", cue: "ri-arrow-right-line",
+  TURN_RIGHT: { say: "Turn your head to your right",
     more: "Turn further, as if looking over your right shoulder.", wrong: "That's the other way. Turn to your right." },
-  LOOK_UP: { say: "Tilt your head up", cue: "ri-arrow-up-line",
+  LOOK_UP: { say: "Tilt your head up",
     more: "Lift your chin higher, as if looking at the ceiling.", wrong: "That's down. Tilt your head up instead." },
-  LOOK_DOWN: { say: "Tilt your head down", cue: "ri-arrow-down-line",
+  LOOK_DOWN: { say: "Tilt your head down",
     more: "Lower your chin further, as if looking at the floor.", wrong: "That's up. Tilt your head down instead." },
 };
 const FACE_TEXT: Record<string, string> = {
-  NO_FACE: "We can't see your face. Keep it inside the oval.",
+  NO_FACE: "We can't see your face. Keep it inside the circle.",
   MULTIPLE_FACES: "Only your face should be in view.",
-  UNCLEAR: "Hold still with your whole face in the oval and good light.",
+  UNCLEAR: "Hold still with your whole face in the circle and good light.",
 };
 const HOLD_FRAMES = 2;
 const GUIDE_INTERVAL_MS = 650;  // ≈90 checks a minute, inside the client-token rate limit
@@ -67,7 +68,7 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
   const runRef = useRef<Run | null>(null);
   const [running, setRunning] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [step, setStep] = useState<{ text: string; cue: string; coach: string; index: number; total: number } | null>(null);
+  const [step, setStep] = useState<{ text: string; kind: Kind | "checking"; index: number; total: number } | null>(null);
   const [coach, setCoach] = useState<{ text: string; progress: number | null; good: boolean }>({ text: "", progress: null, good: false });
   const [dots, setDots] = useState<{ steps: string[]; current: number; done: number } | null>(null);
   const [help, setHelp] = useState<string[] | null>(null);
@@ -88,29 +89,27 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
 
   const showStep = useCallback((run: Run, index: number, kind: Kind) => {
     const steps = run.challenge.steps;
-    const text = STEP_TEXT[steps[index].step] ?? { say: steps[index].instruction, cue: "" };
+    const text = STEP_TEXT[steps[index].step] ?? { say: steps[index].instruction };
     setStep({
-      text: kind === "center" ? "Turn your head back to the center" : text.say,
-      cue: kind === "move" ? text.cue : "",
-      coach: kind === "move" ? `Step ${index} of ${steps.length - 1} · keep going until the bar is full` : kind === "baseline" ? "Hold still for a moment." : "",
-      index, total: steps.length - 1,
+      text: kind === "center" ? "Look back at the center" : kind === "baseline" ? "Position your face in the circle" : text.say,
+      kind, index, total: steps.length - 1,
     });
-    setCoach({ text: kind === "move" ? "Move slowly." : "Keep your face inside the oval.", progress: 0, good: false });
+    setCoach({ text: kind === "move" ? "Move slowly to fill the circle." : "Hold still for a moment.", progress: 0, good: false });
   }, []);
 
   // Tips appear beside the camera while the check keeps running, so the step completes as soon as it is done.
   const showTips = useCallback((run: Run, index: number, kind: Kind) => {
     const stepName = run.challenge.steps[index].step;
     setHelp(kind === "move"
-      ? [STEP_TEXT[stepName]?.more ?? "Move your head clearly.", "Move slowly and keep your whole face inside the oval.",
+      ? [STEP_TEXT[stepName]?.more ?? "Move your head clearly.", "Move slowly and keep your whole face inside the circle.",
          "Keep the camera still at eye level and move only your head.", "Make sure your face is evenly lit."]
-      : ["Hold the camera at eye level, about an arm's length away.", "Keep your whole face inside the oval.",
+      : ["Hold the camera at eye level, about an arm's length away.", "Keep your whole face inside the circle.",
          "Find even light and remove anything covering your face."]);
   }, []);
 
   // Repeats until HOLD_FRAMES consecutive frames satisfy the step; returns those frames.
   const followStep = useCallback(async (run: Run, index: number, kind: Kind): Promise<Blob[]> => {
-    const text = STEP_TEXT[run.challenge.steps[index].step] ?? { say: "", cue: "" };
+    const text = STEP_TEXT[run.challenge.steps[index].step] ?? { say: "" };
     showStep(run, index, kind);
     let held: Blob[] = [];
     const started = Date.now();
@@ -203,7 +202,7 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
     }
     const current: Run = { challenge, baseline: null, stopped: null, abort: new AbortController() };
     runRef.current = current;
-    const stepNames = challenge.steps.map((item) => STEP_TEXT[item.step]?.say ?? item.instruction);
+    const stepNames = challenge.steps.map((item) => item.step);
     const frames: Blob[] = [];
     const indexes: number[] = [];
     try {
@@ -232,7 +231,7 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
       return;
     }
     setChecking(true);
-    setStep({ text: "Checking…", cue: "", coach: "", index: 0, total: 0 });
+    setStep({ text: "Checking…", kind: "checking", index: 0, total: 0 });
     setCoach({ text: "All steps done. Checking…", progress: null, good: true });
     try {
       const result = await kycApi.submitLiveness(credential, sessionId, challenge, frames, indexes);
@@ -255,88 +254,91 @@ export default function LivenessStage({ credential, sessionId, onSessionChanged 
     setHelp(null);
   };
 
-  const overlay = running && step ? (
-    <div className="flex h-full flex-col items-center justify-between p-4">
-      <div className="rounded-lg bg-foreground-950/70 px-4 py-2 text-center">
-        <p className="font-heading text-lg font-semibold text-background-50">{step.text}</p>
-        {step.coach && <p className="mt-0.5 font-label text-xs text-background-50/70">{step.coach}</p>}
-      </div>
-      {step.cue && <i className={`${step.cue} animate-pulse text-6xl leading-none text-primary-300 drop-shadow`}></i>}
-      <div className="w-full max-w-[320px] rounded-lg bg-foreground-950/70 px-4 py-2">
-        <p className={`text-center font-label text-sm ${coach.good ? "text-primary-200" : "text-background-50"}`}>{coach.text}</p>
-        {coach.progress !== null && (
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-background-50/20">
-            <div className="h-full rounded-full bg-primary-400 transition-all" style={{ width: `${Math.round(coach.progress * 100)}%` }}></div>
-          </div>
-        )}
-      </div>
-    </div>
-  ) : undefined;
+  // Ring arcs: one per movement in this challenge, filled as each is completed.
+  const arcs: Partial<Record<Direction, ArcState>> = {};
+  dots?.steps.forEach((name, index) => {
+    if (index === 0 || !(name in STEP_TEXT)) return;
+    const active = index === dots.current && step?.kind === "move";
+    arcs[name as Direction] = { status: index < dots.done ? "done" : active ? "active" : "todo",
+                                progress: active ? coach.progress ?? 0 : 0 };
+  });
+  const cue = running && step?.kind === "move" && !coach.good ? dots?.steps[step.index] as Direction : null;
+  const checkingNow = step?.kind === "checking";
 
+  // One ring (and so one <video> holding the camera stream) stays mounted; only the panel around it changes.
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="font-heading text-lg font-semibold text-foreground-950">Movement check</h2>
-        <p className="mt-0.5 font-label text-sm text-foreground-600">
-          Shows that you are present in person. Follow each instruction: move your head slowly, then hold still.
-          The order is random every time, and no video is kept.
-        </p>
-      </div>
-
-      {dots && (
-        <ol className="flex flex-wrap gap-1.5">
-          {dots.steps.map((label, index) => (
-            <li key={`${index}-${label}`} className={`rounded-full border px-2.5 py-1 font-label text-[11px] ${
-              index < dots.done ? "border-primary-200 bg-primary-100 text-primary-900"
-                : index === dots.current ? "border-primary-300 bg-primary-50 text-primary-800" : "border-background-200 text-foreground-500"}`}>
-              {index < dots.done && <i className="ri-check-line mr-1 text-xs leading-none"></i>}{label}
-            </li>
-          ))}
-        </ol>
-      )}
-
-      <CameraView videoRef={camera.videoRef} state={camera.state} shape="face" overlay={overlay}
-                  good={running ? coach.good : camera.state === "live" && !lightHint}
-                  hint={running ? null : lightHint ?? "Light and focus OK. Press I'm ready, then follow each instruction."} />
-
-      {help && (
-        <div className="rounded-lg border border-accent-200 bg-accent-50 p-4">
-          <p className="font-label text-sm font-medium text-accent-900">Having trouble? Try this:</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 font-label text-sm text-accent-900">
-            {help.map((tip) => <li key={tip}>{tip}</li>)}
-          </ul>
-          <p className="mt-2 font-label text-xs text-accent-800">We're still checking, so keep trying.</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={() => stopRun("RESTART")}
-                    className="rounded-md border border-background-300 bg-background-50 px-4 py-2 font-label text-sm text-foreground-800 hover:bg-background-100">Start over</button>
+      <div className={running ? "flex flex-col gap-4 rounded-2xl bg-foreground-950 px-5 pb-7 pt-4"
+                              : "flex flex-col items-center gap-5 px-2 py-4 text-center"}>
+        {running && (
+          <div className="flex items-center justify-between">
+            <button type="button" onClick={() => stopRun("CANCELLED")} disabled={checking}
+                    className="font-label text-[15px] text-primary-300 hover:text-primary-200 disabled:opacity-40">Cancel</button>
+            {step && step.kind !== "checking" && step.total > 0 && (
+              <span className="font-label text-xs text-background-50/60">
+                {Math.min(dots?.done ?? 0, step.total)} of {step.total} done
+              </span>
+            )}
           </div>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-        {!running ? (
-          <button type="button" onClick={run} disabled={camera.state !== "live"}
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary-500 px-5 py-2.5 font-label text-sm font-medium text-background-50 transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
-            <i className="ri-play-circle-line text-base leading-none"></i>
-            I'm ready
-          </button>
-        ) : (
-          <button type="button" onClick={() => stopRun("CANCELLED")} disabled={checking}
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-background-300 px-5 py-2.5 font-label text-sm font-medium text-foreground-800 transition-colors hover:bg-background-100 disabled:opacity-50">
-            <i className="ri-stop-circle-line text-base leading-none"></i>
-            Cancel
-          </button>
         )}
-        {camera.state === "unavailable" && (
-          <button type="button" onClick={camera.start}
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-background-300 px-5 py-2.5 font-label text-sm text-foreground-700 hover:bg-background-100">
-            <i className="ri-refresh-line text-base leading-none"></i>Retry camera
-          </button>
+        <FaceScanRing videoRef={camera.videoRef} cameraState={camera.state} arcs={running ? arcs : {}}
+                      theme={running ? "dark" : "light"} showCamera={running} complete={checkingNow}
+                      aligned={running && step?.kind !== "move" && coach.good} cue={cue}
+                      center={!running ? <i className="ri-emotion-happy-line text-[7rem] leading-none text-foreground-300"></i>
+                        : checkingNow ? (
+                          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-foreground-950/60">
+                            <i className="ri-loader-4-line animate-spin text-4xl leading-none text-background-50"></i>
+                          </span>
+                        ) : undefined} />
+        {running ? (
+          <>
+            <div className="min-h-[88px] text-center" aria-live="polite">
+              <p className="font-heading text-xl font-semibold text-background-50">{step?.text}</p>
+              <p className={`mt-1.5 font-label text-[15px] ${coach.good ? "text-primary-300" : "text-background-50/75"}`}>{coach.text}</p>
+            </div>
+            {help && (
+              <div className="rounded-xl bg-background-50/10 px-4 py-3">
+                <ul className="list-disc space-y-1 pl-5 font-label text-sm text-background-50/85">
+                  {help.map((tip) => <li key={tip}>{tip}</li>)}
+                </ul>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <p className="font-label text-xs text-background-50/60">We're still checking, so keep trying.</p>
+                  <button type="button" onClick={() => stopRun("RESTART")}
+                          className="whitespace-nowrap font-label text-sm text-primary-300 hover:text-primary-200">Start over</button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="max-w-sm">
+              <h2 className="font-heading text-xl font-semibold text-foreground-950">Movement check</h2>
+              <p className="mt-1.5 font-label text-[15px] leading-relaxed text-foreground-500">
+                First, position your face in the circle. Then move your head slowly in each direction shown to
+                complete the circle. No video is kept.
+              </p>
+            </div>
+            {camera.state === "live" && lightHint && <p className="font-label text-sm text-accent-800">{lightHint}</p>}
+            {camera.state === "starting" && (
+              <p className="font-label text-sm text-foreground-500"><i className="ri-loader-4-line mr-1 animate-spin"></i>Starting camera…</p>
+            )}
+            {camera.state === "unavailable" ? (
+              <div className="flex flex-col items-center gap-2">
+                <p className="font-label text-sm text-foreground-600">This check needs a live camera. Allow camera access and try again.</p>
+                <button type="button" onClick={camera.start}
+                        className="inline-flex items-center gap-2 rounded-full border border-background-300 px-5 py-2.5 font-label text-sm text-foreground-700 hover:bg-background-100">
+                  <i className="ri-refresh-line text-base leading-none"></i>Retry camera
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={run} disabled={camera.state !== "live"}
+                      className="w-full max-w-sm rounded-full bg-primary-500 px-6 py-3.5 font-label text-base font-semibold text-background-50 transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
+                {outcome ? "Try again" : "Get Started"}
+              </button>
+            )}
+          </>
         )}
       </div>
-      {camera.state === "unavailable" && (
-        <p className="text-center font-label text-xs text-foreground-500">This check needs a live camera; photos cannot be uploaded for it.</p>
-      )}
 
       {outcome && (
         <div className={`rounded-lg border p-4 ${outcome.tone === "ok" ? "border-primary-200 bg-primary-50" : "border-accent-200 bg-accent-50"}`}>
