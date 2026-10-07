@@ -47,6 +47,8 @@ export default function VerificationSession() {
     }
   });
   const [now, setNow] = useState(Date.now());
+  // Shown above the card capture when the selfie step sent the person back to retake the card.
+  const [portraitRecapture, setPortraitRecapture] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!credential) return;
@@ -70,6 +72,9 @@ export default function VerificationSession() {
 
   // The server works on its own in these statuses; keep checking until it moves on.
   const status = session?.status;
+  useEffect(() => {
+    if (status && status !== "CREATED" && status !== "DOCUMENT_REQUIRED") setPortraitRecapture(false);
+  }, [status]);
   useEffect(() => {
     if (status !== "DOCUMENT_PROCESSING" && status !== "PROCESSING") return;
     const timer = window.setTimeout(refresh, POLL_MS);
@@ -120,11 +125,29 @@ export default function VerificationSession() {
       stage = <ConsentStage credential={credential} sessionId={sessionId} documentType={session.expected_document_type}
                             onConsented={markConsented} onSessionChanged={onSessionChanged} />;
     } else if (s === "CREATED" || s === "DOCUMENT_REQUIRED") {
-      stage = <CaptureStage key="document" credential={credential} sessionId={sessionId}
-                            documentType={session.expected_document_type} sides={sides}
-                            onSessionChanged={onSessionChanged} onConsentMissing={consentMissing} onUploaded={refresh} />;
+      stage = (
+        <>
+          {portraitRecapture && (
+            <div role="alert" className="mb-4 flex gap-3 rounded-lg border border-accent-200 bg-accent-50 px-4 py-3">
+              <i className="ri-error-warning-line mt-0.5 text-lg leading-none text-accent-700"></i>
+              <div className="font-label text-sm text-accent-900">
+                <p className="font-semibold">Please take your ID card photos again</p>
+                <p className="mt-1">
+                  We couldn't see the face photo on your card clearly enough to compare it with your selfie.
+                  Lay the card flat in good light without reflections, tap the photo on the card to focus,
+                  and hold the phone still while it takes the picture.
+                </p>
+              </div>
+            </div>
+          )}
+          <CaptureStage key="document" credential={credential} sessionId={sessionId}
+                        documentType={session.expected_document_type} sides={sides}
+                        onSessionChanged={onSessionChanged} onConsentMissing={consentMissing} onUploaded={refresh} />
+        </>
+      );
     } else if (s === "SELFIE_REQUIRED") {
-      stage = <SelfieStage credential={credential} sessionId={sessionId} onSessionChanged={onSessionChanged} />;
+      stage = <SelfieStage credential={credential} sessionId={sessionId} onSessionChanged={onSessionChanged}
+                           onDocumentRecapture={() => setPortraitRecapture(true)} />;
     } else if (s === "LIVENESS_REQUIRED") {
       stage = <LivenessStage credential={credential} sessionId={sessionId} onSessionChanged={onSessionChanged} />;
     } else if (s === "NFC_REQUIRED") {

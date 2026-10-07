@@ -11,10 +11,12 @@ interface SelfieStageProps {
   credential: Client;
   sessionId: string;
   onSessionChanged: (status: SessionStatus) => void;
+  /** The card's portrait could not be used, so the server sent the person back to retake the card. */
+  onDocumentRecapture?: () => void;
 }
 
 /** Live selfie, compared only with this session's document portrait. Needs explicit biometric consent. */
-export default function SelfieStage({ credential, sessionId, onSessionChanged }: SelfieStageProps) {
+export default function SelfieStage({ credential, sessionId, onSessionChanged, onDocumentRecapture }: SelfieStageProps) {
   const camera = useCamera("user");
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -37,6 +39,7 @@ export default function SelfieStage({ credential, sessionId, onSessionChanged }:
       setLast(result);
       if (result.status !== "SELFIE_REQUIRED") {
         camera.stop();
+        if (result.status === "DOCUMENT_REQUIRED") onDocumentRecapture?.();
         onSessionChanged(result.status);
       }
     } catch (caught) {
