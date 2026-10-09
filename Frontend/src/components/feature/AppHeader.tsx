@@ -1,17 +1,14 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Menu, Plus, X } from "lucide-react";
 import { useApiKey, useStaffAuth } from "@/auth/useStaffAuth";
+import Brand from "./Brand";
 
-interface NavItem {
-  label: string;
-  to: string;
-}
-
-const navItems: NavItem[] = [
-  { label: "Console", to: "/console" },
+const navItems = [
+  { label: "Overview", to: "/console" },
   { label: "New verification", to: "/verify/new" },
-  { label: "Review", to: "/review" },
-  { label: "Developer", to: "/developers" },
+  { label: "Review queue", to: "/review" },
+  { label: "Developers", to: "/developers" },
 ];
 
 export default function AppHeader() {
@@ -20,115 +17,30 @@ export default function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { profile, signOut } = useStaffAuth();
   const { apiKey, organization } = useApiKey();
-  const initials = (profile?.display_name ?? "")
-    .split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "?";
-
+  const initials = (profile?.display_name ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "?";
+  const leave = () => { signOut(); navigate("/signin", { replace: true }); };
   const isActive = (to: string) => location.pathname.startsWith(to);
 
-  const leave = () => {
-    signOut();
-    navigate("/signin", { replace: true });
-  };
-
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-background-200/80 bg-background-50/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 items-center justify-between gap-4 px-4 md:px-6">
-        <div className="flex items-center gap-8">
-          <Link to="/console" className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-500 text-background-50">
-              <i className="ri-fingerprint-2-line text-xl leading-none"></i>
-            </span>
-            <span className="font-heading text-lg font-semibold tracking-tight text-foreground-950">
-              Verix
-              <span className="ml-1.5 rounded bg-secondary-100 px-1.5 py-0.5 align-middle font-label text-[10px] font-medium uppercase tracking-wider text-secondary-700">
-                KYC
-              </span>
-            </span>
+    <header className="marketing-header staff-header">
+      <div className="marketing-header-inner">
+        <Link to="/" aria-label="Verix KYC home"><Brand /></Link>
+        <nav className="marketing-nav" aria-label="Console navigation">
+          {navItems.map((item) => <Link key={item.to} to={item.to} aria-current={isActive(item.to) ? "page" : undefined}>{item.label}</Link>)}
+        </nav>
+        <div className="marketing-header-actions">
+          <Link to="/developers" className="staff-connection" title={apiKey ? `Connected to ${organization?.name ?? "your organization"}` : "Connect an API key in developer tools"}>
+            <span className="status-dot" style={apiKey ? undefined : { background: "#666" }} /><span>{apiKey ? organization?.name ?? "Connected" : "Connect API key"}</span>
           </Link>
-
-          <nav className="hidden items-center gap-1 md:flex">
-            {navItems.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={`rounded-md px-3 py-2 font-label text-sm transition-colors ${
-                  isActive(item.to)
-                    ? "bg-primary-100 text-primary-900"
-                    : "text-foreground-600 hover:bg-background-100 hover:text-foreground-950"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <Link to="/verify/new" className="button button-small button-white"><Plus size={14} />New verification</Link>
+          {profile && <><span className="staff-avatar" title={`${profile.display_name} · ${profile.role.toLowerCase()}`}>{initials}</span><button type="button" className="staff-signout" onClick={leave}>Sign out</button></>}
+          <button type="button" className="mobile-menu-toggle" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} aria-controls="staff-mobile-nav" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
         </div>
-
-        <div className="hidden items-center gap-3 md:flex">
-          <Link to="/developers"
-                title={apiKey ? `API key connected · ${organization?.credential.scopes.join(", ")}` : "Connect an API key to create sessions and manage keys and webhooks"}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-label text-xs font-medium ${
-                  apiKey ? "border-primary-200 bg-primary-50 text-primary-800" : "border-background-300 bg-background-100 text-foreground-600"}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${apiKey ? "bg-primary-500" : "bg-foreground-300"}`}></span>
-            {apiKey ? organization?.name ?? "API key" : "No API key"}
-          </Link>
-          <button
-            type="button"
-            onClick={() => navigate("/verify/new")}
-            className="inline-flex items-center gap-2 whitespace-nowrap rounded-md bg-primary-500 px-4 py-2 font-label text-sm font-medium text-background-50 transition-colors hover:bg-primary-600"
-          >
-            <i className="ri-add-line text-base leading-none"></i>
-            New verification
-          </button>
-          {profile && (
-            <div className="flex items-center gap-2">
-              <div title={`${profile.display_name} · ${profile.role.toLowerCase()}`}
-                   className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary-200 font-label text-sm font-semibold text-secondary-800">
-                {initials}
-              </div>
-              <button type="button" onClick={leave}
-                      className="whitespace-nowrap rounded-md border border-background-300 px-3 py-2 font-label text-sm text-foreground-700 transition-colors hover:bg-background-100">
-                Sign out
-              </button>
-            </div>
-          )}
-        </div>
-
-        <button
-          type="button"
-          aria-label="Toggle menu"
-          onClick={() => setMenuOpen((v) => !v)}
-          className="flex h-9 w-9 items-center justify-center rounded-md border border-background-300 text-foreground-700 md:hidden"
-        >
-          <i className={`${menuOpen ? "ri-close-line" : "ri-menu-line"} text-xl leading-none`}></i>
-        </button>
       </div>
-
-      {menuOpen && (
-        <div className="border-t border-background-200 bg-background-50 px-4 py-3 md:hidden">
-          <div className="flex flex-col gap-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                onClick={() => setMenuOpen(false)}
-                className={`rounded-md px-3 py-2.5 font-label text-sm ${
-                  isActive(item.to)
-                    ? "bg-primary-100 text-primary-900"
-                    : "text-foreground-700 hover:bg-background-100"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-            {profile && (
-              <button type="button" onClick={leave}
-                      className="rounded-md px-3 py-2.5 text-left font-label text-sm text-foreground-700 hover:bg-background-100">
-                Sign out ({profile.display_name})
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      {menuOpen && <nav id="staff-mobile-nav" className="marketing-mobile-nav" aria-label="Mobile console navigation">
+        {navItems.map((item) => <Link key={item.to} to={item.to} aria-current={isActive(item.to) ? "page" : undefined} onClick={() => setMenuOpen(false)}>{item.label}</Link>)}
+        {profile && <button type="button" onClick={leave} className="py-3 text-left text-sm text-foreground-600">Sign out ({profile.display_name})</button>}
+      </nav>}
     </header>
   );
 }

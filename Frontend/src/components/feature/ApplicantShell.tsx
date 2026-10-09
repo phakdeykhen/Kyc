@@ -1,23 +1,19 @@
 import type { ReactNode } from "react";
+import { LockKeyhole } from "lucide-react";
+import Brand from "./Brand";
 
 /** Page frame for the person being verified: no console navigation, no staff identity. */
 export function ApplicantShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background-50">
-      <header className="border-b border-background-200 bg-background-50">
-        <div className="mx-auto flex h-14 max-w-[960px] items-center justify-between px-4 md:px-6">
-          <span className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500 text-background-50">
-              <i className="ri-fingerprint-2-line text-lg leading-none"></i>
-            </span>
-            <span className="font-heading text-base font-semibold tracking-tight text-foreground-950">Identity verification</span>
-          </span>
-          <span className="inline-flex items-center gap-1.5 font-label text-xs text-foreground-500">
-            <i className="ri-lock-2-line text-sm leading-none"></i>Secure session
-          </span>
+      <header className="applicant-header">
+        <div className="applicant-header-inner">
+          <Brand />
+          <span><LockKeyhole size={13} />Secure verification</span>
         </div>
       </header>
       <main className="mx-auto w-full max-w-[960px] flex-1 px-4 py-6 md:px-6 md:py-10">{children}</main>
+      <footer className="applicant-footer">Powered by Verix · Privacy at every step</footer>
     </div>
   );
 }
