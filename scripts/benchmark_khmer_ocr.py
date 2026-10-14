@@ -20,6 +20,11 @@ from kyc.mrz.reader import read_mrz_lines
 from kyc.ocr.tesseract import TesseractOCREngine
 
 
+def comparable(text):
+    """Spacing varies and subscript DA/TA (្ដ/្ត) print identically; neither is a reading error."""
+    return "".join((text or "").replace("\u17d2\u178a", "\u17d2\u178f").split())
+
+
 def edit_distance(left, right):
     previous = list(range(len(right) + 1))
     for i, a in enumerate(left, 1):
@@ -74,6 +79,7 @@ def main():
             fields[item.field] = {"value": item.normalized_value, "confidence": item.confidence, "flags": item.flags,
                                   "dedicated_roi": any(line.notes[0] == f"FIELD_ROI:{item.field}" for line in dedicated)}
             if expected is not None:
+                value, expected = comparable(value), comparable(expected)
                 fields[item.field].update({"exact_match": value == expected,
                     "cer": round(edit_distance(value, expected) / max(1, len(expected)), 4)})
         samples.append({"sample": path.name, "classification": classification.document_side,
@@ -89,8 +95,12 @@ def main():
     for sample in samples:
         print(json.dumps({"sample": sample["sample"], "classification": sample["classification"], "seconds": sample["seconds"],
                           "fields": {name: {"present": bool(field["value"]), "confidence": field["confidence"],
-                                            "dedicated_roi": field["dedicated_roi"], "flags": field["flags"]}
+                                            "cer": field.get("cer"), "flags": field["flags"]}
                                      for name, field in sample.get("fields", {}).items()}}, ensure_ascii=False), flush=True)
+    scored = [field for sample in samples for field in sample.get("fields", {}).values() if "cer" in field]
+    if scored:
+        print(json.dumps({"fields_scored": len(scored), "exact": sum(field["exact_match"] for field in scored),
+                          "mean_cer": round(sum(field["cer"] for field in scored) / len(scored), 4)}))
 
 
 if __name__ == "__main__":

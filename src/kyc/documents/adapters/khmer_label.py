@@ -115,6 +115,10 @@ class CardLayout:
     barcode_expected: bool = False                            # True: a missing barcode is a REVIEW signal
     portrait_regions: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)
     khmer_field_regions: dict[str, tuple[float, float, float, float]] = field(default_factory=dict)
+    # Rectified cards whose fields sit in a fixed row order (see documents.card_rows).
+    structured_rows: bool = False
+    # Fallback x where each field's value begins when its label colon is unreadable; "zone_left" is the label column.
+    value_starts: dict[str, float] = field(default_factory=dict)
 
 
 def _similar(a: str, b: str) -> float:

@@ -47,6 +47,8 @@ LAYOUT = CardLayout(
     khmer_field_regions={"full_name_local": (0.23, 0.055, 0.98, 0.155),
                          "place_of_birth": (0.26, 0.26, 0.98, 0.37),
                          "address": (0.26, 0.36, 0.98, 0.56)},
+    structured_rows=True,
+    value_starts={"zone_left": 0.225, "full_name_local": 0.40, "place_of_birth": 0.37, "address": 0.33},
 )
 
 

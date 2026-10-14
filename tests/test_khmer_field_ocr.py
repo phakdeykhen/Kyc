@@ -1,11 +1,14 @@
 from datetime import date
 import unittest
 
+import cv2
+import numpy as np
 from PIL import Image
 
 from kyc.documents import khmer
 from kyc.documents.adapters.kh_national_id import CambodiaNationalIDAdapter
-from kyc.documents.field_ocr import _value, field_region, read_khmer_fields, vote_field
+from kyc.documents import card_rows
+from kyc.documents.field_ocr import _strip_label, _value, field_region, read_khmer_fields, vote_field
 from kyc.domain.enums import CheckResult
 from kyc.domain.identity import OCRLine, OCRWord
 from tests.test_kh_national_id import BACK, front_lines, line
@@ -93,6 +96,71 @@ class VoteTests(unittest.TestCase):
         self.assertIn("KHMER_ORDERING_UNCERTAIN", khmer.khmer_text("សុខ្").flags)
 
 
+    def test_near_agreeing_noisy_reads_support_their_shared_reading(self):
+        field = vote_field("address", [("a", "ឃុំជៀប ស្រុកទឹកផុស", .4), ("b", "ឃុំជៀប ស្រុកទឹកផុស", .4),
+                                       ("c", "ឃុំជៀប់ ស្រុកទឹកផុស", .6), ("d", "ឃុំជៀប ស្រុកទឹកផស", .6),
+                                       ("e", "ម្ម", .9), ("f", "ម្ម", .9)], self.box)
+        self.assertEqual(field.text, "ឃុំជៀប ស្រុកទឹកផុស")
+
+    def test_label_debris_before_an_early_colon_is_dropped(self):
+        self.assertEqual(_strip_label("ទីកន្លែងកំណើត់ៈ ឃុំតំបែរ ស្រុកតំបែរ"), "ឃុំតំបែរ ស្រុកតំបែរ")
+        self.assertEqual(_strip_label("ANE: ផ្ទះ១០៩ ផ្លូវ/ក្រុម១"), "ផ្ទះ១០៩ ផ្លូវ/ក្រុម១")
+        # A colon late in the text is not a label separator.
+        self.assertEqual(_strip_label("ប្រជ្រុយចំ ១ ស.ម មុខលើចុង:"), "ប្រជ្រុយចំ ១ ស.ម មុខលើចុង")
+
+
+def row(top, text, left=.24, ink=.06):
+    return card_rows.Row(top=top, bottom=top + .07, left=left, right=.9, ink_height=ink,
+                         words=[OCRWord(text=text, confidence=.5, bbox=(left, top, .9, top + .07))])
+
+
+class CardRowTests(unittest.TestCase):
+    def card(self):
+        return [row(.0, "011301069", left=.62, ink=.03), row(.08, "គោត្តនាមនិងនាម: ខុន ពិសិដ្ឋ"),
+                row(.16, "KHON PISETH", left=.4, ink=.035), row(.21, "ថ្ងៃខែឆ្នាំកំណើត: ២០.០៥.២០០១ ភេទ: ប្រុស"),
+                row(.28, "ទីកន្លែងកំណើត: ឃុំតាខ្មៅ"), row(.34, "អាសយដ្ឋាន: ផ្ទះគ្មានលេខ"), row(.41, "សង្កាត់ព្រែកថ្មី"),
+                row(.49, "សុពលភាព: ២០.១០.២០១៧ ដល់ថ្ងៃ ១៩.១០.២០២៧"), row(.55, "ភិនភាគ: ប្រជ្រុយ")]
+
+    def test_rows_are_assigned_by_card_order_even_with_unreadable_labels(self):
+        rows = self.card()
+        for item in rows:
+            item.words[0] = item.words[0].model_copy(update={"text": item.words[0].text.replace("គោត្តនាមនិងនាម", "ធាគ្គនា")})
+        assigned = card_rows.assign_rows(rows)
+        self.assertIs(assigned["full_name_local"][0], rows[1])
+        self.assertIs(assigned["place_of_birth"][0], rows[4])
+        self.assertEqual(assigned["address"], rows[5:7])
+
+    def test_a_noisy_latin_row_is_not_taken_for_the_khmer_name(self):
+        rows = self.card()
+        rows[2] = row(.16, "%. , ស40៩ ‘58:", ink=.061)
+        self.assertIs(card_rows.assign_rows(rows)["full_name_local"][0], rows[1])
+
+    def test_no_assignment_without_validity_and_birth_anchors(self):
+        rows = self.card()
+        rows[7] = row(.49, "ពពព")
+        self.assertEqual(card_rows.assign_rows(rows), {})
+        self.assertEqual(card_rows.assign_rows(self.card()[:4]), {})
+
+    def test_value_starts_after_the_label_colon(self):
+        label = OCRWord(text="អាសយដ្ឋាន:", confidence=.5, bbox=(.24, .3, .35, .36))
+        item = card_rows.Row(top=.3, bottom=.37, left=.24, right=.7, ink_height=.06, words=[label])
+        self.assertAlmostEqual(card_rows.value_start(item, .33), .35)
+        item.words = []
+        self.assertEqual(card_rows.value_start(item, .33), .33)
+
+    def test_segmentation_separates_rows_and_ignores_thin_pattern_lines(self):
+        pixels = np.full((400, 800, 3), 210, np.uint8)
+        for top in (40, 120, 200):
+            for left in range(60, 500, 40):
+                pixels[top:top + 30, left:left + 25] = 20  # glyph-like blocks
+        cv2.line(pixels, (0, 390), (799, 10), (60, 60, 60), 1)  # guilloche stroke
+        rows = card_rows.segment_rows(Image.fromarray(pixels), (0.0, 0.0, 1.0, 1.0))
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(abs(r.right - 485 / 800) < .02 for r in rows))
+        crop = card_rows.isolate(Image.fromarray(pixels), rows[1], card_rows.glyph_box(rows[1], 0.0, (800, 400)))
+        self.assertLess(crop.height, 80)
+
+
 class RegionReader:
     def __init__(self):
         self.calls = []
@@ -106,7 +174,7 @@ class RegionReader:
 
 
 class ReaderTests(unittest.TestCase):
-    def test_dedicated_name_uses_single_line_khmer_models_and_multiple_scales(self):
+    def test_dedicated_name_uses_single_line_khmer_models_at_the_printed_scale(self):
         adapter = CambodiaNationalIDAdapter()
         reader = RegionReader()
         label = "គោត្តនាម និងនាម:"
@@ -118,8 +186,9 @@ class ReaderTests(unittest.TestCase):
         [result] = read_khmer_fields(reader, Image.new("RGB", (1600, 1000)), adapter, [row], False)
         self.assertEqual(result.text, "សុខ សុភា")
         self.assertTrue(all(call[1] in (("khm",), ("script/Khmer",)) and call[2] is None and call[3] in (7, 13) for call in reader.calls))
+        # Upscaled Khmer rows make the LSTM return nothing; every variant keeps the crop's own size.
         sizes = {call[0] for call in reader.calls}
-        self.assertEqual(len(sizes), 3)
+        self.assertEqual(len(sizes), 1)
 
 
 if __name__ == "__main__":
