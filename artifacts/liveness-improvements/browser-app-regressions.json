@@ -1,0 +1,90 @@
+[
+  {
+    "scenario": "complete",
+    "passed": true,
+    "positioned": 4,
+    "challenges": 1,
+    "submitted": 1,
+    "sessionReads": 2
+  },
+  {
+    "scenario": "successful_capture",
+    "passed": true,
+    "positioned": 4,
+    "challenges": 1,
+    "submitted": 1,
+    "sessionReads": 2
+  },
+  {
+    "scenario": "exhausted",
+    "passed": true,
+    "positioned": 1,
+    "challenges": 0,
+    "submitted": 0,
+    "sessionReads": 2
+  },
+  {
+    "scenario": "camera_denied",
+    "passed": true,
+    "positioned": 0,
+    "challenges": 0,
+    "submitted": 0,
+    "sessionReads": 2
+  },
+  {
+    "scenario": "cancel_positioning",
+    "passed": true,
+    "positioned": 1,
+    "challenges": 0,
+    "submitted": 0,
+    "sessionReads": 2
+  },
+  {
+    "scenario": "position_body_timeout",
+    "passed": true,
+    "positioned": 0,
+    "challenges": 0,
+    "submitted": 0,
+    "sessionReads": 2
+  },
+  {
+    "scenario": "challenge_body_timeout",
+    "passed": true,
+    "positioned": 4,
+    "challenges": 0,
+    "submitted": 0,
+    "sessionReads": 2
+  },
+  {
+    "scenario": "cancel_challenge",
+    "passed": true,
+    "positioned": 4,
+    "challenges": 0,
+    "submitted": 0,
+    "sessionReads": 2
+  },
+  {
+    "scenario": "camera_interrupted",
+    "passed": true,
+    "positioned": 4,
+    "challenges": 1,
+    "submitted": 0,
+    "sessionReads": 2
+  },
+  {
+    "scenario": "challenge_expired_offline",
+    "passed": true,
+    "positioned": 4,
+    "challenges": 1,
+    "submitted": 0,
+    "sessionReads": 2
+  },
+  {
+    "scenario": "poll_recovery",
+    "passed": true,
+    "positioned": 0,
+    "challenges": 0,
+    "submitted": 0,
+    "sessionReads": 4
+  }
+]

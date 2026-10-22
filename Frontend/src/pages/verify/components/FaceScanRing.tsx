@@ -1,11 +1,14 @@
+import { useMemo } from "react";
 import type { ReactNode, RefObject } from "react";
 import type { CameraState } from "@/lib/useCamera";
+import "./FaceScanRing.css";
 
 export type Direction = "LOOK_UP" | "TURN_RIGHT" | "LOOK_DOWN" | "TURN_LEFT";
 export interface ArcState {
   status: "todo" | "active" | "done";
   progress: number;  // 0–1, for the active arc
 }
+export type ScanFeedback = "active" | "hold" | "confirmed" | "correction";
 
 interface FaceScanRingProps {
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -18,23 +21,27 @@ interface FaceScanRingProps {
   aligned?: boolean;
   /** Overall progress from confirmed steps and the current server movement measurement. */
   progress?: number;
+  /** Fraction of challenge movements actually confirmed; the remaining active progress stays blue. */
+  confirmedProgress?: number;
   showCamera: boolean;
   /** Arrow pointing where to move. */
   cue?: Direction | null;
+  /** Mirrors recognition state; visual completion never approves verification. */
+  feedback?: ScanFeedback;
   theme: "light" | "dark";
   /** Drawn in the middle of the circle (intro icon, spinner, check mark). */
   center?: ReactNode;
 }
 
-// The selfie preview is mirrored, so the person's left is on the screen's left: each movement fills the
-// arc on its own side, like a Face ID enrolment ring.
+// Mirror only the camera image. A person's right appears on their right in a selfie preview, so the
+// instructions and arrow directions keep their anatomical meaning and are never CSS-mirrored.
 const CENTRES: Record<Direction, number> = { LOOK_UP: 0, TURN_RIGHT: 90, LOOK_DOWN: 180, TURN_LEFT: 270 };
 const TICKS = 72;
-const ARROWS: Record<Direction, { icon: string; place: string }> = {
-  LOOK_UP: { icon: "ri-arrow-up-s-line", place: "left-1/2 top-[13%] -translate-x-1/2" },
-  TURN_RIGHT: { icon: "ri-arrow-right-s-line", place: "right-[13%] top-1/2 -translate-y-1/2" },
-  LOOK_DOWN: { icon: "ri-arrow-down-s-line", place: "bottom-[13%] left-1/2 -translate-x-1/2" },
-  TURN_LEFT: { icon: "ri-arrow-left-s-line", place: "left-[13%] top-1/2 -translate-y-1/2" },
+const ARROWS: Record<Direction, string> = {
+  LOOK_UP: "M12 20V4m-7 7 7-7 7 7",
+  TURN_RIGHT: "M4 12h16m-7-7 7 7-7 7",
+  LOOK_DOWN: "M12 4v16m-7-7 7 7 7-7",
+  TURN_LEFT: "M20 12H4m7-7-7 7 7 7",
 };
 
 function nearest(angle: number): { direction: Direction; offset: number } {
@@ -48,41 +55,70 @@ function nearest(angle: number): { direction: Direction; offset: number } {
 }
 
 export default function FaceScanRing({ videoRef, cameraState, arcs, complete = false, aligned = false, showCamera,
-                                       progress, cue = null, theme, center }: FaceScanRingProps) {
+                                       progress, confirmedProgress, cue = null, feedback = "active", theme, center }: FaceScanRingProps) {
   const dark = theme === "dark";
-  const idle = dark ? (aligned ? "stroke-background-50/70" : "stroke-background-50/25") : "stroke-foreground-300";
-  const ticks = Array.from({ length: TICKS }, (_, index) => {
+  const idle = dark ? (aligned ? "stroke-white/70" : "stroke-white/35") : "stroke-foreground-300";
+  const activeTone = dark ? "stroke-[#60A5FA]" : "stroke-[#1D4ED8]";
+  const confirmedTone = dark ? "stroke-[#4ADE80]" : "stroke-[#15803D]";
+  const up = arcs.LOOK_UP;
+  const down = arcs.LOOK_DOWN;
+  const left = arcs.TURN_LEFT;
+  const right = arcs.TURN_RIGHT;
+  const ticks = useMemo(() => Array.from({ length: TICKS }, (_, index) => {
+    const currentArcs = { LOOK_UP: up, LOOK_DOWN: down, TURN_LEFT: left, TURN_RIGHT: right };
     const angle = (index * 360) / TICKS;
     const { direction, offset } = nearest(angle);
-    const arc = arcs[direction];
+    const arc = currentArcs[direction];
     let tone = idle;
     let long = false;
-    if (complete || (progress !== undefined ? index < Math.floor(Math.min(1, Math.max(0, progress)) * TICKS) : arc?.status === "done")) {
-      tone = "stroke-primary-400";
+    if (complete || (confirmedProgress !== undefined
+      ? index < Math.floor(Math.min(1, Math.max(0, confirmedProgress)) * TICKS)
+      : progress === undefined && arc?.status === "done")) {
+      tone = confirmedTone;
+      long = true;
+    } else if (progress !== undefined && index < Math.floor(Math.min(1, Math.max(0, progress)) * TICKS)) {
+      tone = activeTone;
       long = true;
     } else if (arc?.status === "active") {
       // Fills outward from the middle of the arc as the head moves further.
       long = arc.progress > 0 && offset <= arc.progress * 45;
-      tone = long ? "stroke-primary-400" : "stroke-background-50";
+      tone = long ? activeTone : idle;
     }
     return (
       <line key={index} x1="100" y1="16" x2="100" y2={long ? 4 : 9} transform={`rotate(${angle} 100 100)`}
-            strokeWidth="2.4" strokeLinecap="round" className={`transition-all duration-300 motion-reduce:transition-none ${tone}`} />
+            strokeWidth="2.4" strokeLinecap="round" className={`transition-all duration-200 motion-reduce:transition-none ${tone}`} />
     );
-  });
+  }), [activeTone, complete, confirmedProgress, confirmedTone, down, idle, left, progress, right, up]);
+  const confirmed = complete || feedback === "confirmed";
+  const showBadge = !!cue || confirmed || feedback === "correction";
 
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-[340px] shrink-0">
-      <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full" aria-hidden="true">{ticks}</svg>
-      <div className={`absolute left-[11%] top-[11%] h-[78%] w-[78%] overflow-hidden rounded-full ${dark ? "bg-foreground-900" : "bg-background-100"}`}>
-        <video ref={videoRef} autoPlay playsInline muted
-               className={`h-full w-full -scale-x-100 object-cover transition-opacity duration-500 ${
-                 showCamera && cameraState === "live" ? "opacity-100" : "opacity-0"}`} />
-        {center && <div className="absolute inset-0 flex items-center justify-center">{center}</div>}
+    <div className="face-scan-ring">
+      <div className="relative aspect-square min-w-0">
+        <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full" aria-hidden="true">{ticks}</svg>
+        <div className={`absolute left-[11%] top-[11%] h-[78%] w-[78%] overflow-hidden rounded-full ${dark ? "bg-foreground-900" : "bg-background-100"}`}>
+          <video ref={videoRef} autoPlay playsInline muted
+                 className={`h-full w-full -scale-x-100 object-cover transition-opacity duration-200 motion-reduce:transition-none ${
+                   showCamera && cameraState === "live" ? "opacity-100" : "opacity-0"}`} />
+          {center && <div className="absolute inset-0 flex items-center justify-center">{center}</div>}
+        </div>
       </div>
-      {cue && (
-        <i className={`${ARROWS[cue].icon} pointer-events-none absolute animate-pulse text-5xl leading-none text-background-50 drop-shadow-lg ${ARROWS[cue].place}`}></i>
-      )}
+      {/* The reserved gutter stays in place even between steps. The badge never covers camera pixels. */}
+      <div className="face-scan-cue-slot" aria-hidden="true">
+        {showBadge && (
+          <div className="face-scan-cue" data-direction={cue ?? undefined} data-feedback={confirmed ? "confirmed" : feedback}>
+            <svg className="face-scan-cue-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d={confirmed ? "m5 12 4 4L19 6" : cue ? ARROWS[cue] : "M12 8v5m0 3h.01M12 3 2 21h20L12 3Z"} />
+            </svg>
+            {feedback === "correction" && cue && !confirmed && (
+              <svg className="face-scan-cue-warning" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2 1 22h22L12 2Z" />
+                <path d="M12 8v6m0 3h.01" fill="none" stroke="#111827" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

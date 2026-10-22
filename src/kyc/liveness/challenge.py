@@ -13,11 +13,11 @@ import secrets
 MOVES = ("TURN_LEFT", "TURN_RIGHT", "LOOK_UP", "LOOK_DOWN")
 BASELINE = "LOOK_STRAIGHT"
 INSTRUCTIONS = {
-    "LOOK_STRAIGHT": "Look straight at the camera.",
-    "TURN_LEFT": "Slowly turn your head to your left.",
-    "TURN_RIGHT": "Slowly turn your head to your right.",
-    "LOOK_UP": "Tilt your head up slightly.",
-    "LOOK_DOWN": "Tilt your head down slightly.",
+    "LOOK_STRAIGHT": "Look straight ahead.",
+    "TURN_LEFT": "Turn your head to your left.",
+    "TURN_RIGHT": "Turn your head to your right.",
+    "LOOK_UP": "Lift your chin slightly.",
+    "LOOK_DOWN": "Lower your chin slightly.",
 }
 
 

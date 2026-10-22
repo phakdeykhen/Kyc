@@ -238,7 +238,10 @@ def guide_liveness(session_id: UUID, request: Request, tenant: Capture, db: Data
                    challenge_id: Annotated[UUID, Form()], nonce: Annotated[str, Form(max_length=128)],
                    step: Annotated[int, Form(ge=0, le=20)],
                    frame: Annotated[UploadFile, File(description="Current raw (unmirrored) camera frame")],
-                   baseline: Annotated[UploadFile | None, File(description="The frame accepted for step 0")] = None):
+                   baseline: Annotated[UploadFile | None, File(description="First accepted neutral frame")] = None,
+                   baseline_extra: Annotated[list[UploadFile] | None, File(description="Other accepted neutral frames (at most two)")] = None,
+                   holding: Annotated[bool, Form(description="Advisory hysteresis only; never evidence")] = False,
+                   calibration: Annotated[str | None, Form(max_length=2048, description="Opaque advisory neutral calibration for this challenge")] = None):
     """Live feedback while the person follows one step: is the face visible, and is the movement done?
 
     Advisory only. It does not use up the challenge or record evidence, and frames are not stored;
@@ -248,10 +251,14 @@ def guide_liveness(session_id: UUID, request: Request, tenant: Capture, db: Data
     limits = _liveness_limits(state.settings)
     data = frame.file.read(limits.max_frame_bytes + 1)
     reference = baseline.file.read(limits.max_frame_bytes + 1) if baseline is not None else None
-    if len(data) > limits.max_frame_bytes or (reference is not None and len(reference) > limits.max_frame_bytes):
+    if len(baseline_extra or []) > 2:
+        raise HTTPException(422, detail="At most three neutral frames are supported.")
+    references = [item.file.read(limits.max_frame_bytes + 1) for item in baseline_extra or []]
+    if any(value is not None and len(value) > limits.max_frame_bytes for value in (data, reference, *references)):
         raise HTTPException(413, detail="Frame is too large.")
     return guide_step(db, tenant, session_id, challenge_id, nonce, step, data, reference or None, state.face_engine,
-                      state.liveness_policy, limits, request.state.request_id)
+                      state.liveness_policy, limits, request.state.request_id, references, holding,
+                      calibration, state.biometric_cipher)
 
 
 @router.post("/kyc/{session_id}/liveness", responses={

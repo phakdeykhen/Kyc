@@ -6,17 +6,16 @@ FAIL for byte-identical replay. Flat geometry is a heuristic, not proof of a pho
 uncalibrated findings go to review. Thresholds never leave the server.
 """
 
-from dataclasses import dataclass, field
-import statistics
+from dataclasses import dataclass, field, replace
 
 from PIL import Image
 
 from kyc.biometrics import compare_embeddings
-from kyc.biometrics.types import FaceAssessment, FaceEmbedding, FaceMatchPolicy
-from kyc.biometrics.quality import assess_face_quality
+from kyc.biometrics.types import FaceAssessment, FaceDetection, FaceEmbedding, FaceMatchPolicy
+from kyc.biometrics.quality import UNVERIFIED_REASONS, assess_face_quality
 from kyc.domain.enums import CheckResult
 from kyc.liveness.challenge import BASELINE
-from kyc.liveness.geometry import PoseSample, pose
+from kyc.liveness.geometry import PoseSample, median_pose, pose
 
 # Expected sign of the pose change for each movement (frames are unmirrored). The nose tip stands in
 # front of the eye/mouth plane: looking up lifts it toward the eye line (b falls), looking down lowers
@@ -36,7 +35,7 @@ COVERAGE = {
 
 @dataclass(frozen=True)
 class ActiveLivenessPolicy:
-    version: str = "ACTIVE-GEOMETRY-2026.10.5"
+    version: str = "ACTIVE-GEOMETRY-2026.10.22"
     calibrated: bool = False
     movement: float = 0.08           # minimum directed change of a/b (≈10° head turn)
     planar_deformation: float = 0.12  # eye/mouth triangle aspect change that should move the nose
@@ -64,25 +63,50 @@ class LivenessOutcome:
 @dataclass(frozen=True)
 class Guidance:
     """Advisory, per-frame feedback while the person follows a step; never evidence."""
-    state: str        # DONE | KEEP_GOING | WRONG_DIRECTION for a movement; CENTERED | NOT_CENTERED for the baseline
+    state: str        # DONE | HOLDING | KEEP_GOING | WRONG_DIRECTION; CENTERED | NOT_CENTERED for the baseline
     progress: float   # 0–1 in quarter steps, so the threshold itself is not disclosed
 
 
 def guide(baseline: PoseSample, sample: PoseSample, step: str,
-          policy: ActiveLivenessPolicy | None = None) -> Guidance:
-    """Same geometry and threshold as `assess`, so a step reported DONE here completes there."""
+          policy: ActiveLivenessPolicy | None = None, *, holding: bool = False) -> Guidance:
+    """DONE uses exactly the final evidence threshold; HOLDING is advisory only.
+
+    A small exit margin stops the displayed instruction from oscillating at the
+    boundary. A HOLDING frame must never count toward the required evidence hold.
+    """
     policy = policy or ActiveLivenessPolicy()
     if step == BASELINE:
         offset = max(abs(sample.a - baseline.a), abs(sample.b - baseline.b))
-        centered = offset <= policy.movement / 2
-        return Guidance("CENTERED" if centered else "NOT_CENTERED", 1.0 if centered else 0.0)
+        if offset <= policy.movement / 2:
+            return Guidance("CENTERED", 1.0)
+        if holding and offset <= policy.movement * 0.6:
+            return Guidance("HOLDING", 0.75)
+        return Guidance("NOT_CENTERED", 0.0)
     axis, sign = DIRECTIONS[step]
     move = sign * (getattr(sample, axis) - getattr(baseline, axis))
     if move >= policy.movement:
         return Guidance("DONE", 1.0)
+    if holding and move >= policy.movement * 0.8:
+        return Guidance("HOLDING", 0.75)
     if move <= -policy.movement / 2:
         return Guidance("WRONG_DIRECTION", 0.0)
     return Guidance("KEEP_GOING", min(0.75, max(0.0, move / policy.movement)) // 0.25 * 0.25)
+
+
+def movement_visibility(image: Image.Image, face: FaceDetection) -> FaceAssessment:
+    """Require a usable visible face without rejecting the requested head turn.
+
+    Keep the existing size, crop, illumination, focus and landmark checks. The
+    frontal-pose gate belongs to neutral capture; applying it during movement
+    would conflict with the very action the person was asked to perform.
+    Predicted landmarks still cannot establish eye visibility or lack of occlusion.
+    """
+    quality = assess_face_quality(image, [face])
+    reasons = tuple(code for code in quality.reason_codes if code != "FACE_POSE_UNACCEPTABLE")
+    failures = set(reasons).difference(UNVERIFIED_REASONS)
+    instructions = tuple(instruction for instruction in quality.instructions
+                         if instruction != "FACE_CAMERA" or "FACE_LANDMARKS_UNRELIABLE" in failures)
+    return replace(quality, accepted=not failures, reason_codes=reasons, instructions=instructions)
 
 
 def _retry(reasons, steps=(), instructions=("FOLLOW_EACH_INSTRUCTION",), metrics=None) -> LivenessOutcome:
@@ -112,25 +136,39 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
     observed: dict[int, list[PoseSample | None]] = {}
     detections = []
     reasons: list[str] = []
+    visibility_reasons: list[str] = []
+    corrections: list[str] = []
     for frame_number, (index, image, _) in enumerate(frames):
         faces = engine.detect(image)
         if len(faces) != 1:
             observed.setdefault(index, []).append(None)
             reasons.append("MULTIPLE_FACES" if faces else "NO_FACE_IN_FRAME")
+            corrections.append("ONE_FACE_ONLY" if faces else "CENTER_FACE")
             continue
         try:
             sample = pose(faces[0].landmarks)
         except ValueError:
             observed.setdefault(index, []).append(None)
             reasons.append("LANDMARKS_UNUSABLE")
+            corrections.append("FACE_CAMERA")
             continue
+        if index != 0:
+            quality = movement_visibility(image, faces[0])
+            if not quality.accepted:
+                # Keep geometry for the existing presentation-attack heuristic,
+                # but never count this unusable observation as movement evidence.
+                samples.setdefault(index, []).append(sample)
+                observed.setdefault(index, []).append(None)
+                visibility_reasons.extend(reason for reason in quality.reason_codes if reason not in UNVERIFIED_REASONS)
+                corrections.extend(quality.instructions)
+                continue
         samples.setdefault(index, []).append(sample)
         observed.setdefault(index, []).append(sample)
         detections.append((frame_number, index, image, faces[0]))
     if "MULTIPLE_FACES" in reasons:
         return _retry(["MULTIPLE_FACES"], instructions=["ONLY_YOU_IN_FRAME"])
     if reasons:
-        return _retry(sorted(set(reasons)), instructions=["FACE_CAMERA", "MORE_LIGHT"])
+        return _retry(sorted(set(reasons)), instructions=list(dict.fromkeys(corrections)))
     if 0 not in samples:
         return _retry(sorted(set(reasons)) or ["BASELINE_NOT_CAPTURED"], instructions=["LOOK_STRAIGHT", "MORE_LIGHT"])
 
@@ -146,9 +184,7 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
                 return _retry(["BASELINE_QUALITY_UNUSABLE"], instructions=quality.instructions)
             qualities[frame_number] = quality
 
-    baseline = PoseSample(a=statistics.median(s.a for s in samples[0]), b=statistics.median(s.b for s in samples[0]),
-                          aspect=statistics.median(s.aspect for s in samples[0]),
-                          scale=statistics.median(s.scale for s in samples[0]), centre=samples[0][0].centre)
+    baseline = median_pose(samples[0])
     if any(max(abs(sample.a - baseline.a), abs(sample.b - baseline.b)) > policy.movement / 2
            for sample in samples[0]):
         return _retry(["BASELINE_NOT_STABLE"], instructions=["HOLD_STILL", "LOOK_STRAIGHT"])
@@ -184,6 +220,9 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
                                    steps=step_results, metrics=metrics)
         return LivenessOutcome(CheckResult.FAIL, 0.0, ["FLAT_FACE_PRESENTATION"], False,
                                attack_type="PRINTED_OR_SCREEN_PHOTO", steps=step_results, metrics=metrics)
+    if visibility_reasons:
+        return _retry(sorted(set(visibility_reasons)), step_results,
+                      instructions=list(dict.fromkeys(corrections)), metrics=metrics)
     if completed < len(steps) - 1:
         return _retry(["CHALLENGE_NOT_COMPLETED"], step_results, metrics=metrics)
 

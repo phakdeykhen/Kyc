@@ -1,0 +1,99 @@
+{
+  "recorded_at": "2026-10-22T09:05:43.852099+00:00",
+  "baseline_revision": "3629ebce84a93165425773f5766ac421ab6bd11a",
+  "command": ".venv/bin/python scripts/benchmark_liveness_guidance.py --repeat 100 --baseline-revision 3629ebce84a93165425773f5766ac421ab6bd11a --output artifacts/liveness-guidance-server-profile.json",
+  "scope": "Warm local CPU processing; excludes HTTP, DB, camera rendering and network latency.",
+  "limitations": [
+    "One vendored public static face; not a live movement or presentation-attack test.",
+    "Desktop host; does not establish mobile, lighting, skin-tone or glasses performance.",
+    "The static fixture is never submitted for verification; no identity approval is attempted."
+  ],
+  "environment": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "cpu_model": "arm",
+    "python": "3.13.16",
+    "logical_cpus": 10,
+    "opencv": "4.14.0",
+    "opencv_threads": 10
+  },
+  "input": {
+    "path": "realtime-face-liveness-detector/misc/face.jpg",
+    "resolution": [
+      640,
+      449
+    ],
+    "jpeg_quality": 85,
+    "frame_bytes": 37693,
+    "faces_detected": 1,
+    "native_detector": "OpenCV YuNet",
+    "detector_version": "2023mar",
+    "detection_max_dimension": 1280
+  },
+  "limits": {
+    "max_frame_bytes": 5242880,
+    "max_frame_pixels": 12000000,
+    "challenge_ttl_seconds": 120
+  },
+  "measurements": {
+    "decode_rgb": {
+      "samples": 100,
+      "p50_ms": 0.4954,
+      "p95_ms": 0.5707,
+      "mean_ms": 0.5056
+    },
+    "native_yunet_detection": {
+      "samples": 100,
+      "p50_ms": 5.655,
+      "p95_ms": 6.7519,
+      "mean_ms": 5.8282
+    },
+    "original_pose": {
+      "samples": 1000,
+      "p50_ms": 0.0133,
+      "p95_ms": 0.0148,
+      "mean_ms": 0.0148
+    },
+    "updated_pose": {
+      "samples": 1000,
+      "p50_ms": 0.0126,
+      "p95_ms": 0.0136,
+      "mean_ms": 0.0131
+    },
+    "movement_visibility": {
+      "samples": 100,
+      "p50_ms": 0.3023,
+      "p95_ms": 0.4072,
+      "mean_ms": 0.3201
+    },
+    "before_guide_2_images": {
+      "samples": 100,
+      "p50_ms": 12.9728,
+      "p95_ms": 17.8122,
+      "mean_ms": 13.5051
+    },
+    "after_setup_3_images": {
+      "samples": 100,
+      "p50_ms": 19.889,
+      "p95_ms": 20.7075,
+      "mean_ms": 19.8683
+    },
+    "after_warm_token_1_image": {
+      "samples": 100,
+      "p50_ms": 6.4076,
+      "p95_ms": 7.0801,
+      "mean_ms": 6.4967
+    }
+  },
+  "multipart_upload": {
+    "before_images": 2,
+    "setup_images": 3,
+    "warm_images": 1,
+    "before_bytes": 76042,
+    "setup_bytes": 113976,
+    "warm_token_bytes": 38619,
+    "opaque_token_characters": 225,
+    "setup_increase_percent": 49.89,
+    "warm_decrease_percent": 49.21
+  }
+}

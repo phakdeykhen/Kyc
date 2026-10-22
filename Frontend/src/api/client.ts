@@ -65,13 +65,18 @@ export const kycApi = {
   livenessChallenge: (credential: SessionCaller, id: string, signal?: AbortSignal) =>
     apiJson<LivenessChallenge>(credential, `${session(id)}/liveness/challenge`, { method: "POST", json: {}, signal, timeoutMs: 10000 }),
   livenessGuide: (credential: SessionCaller, id: string, challenge: LivenessChallenge, step: number, frame: Blob,
-                  baseline: Blob | null, signal?: AbortSignal) => {
+                  baseline: Blob | null, signal?: AbortSignal, baselineExtra: Blob[] = [], holding = false, calibration?: string) => {
     const form = new FormData();
     form.append("challenge_id", challenge.challenge_id);
     form.append("nonce", challenge.nonce);
     form.append("step", String(step));
     form.append("frame", frame, "frame.jpg");
-    if (baseline) form.append("baseline", baseline, "baseline.jpg");
+    if (calibration) form.append("calibration", calibration);
+    else {
+      if (baseline) form.append("baseline", baseline, "baseline.jpg");
+      baselineExtra.forEach((blob) => form.append("baseline_extra", blob, "baseline-extra.jpg"));
+    }
+    form.append("holding", String(holding));
     return apiJson<LivenessGuide>(credential, `${session(id)}/liveness/guide`, { method: "POST", form, signal, timeoutMs: 10000 });
   },
   submitLiveness: (credential: SessionCaller, id: string, challenge: LivenessChallenge, frames: Blob[], steps: number[], signal?: AbortSignal) => {

@@ -1,0 +1,87 @@
+.face-scan-ring {
+  --face-scan-badge-size: clamp(48px, 14vw, 56px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--face-scan-badge-size);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 408px;
+  margin-inline: auto;
+  flex-shrink: 0;
+}
+
+.face-scan-cue-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--face-scan-badge-size);
+  height: var(--face-scan-badge-size);
+}
+
+.face-scan-cue {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #1d4ed8;
+  color: #fff;
+  transition: background-color 200ms ease;
+  pointer-events: none;
+}
+
+.face-scan-cue[data-feedback="confirmed"] {
+  background: #15803d;
+}
+
+.face-scan-cue-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+/* Only the arrow moves. Its fully opaque badge and layout anchor never move or fade. */
+.face-scan-cue[data-feedback="active"] .face-scan-cue-icon {
+  animation-duration: 1.6s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.face-scan-cue[data-direction="LOOK_UP"] .face-scan-cue-icon { animation-name: face-scan-arrow-up; }
+.face-scan-cue[data-direction="LOOK_DOWN"] .face-scan-cue-icon { animation-name: face-scan-arrow-down; }
+.face-scan-cue[data-direction="TURN_LEFT"] .face-scan-cue-icon { animation-name: face-scan-arrow-left; }
+.face-scan-cue[data-direction="TURN_RIGHT"] .face-scan-cue-icon { animation-name: face-scan-arrow-right; }
+
+.face-scan-cue-warning {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 22px;
+  height: 22px;
+  color: #fbbf24;
+  filter: drop-shadow(0 0 1px #111827);
+}
+
+@keyframes face-scan-arrow-up {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes face-scan-arrow-down {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(3px); }
+}
+@keyframes face-scan-arrow-left {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-3px); }
+}
+@keyframes face-scan-arrow-right {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .face-scan-cue { transition: none; }
+  .face-scan-cue[data-feedback] .face-scan-cue-icon { animation: none; }
+}

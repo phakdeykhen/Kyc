@@ -15,6 +15,7 @@ same measurements on a live head, so this is a heuristic requiring empirical cal
 
 from dataclasses import dataclass
 import math
+import statistics
 
 import numpy as np
 
@@ -29,16 +30,33 @@ class PoseSample:
 
 
 def pose(landmarks) -> PoseSample:
-    right_eye, left_eye, nose, right_mouth, left_mouth = (np.asarray(point, dtype=np.float64) for point in landmarks)
+    points = np.asarray(landmarks, dtype=np.float64)
+    if points.shape != (5, 2) or not np.isfinite(points).all():
+        raise ValueError("Five finite facial landmarks are required")
+    right_eye, left_eye, nose, right_mouth, left_mouth = points
     mouth = (right_mouth + left_mouth) / 2
     middle = (right_eye + left_eye) / 2
     basis = np.column_stack((left_eye - right_eye, mouth - middle))
-    if abs(np.linalg.det(basis)) < 1e-6:
+    eye_distance = float(np.linalg.norm(left_eye - right_eye))
+    eye_mouth = float(np.linalg.norm(mouth - middle))
+    # A relative degeneracy check remains meaningful at every camera resolution.
+    if min(eye_distance, eye_mouth) <= 0 or abs(np.linalg.det(basis)) <= max(eye_distance, eye_mouth) ** 2 * 1e-3:
         raise ValueError("Degenerate facial landmarks")
     a, b = np.linalg.solve(basis, nose - middle)
-    eye_distance = float(np.linalg.norm(left_eye - right_eye))
-    eye_mouth = float(np.linalg.norm(mouth - (right_eye + left_eye) / 2))
     if not (math.isfinite(a) and math.isfinite(b)) or eye_mouth <= 0:
         raise ValueError("Degenerate facial landmarks")
     centre = tuple(float(value) for value in (right_eye + left_eye + mouth) / 3)
     return PoseSample(float(a), float(b), eye_distance / eye_mouth, eye_distance, centre)
+
+
+def median_pose(samples: list[PoseSample]) -> PoseSample:
+    """Use the same neutral calibration for advisory guidance and final evidence.
+
+    In particular, guidance must not compare against only the last neutral frame
+    when the final assessment compares against the median of the captured frames.
+    """
+    if not samples:
+        raise ValueError("Neutral calibration requires at least one pose")
+    return PoseSample(*(statistics.median(getattr(sample, field) for sample in samples)
+                        for field in ("a", "b", "aspect", "scale")),
+                      centre=tuple(statistics.median(sample.centre[axis] for sample in samples) for axis in (0, 1)))

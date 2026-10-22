@@ -4,6 +4,7 @@
 const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert/strict');
+let capturedFrames = 0;
 class Element {
   constructor(id) { this.id = id; this.value = ''; this.hidden = false; this.disabled = false; this.checked = false; this.textContent = ''; this.children = []; this.listeners = {}; this.videoWidth = 640; this.videoHeight = 480; this.style = { setProperty() {} }; this.classList = { toggle() {} }; }
   addEventListener(name, callback) { this.listeners[name] = callback; }
@@ -13,7 +14,7 @@ class Element {
   querySelector() { return submitButton; }
   play() { return Promise.resolve(); }
   getContext() { return { drawImage() {} }; }
-  toBlob(callback) { callback(new Blob(['camera'], { type: 'image/jpeg' })); }
+  toBlob(callback) { callback(new Blob([`camera-${++capturedFrames}`], { type: 'image/jpeg' })); }
 }
 const html = fs.readFileSync('src/kyc/web/capture/index.html', 'utf8');
 const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
@@ -105,11 +106,20 @@ const enqueue = (body, status = 200) => queue.push({ body, status });
             { index: 1, step: 'TURN_RIGHT', instruction: 'Slowly turn your head to your right.' },
             { index: 2, step: 'LOOK_DOWN', instruction: 'Tilt your head down slightly.' },
             { index: 3, step: 'TURN_LEFT', instruction: 'Slowly turn your head to your left.' }] };
-  const guide = (state, face = 'OK', progress = 0) => enqueue({ step: 'ANY', face, state, progress });
+  const guide = (state, face = 'OK', progress = 0, instructions = []) => enqueue({ step: 'ANY', face, state, progress, instructions });
   const centre = () => { guide('CENTERED'); guide('CENTERED'); };
   const flush = async () => { for (let i = 0; i < 50; i++) await new Promise(resolve => setImmediate(resolve)); };
+  run('globalThis.coachingMessages = []; const originalCoach = coach; coach = (...args) => { coachingMessages.push(args[0]); return originalCoach(...args); }');
+  assert.doesNotMatch(run('JSON.stringify(STEP_TEXT)'), /floor|ceiling|shoulder|further|higher/,
+    'Movement guidance keeps the face visible and avoids exaggerated rotations');
+  assert.equal(run('STEP_TEXT.LOOK_DOWN.say'), 'Lower your chin slightly.');
+  assert.equal(run('STEP_TEXT.LOOK_UP.say'), 'Lift your chin slightly.');
   enqueue(challenge);
+  guide('NOT_CENTERED', 'OK', 0, ['LOOK_STRAIGHT']);             // an explicit centering failure must not count
   guide(null); guide(null);                                    // baseline: two clear frontal frames
+  guide(null, 'UNCLEAR', 0, ['MORE_LIGHT']);
+  guide(null, 'UNCLEAR', 0, ['MOVE_BACK']);
+  guide(null, 'UNCLEAR', 0, ['MOVE_CLOSER']);
   guide('WRONG_DIRECTION'); guide('DONE'); guide('KEEP_GOING', 'OK', .5); guide('DONE'); guide('DONE');  // a lapse resets the hold
   centre();
   guide(null, 'NO_FACE'); guide('DONE'); guide('DONE');       // LOOK_DOWN, after the face briefly left the frame
@@ -124,12 +134,26 @@ const enqueue = (body, status = 200) => queue.push({ body, status });
   assert.ok(requests.slice(before + 1, -1).every(request => request.path.endsWith('/liveness/guide')));
   assert.equal(guided[0].get('step'), '0');
   assert.equal(guided[0].get('baseline'), null, 'The baseline frame is captured first');
-  assert.ok(guided[2].get('baseline'), 'Movement checks compare against the baseline frame');
-  assert.equal(guided[2].get('nonce'), challenge.nonce);
+  const firstMovement = guided.find(form => form.get('step') === '1');
+  assert.ok(firstMovement.get('baseline'), 'Movement checks compare against the baseline frame');
+  assert.equal(firstMovement.get('nonce'), challenge.nonce);
   const upload = requests.at(-1).options.body;
   assert.equal(upload.get('nonce'), challenge.nonce);
   assert.equal(upload.get('frame_steps'), '0,0,1,1,2,2,3,3');
   assert.equal(upload.getAll('frames').length, 8);
+  assert.notEqual(await guided[0].get('frame').text(), await upload.getAll('frames')[0].text(),
+    'An explicitly uncentered frame is not submitted as neutral evidence');
+  for (const form of guided.filter(form => form.get('baseline'))) {
+    assert.equal(await form.get('baseline').text(), await upload.getAll('frames')[0].text(),
+      'Guidance uses the same first neutral frame as the final server check');
+    assert.equal(form.getAll('baseline_extra').length, 1, 'Guidance sends the complete neutral pair');
+    assert.equal(await form.getAll('baseline_extra')[0].text(), await upload.getAll('frames')[1].text(),
+      'Guidance and final submission calibrate against the same second neutral frame');
+  }
+  for (const message of ['Look straight ahead.', 'Move to brighter, even light.',
+    'Move back so your whole face is visible.', 'Move closer to the camera.']) {
+    assert.ok(run('coachingMessages').includes(message), `Specific server recovery guidance shown: ${message}`);
+  }
   assert.equal(run('state.mode'), 'liveness', 'Retry keeps the liveness step open');
   assert.equal(run('state.live'), null);
   assert.equal(elements['liveness-tips'].hidden, false, 'Tips are shown again before a retry');
@@ -150,7 +174,7 @@ const enqueue = (body, status = 200) => queue.push({ body, status });
   await flush();
   assert.equal(elements['liveness-help'].hidden, false, 'Help card shown when the step is not followed');
   assert.equal(elements['liveness-help-tips'].children.length, 4);
-  assert.match(elements['liveness-help-tips'].children[0].textContent, /right shoulder/);
+  assert.match(elements['liveness-help-tips'].children[0].textContent, /camera still.*head slightly/);
   guide('DONE'); guide('DONE'); centre(); guide('DONE'); guide('DONE'); centre(); guide('DONE'); guide('DONE');
   enqueue({ status: 'PROCESSING', result: 'REVIEW', retry_allowed: false, attempts_remaining: 2, instructions: [], score: 1 });
   elements['liveness-retry-step'].listeners.click();

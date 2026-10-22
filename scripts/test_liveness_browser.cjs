@@ -133,13 +133,14 @@ async function main() {
           await page.getByRole("button", { name: "Start face scan" }).waitFor();
           assert.equal(challenges, 0);
         } else if (scenario === "camera_interrupted") {
-          await page.getByText("Turn your head to your left", { exact: true }).waitFor();
+          await page.getByText("Turn your head to your left.", { exact: true }).waitFor();
           await page.evaluate(() => {
             const track = document.querySelector("video").srcObject.getVideoTracks()[0];
             track.stop();
             track.dispatchEvent(new Event("ended"));
           });
-          await page.getByText("The camera stopped. Restart the camera and try again.", { exact: true }).waitFor();
+          try { await page.getByText("The camera stopped. Restart the camera and try again.", { exact: true }).first().waitFor({timeout:10000}); }
+          catch(error) { await page.screenshot({path:"var/liveness-camera-interruption-failure.png"}); console.error(await page.locator("body").innerText()); throw error; }
           try {
             await page.getByRole("button", { name: "Retry camera" }).waitFor({ timeout: 5000 });
           } catch (error) {
@@ -156,13 +157,13 @@ async function main() {
           assert.equal(challenges, 1);
           assert.equal(submitted, 0);
         } else {
-          await page.getByText("Turn your head to your left", { exact: true }).waitFor();
+          await page.getByText("Turn your head to your left.", { exact: true }).waitFor();
           assert.equal(await page.getByText("Tilt your head up", { exact: true }).count(), 0);
           const videoBox = await page.locator("video").boundingBox();
           assert.ok(videoBox.width > 200 && videoBox.y < 250);
           await page.screenshot({ path: "var/liveness-guided.png" });
           if (scenario === "successful_capture") {
-            await page.getByText("Face scan complete", { exact: true }).waitFor({ timeout: 30000 });
+            await page.getByText("Movement capture received", { exact: true }).waitFor({ timeout: 30000 });
           } else {
             await page.getByText("Please try the movement check again", { exact: true }).waitFor({ timeout: 30000 });
           }

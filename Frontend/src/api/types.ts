@@ -241,7 +241,7 @@ export interface LivenessChallenge {
   nonce: string;
   steps: { index: number; step: string; instruction: string }[];
   expires_at: string;
-  frames: { min: number; max: number };
+  frames: { min: number; max: number; stable_frames_per_step?: number };
   attempts_remaining: number;
 }
 
@@ -250,6 +250,9 @@ export interface LivenessGuide {
   face: "OK" | "NO_FACE" | "MULTIPLE_FACES" | "UNCLEAR" | string;
   state: "DONE" | "CENTERED" | "WRONG_DIRECTION" | string | null;
   progress: number;
+  instructions?: string[];
+  /** Opaque challenge-bound neutral calibration. Advisory only; never submitted as evidence. */
+  calibration?: string;
 }
 
 export interface LivenessResult {

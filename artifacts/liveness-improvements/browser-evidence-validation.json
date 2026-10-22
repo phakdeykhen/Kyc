@@ -1,0 +1,332 @@
+[
+  {
+    "test": "help",
+    "variant": "current",
+    "viewport": {
+      "width": 320,
+      "height": 568
+    },
+    "reducedMotion": false,
+    "help": true,
+    "cameraDenied": false,
+    "cameraInterrupted": false,
+    "frozenCamera": false,
+    "stale": false,
+    "trackingLoss": false,
+    "tokenFallback": false,
+    "inFlightDisabled": false,
+    "cpu": 0,
+    "passed": true,
+    "synthetic": true,
+    "baselineRevision": "3629ebce84a93165425773f5766ac421ab6bd11a",
+    "browser": "156.0.8078.4",
+    "host": {
+      "platform": "darwin",
+      "architecture": "arm64",
+      "cpu": "Apple M4"
+    },
+    "camera": "Chromium synthetic media stream; no physical camera or person",
+    "network": "Playwright route mock, 50 ms per response; final submission adds 400 ms",
+    "positioned": 4,
+    "submitted": 0,
+    "tokenRequests": 24,
+    "referenceRequests": 2,
+    "cameraStarts": 2,
+    "canvasAllocations": 2,
+    "drawMs": {
+      "count": 30,
+      "median": 6.9,
+      "p95": 11.9
+    },
+    "jpegEncodeMs": {
+      "count": 30,
+      "median": 6.6,
+      "p95": 11.9
+    },
+    "rafIntervalMs": {
+      "count": 1138,
+      "median": 16.7,
+      "p95": 16.8
+    },
+    "videoPresentedFrames": 374,
+    "domMutationRecords": 498,
+    "maxConcurrentRequests": 1,
+    "requestMs": {
+      "count": 31,
+      "median": 53.9,
+      "p95": 57.7
+    },
+    "requestCount": 31,
+    "uploadBytes": {
+      "count": 26,
+      "median": 5311,
+      "p95": 14901
+    },
+    "totalUploadBytes": 179434,
+    "longTasksMs": []
+  },
+  {
+    "test": "stale",
+    "variant": "current",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "reducedMotion": false,
+    "help": false,
+    "cameraDenied": false,
+    "cameraInterrupted": false,
+    "frozenCamera": false,
+    "stale": true,
+    "trackingLoss": false,
+    "tokenFallback": false,
+    "inFlightDisabled": false,
+    "cpu": 0,
+    "passed": true,
+    "synthetic": true,
+    "baselineRevision": "3629ebce84a93165425773f5766ac421ab6bd11a",
+    "browser": "156.0.8078.4",
+    "host": {
+      "platform": "darwin",
+      "architecture": "arm64",
+      "cpu": "Apple M4"
+    },
+    "camera": "Chromium synthetic media stream; no physical camera or person",
+    "network": "Playwright route mock, 50 ms per response; final submission adds 400 ms",
+    "positioned": 4,
+    "submitted": 1,
+    "tokenRequests": 15,
+    "referenceRequests": 2,
+    "cameraStarts": 2,
+    "canvasAllocations": 2,
+    "drawMs": {
+      "count": 21,
+      "median": 6,
+      "p95": 7.7
+    },
+    "jpegEncodeMs": {
+      "count": 21,
+      "median": 3.6,
+      "p95": 13.6
+    },
+    "rafIntervalMs": {
+      "count": 809,
+      "median": 16.7,
+      "p95": 16.8
+    },
+    "videoPresentedFrames": 267,
+    "domMutationRecords": 1294,
+    "maxConcurrentRequests": 1,
+    "requestMs": {
+      "count": 23,
+      "median": 53.6,
+      "p95": 458.1
+    },
+    "requestCount": 23,
+    "uploadBytes": {
+      "count": 17,
+      "median": 5842,
+      "p95": 16337
+    },
+    "totalUploadBytes": 178042,
+    "longTasksMs": []
+  },
+  {
+    "test": "tracking_loss",
+    "variant": "current",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "reducedMotion": false,
+    "help": false,
+    "cameraDenied": false,
+    "cameraInterrupted": false,
+    "frozenCamera": false,
+    "stale": false,
+    "trackingLoss": true,
+    "tokenFallback": false,
+    "inFlightDisabled": false,
+    "cpu": 0,
+    "passed": true,
+    "synthetic": true,
+    "baselineRevision": "3629ebce84a93165425773f5766ac421ab6bd11a",
+    "browser": "156.0.8078.4",
+    "host": {
+      "platform": "darwin",
+      "architecture": "arm64",
+      "cpu": "Apple M4"
+    },
+    "camera": "Chromium synthetic media stream; no physical camera or person",
+    "network": "Playwright route mock, 50 ms per response; final submission adds 400 ms",
+    "positioned": 4,
+    "submitted": 1,
+    "tokenRequests": 19,
+    "referenceRequests": 2,
+    "cameraStarts": 2,
+    "canvasAllocations": 2,
+    "drawMs": {
+      "count": 25,
+      "median": 6.3,
+      "p95": 8
+    },
+    "jpegEncodeMs": {
+      "count": 25,
+      "median": 5.2,
+      "p95": 13.3
+    },
+    "rafIntervalMs": {
+      "count": 868,
+      "median": 16.7,
+      "p95": 16.7
+    },
+    "videoPresentedFrames": 286,
+    "domMutationRecords": 1314,
+    "maxConcurrentRequests": 1,
+    "requestMs": {
+      "count": 27,
+      "median": 53.7,
+      "p95": 60.4
+    },
+    "requestCount": 27,
+    "uploadBytes": {
+      "count": 21,
+      "median": 5825,
+      "p95": 14789
+    },
+    "totalUploadBytes": 199648,
+    "longTasksMs": []
+  },
+  {
+    "test": "token_fallback",
+    "variant": "current",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "reducedMotion": false,
+    "help": false,
+    "cameraDenied": false,
+    "cameraInterrupted": false,
+    "frozenCamera": false,
+    "stale": false,
+    "trackingLoss": false,
+    "tokenFallback": true,
+    "inFlightDisabled": false,
+    "cpu": 0,
+    "passed": true,
+    "synthetic": true,
+    "baselineRevision": "3629ebce84a93165425773f5766ac421ab6bd11a",
+    "browser": "156.0.8078.4",
+    "host": {
+      "platform": "darwin",
+      "architecture": "arm64",
+      "cpu": "Apple M4"
+    },
+    "camera": "Chromium synthetic media stream; no physical camera or person",
+    "network": "Playwright route mock, 50 ms per response; final submission adds 400 ms",
+    "positioned": 4,
+    "submitted": 1,
+    "tokenRequests": 1,
+    "referenceRequests": 21,
+    "cameraStarts": 2,
+    "canvasAllocations": 2,
+    "drawMs": {
+      "count": 26,
+      "median": 6.7,
+      "p95": 9.2
+    },
+    "jpegEncodeMs": {
+      "count": 26,
+      "median": 3.8,
+      "p95": 12
+    },
+    "rafIntervalMs": {
+      "count": 905,
+      "median": 16.7,
+      "p95": 16.8
+    },
+    "videoPresentedFrames": 300,
+    "domMutationRecords": 1451,
+    "maxConcurrentRequests": 1,
+    "requestMs": {
+      "count": 28,
+      "median": 54.1,
+      "p95": 55
+    },
+    "requestCount": 28,
+    "uploadBytes": {
+      "count": 22,
+      "median": 14662,
+      "p95": 15847
+    },
+    "totalUploadBytes": 377617,
+    "longTasksMs": []
+  },
+  {
+    "test": "in_flight_camera_disabled",
+    "variant": "current",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "reducedMotion": false,
+    "help": false,
+    "cameraDenied": false,
+    "cameraInterrupted": false,
+    "frozenCamera": false,
+    "stale": false,
+    "trackingLoss": false,
+    "tokenFallback": false,
+    "inFlightDisabled": true,
+    "cpu": 0,
+    "passed": true,
+    "synthetic": true,
+    "baselineRevision": "3629ebce84a93165425773f5766ac421ab6bd11a",
+    "browser": "156.0.8078.4",
+    "host": {
+      "platform": "darwin",
+      "architecture": "arm64",
+      "cpu": "Apple M4"
+    },
+    "camera": "Chromium synthetic media stream; no physical camera or person",
+    "network": "Playwright route mock, 50 ms per response; final submission adds 400 ms",
+    "positioned": 4,
+    "submitted": 0,
+    "tokenRequests": 1,
+    "referenceRequests": 2,
+    "cameraStarts": 2,
+    "canvasAllocations": 3,
+    "drawMs": {
+      "count": 7,
+      "median": 11.7,
+      "p95": 15.3
+    },
+    "jpegEncodeMs": {
+      "count": 7,
+      "median": 5.7,
+      "p95": 20.4
+    },
+    "rafIntervalMs": {
+      "count": 509,
+      "median": 16.7,
+      "p95": 16.8
+    },
+    "videoPresentedFrames": 168,
+    "domMutationRecords": 562,
+    "maxConcurrentRequests": 1,
+    "requestMs": {
+      "count": 8,
+      "median": 55.4,
+      "p95": 307.7
+    },
+    "requestCount": 8,
+    "uploadBytes": {
+      "count": 3,
+      "median": 15205,
+      "p95": 15663
+    },
+    "totalUploadBytes": 55453,
+    "longTasksMs": []
+  }
+]

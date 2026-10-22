@@ -1,0 +1,5 @@
+2026-10-22 16:09:30,909 WARNING kyc.security request refused {"client": "127.0.0.1", "credential": "development_key", "event": "HTTP_429", "method": "POST", "organization_id": "19467c77-a555-4c90-8e5e-e5728abc9aff", "path": "/v1/kyc/{session_id}/liveness/challenge", "request_id": "6b61724f-e793-41ec-982a-a46bbb049305", "status": 429}
+----------------------------------------------------------------------
+Ran 58 tests in 7.292s
+
+OK

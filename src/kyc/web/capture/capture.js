@@ -464,20 +464,28 @@ async function submitSelfie(blob) {
 // a frame at a time, whether the person has done the movement (same geometry as the final check), and
 // only moves on once two frames in a row show it. Raw (unmirrored) frames go back with each step index.
 const STEP_TEXT = {
-  LOOK_STRAIGHT: { say: "Look straight at the camera", cue: "" },
-  TURN_LEFT: { say: "Turn your head to your left", cue: "left",
-    more: "Turn further, as if looking over your left shoulder.", wrong: "That's the other way. Turn to your left." },
-  TURN_RIGHT: { say: "Turn your head to your right", cue: "right",
-    more: "Turn further, as if looking over your right shoulder.", wrong: "That's the other way. Turn to your right." },
-  LOOK_UP: { say: "Tilt your head up", cue: "up",
-    more: "Lift your chin higher, as if looking at the ceiling.", wrong: "That's down. Tilt your head up instead." },
-  LOOK_DOWN: { say: "Tilt your head down", cue: "down",
-    more: "Lower your chin further, as if looking at the floor.", wrong: "That's up. Tilt your head down instead." },
+  LOOK_STRAIGHT: { say: "Look straight ahead.", cue: "" },
+  TURN_LEFT: { say: "Turn your head to your left.", cue: "left",
+    more: "Keep the camera still and turn only your head slightly.", wrong: "Turn to your left, following the arrow." },
+  TURN_RIGHT: { say: "Turn your head to your right.", cue: "right",
+    more: "Keep the camera still and turn only your head slightly.", wrong: "Turn to your right, following the arrow." },
+  LOOK_UP: { say: "Lift your chin slightly.", cue: "up",
+    more: "Keep your eyes and whole face visible to the camera.", wrong: "Lift your chin slightly, following the arrow." },
+  LOOK_DOWN: { say: "Lower your chin slightly.", cue: "down",
+    more: "Keep your eyes and whole face visible to the camera.", wrong: "Lower your chin slightly, following the arrow." },
 };
 const FACE_TEXT = {
-  NO_FACE: "We can't see your face. Keep it inside the oval.",
+  NO_FACE: "Tracking lost. Look straight ahead with your face in the oval.",
   MULTIPLE_FACES: "Only your face should be in view.",
-  UNCLEAR: "Hold still with your whole face in the oval and good light.",
+  UNCLEAR: "Hold still with your whole face visible.",
+};
+// Global MOVE_CLOSER/MOVE_BACK messages concern document corners; face guidance needs its own wording.
+const LIVENESS_RECOVERY = {
+  MORE_LIGHT: "Move to brighter, even light.", REDUCE_LIGHT: "Move away from direct bright light.",
+  EVEN_LIGHTING: "Face an even light source.", MOVE_CLOSER: "Move closer to the camera.",
+  MOVE_BACK: "Move back so your whole face is visible.", CENTER_FACE: "Center your face in the oval.",
+  HOLD_STILL: "Hold still for a clear picture.", FACE_CAMERA: "Look straight ahead with your whole face visible.",
+  LOOK_STRAIGHT: "Look straight ahead.",
 };
 const HOLD_FRAMES = 2;
 
@@ -509,11 +517,11 @@ function renderDots(current, done) {
 function showStep(index, kind) {
   const steps = state.live.issued.steps;
   const text = STEP_TEXT[steps[index].step] || { say: steps[index].instruction, cue: "" };
-  $("liveness-step").textContent = kind === "center" ? "Turn your head back to the center" : text.say;
+  $("liveness-step").textContent = kind === "center" ? "Look straight ahead." : text.say;
   $("liveness-cue").hidden = kind !== "move" || !text.cue;
   $("liveness-cue").className = `cue ${kind === "move" ? text.cue : ""}`;
-  $("liveness-coach").textContent = kind === "move" ? `Step ${index} of ${steps.length - 1} · keep going until the dot turns green`
-    : kind === "baseline" ? "Hold still for a moment." : "";
+  $("liveness-coach").textContent = kind === "move" ? `Step ${index} of ${steps.length - 1} · keep your whole face visible`
+    : kind === "baseline" ? "Hold still." : "";
   coach(kind === "move" ? "Move slowly." : "Keep your face inside the oval.", 0);
 }
 
@@ -531,6 +539,7 @@ async function guideCall(index, blob) {
   form.append("step", String(index));
   form.append("frame", blob, "frame.jpg");
   if (live.baseline) form.append("baseline", live.baseline, "baseline.jpg");
+  (live.baselineExtra || []).forEach((frame, index) => form.append("baseline_extra", frame, `baseline-${index + 1}.jpg`));
   return api(`/v1/kyc/${state.session.session_id}/liveness/guide`, { method: "POST", body: form });
 }
 
@@ -581,16 +590,20 @@ async function followStep(index, kind) {
       coach("The connection is slow. Keep still…", null);
     } else if (result) {
       const body = result.body;
+      const recovery = (body.instructions || []).map((code) => LIVENESS_RECOVERY[code]).find(Boolean);
       if (body.face !== "OK") {
         held = [];
-        coach(FACE_TEXT[body.face] || FACE_TEXT.UNCLEAR, 0);
+        coach(recovery || FACE_TEXT[body.face] || FACE_TEXT.UNCLEAR, 0);
       } else {
-        satisfied = kind === "baseline" || body.state === (kind === "center" ? "CENTERED" : "DONE");
+        // An initial neutral guide has no reference yet and returns null on a valid frontal frame.
+        // An explicit NOT_CENTERED (or any other movement state) must never count as neutral evidence.
+        satisfied = kind === "baseline" ? body.state === null || body.state === "CENTERED"
+          : body.state === (kind === "center" ? "CENTERED" : "DONE");
         const elapsed = Date.now() - started;
-        const hint = satisfied ? (held.length + 1 >= HOLD_FRAMES ? "Done!" : "Hold it there…")
-          : body.state === "WRONG_DIRECTION" ? text.wrong
-          : kind === "center" ? "Look straight at the camera again."
-          : elapsed > state.nudgeAfterMs ? text.more : "Keep going, slowly.";
+        const hint = satisfied ? (held.length + 1 >= HOLD_FRAMES ? "Step confirmed." : "Movement detected. Hold still.")
+          : recovery || (body.state === "WRONG_DIRECTION" ? text.wrong || "Follow the arrow slowly."
+          : kind !== "move" ? "Look straight ahead and hold still."
+          : elapsed > state.nudgeAfterMs ? text.more || "Move only your head slightly." : "Keep going, slowly.");
         coach(hint, kind === "move" ? (satisfied ? 1 : body.progress) : (satisfied ? 1 : 0), satisfied);
       }
     }
@@ -641,13 +654,14 @@ async function runLiveness() {
     $("liveness-tips").hidden = false;
     return showError(issued);
   }
-  state.live = { issued: issued.body, baseline: null, stopped: null, help: null };
+  state.live = { issued: issued.body, baseline: null, baselineExtra: [], stopped: null, help: null };
   updateButtons();
   const frames = [], steps = [];
   try {
     renderDots(0, 0);
     const baseline = await followStep(0, "baseline");
     state.live.baseline = baseline[0];
+    state.live.baselineExtra = baseline.slice(1);
     baseline.forEach((blob) => { frames.push(blob); steps.push(0); });
     const sequence = issued.body.steps;
     for (let index = 1; index < sequence.length; index++) {

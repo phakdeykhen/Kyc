@@ -8,8 +8,12 @@ decision itself belongs to the risk engine (Phase 13).
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import base64
+import binascii
 import hashlib
 import hmac
+import json
+import math
 from uuid import UUID, uuid4
 
 from cryptography.exceptions import InvalidTag
@@ -30,8 +34,8 @@ from kyc.domain.enums import CheckResult, SessionStatus, VerificationLevel
 from kyc.domain.state_machine import Event
 from kyc.engines.capture_quality import CaptureRejected, decode_capture
 from kyc.liveness import challenge as challenges
-from kyc.liveness.active import COVERAGE, ActiveLivenessPolicy, assess, guide
-from kyc.liveness.geometry import pose
+from kyc.liveness.active import COVERAGE, ActiveLivenessPolicy, assess, guide, movement_visibility
+from kyc.liveness.geometry import PoseSample, median_pose, pose
 from kyc.services.biometrics import _quality_metadata, _template_context
 from kyc.services.sessions import apply_event, aware, is_expired
 
@@ -105,6 +109,7 @@ def issue_challenge(db: Session, tenant: TenantContext, session_id: UUID, limits
             "expires_at": item.expires_at,
             "frames": {"min": max(policy.min_frames, len(item.steps) * policy.stable_frames_per_step),
                        "max": policy.max_frames,
+                       "stable_frames_per_step": policy.stable_frames_per_step,
                        "per_step": f"{policy.stable_frames_per_step}-3 frames, tagged with the step index"},
             "attempts_remaining": limits.max_attempts - attempts - 1}
 
@@ -124,16 +129,20 @@ def _open_challenge(db, record, challenge_id: UUID, nonce: str, now: datetime,
     return item, None
 
 
-def _single_face(engine, data: bytes, limits: LivenessLimits):
-    """(face status, pose or None). Face status: OK, NO_FACE, MULTIPLE_FACES or UNCLEAR."""
+def _single_face(engine, data: bytes, limits: LivenessLimits, *, frontal: bool = False):
+    """Current visibility and pose; a predicted landmark alone is insufficient evidence."""
     capture = decode_capture(data, max_bytes=limits.max_frame_bytes, max_pixels=limits.max_frame_pixels)
-    faces = engine.detect(Image.fromarray(capture.pixels))
+    image = Image.fromarray(capture.pixels)
+    faces = engine.detect(image)
     if len(faces) != 1:
-        return ("MULTIPLE_FACES" if faces else "NO_FACE"), None
+        return ("MULTIPLE_FACES" if faces else "NO_FACE"), None, []
     try:
-        return "OK", pose(faces[0].landmarks)
+        quality = assess_face_quality(image, faces) if frontal else movement_visibility(image, faces[0])
+        if not quality.accepted:
+            return "UNCLEAR", None, list(quality.instructions)
+        return "OK", pose(faces[0].landmarks), []
     except ValueError:
-        return "UNCLEAR", None
+        return "UNCLEAR", None, ["FACE_CAMERA"]
 
 
 def position_face(db: Session, tenant: TenantContext, session_id: UUID, frame: bytes, engine,
@@ -168,9 +177,48 @@ def position_face(db: Session, tenant: TenantContext, session_id: UUID, frame: b
             "attempts_remaining": remaining}
 
 
+def _calibration_context(record, item, policy) -> str:
+    """A separate AEAD purpose; a calibration can only advise its open challenge."""
+    return (f"biometric/{record.organization_id}/{record.id}/{item.id}/LIVENESS_CALIBRATION/"
+            f"{item.policy_version}/{policy.version}/POSE_V1")
+
+
+def _seal_calibration(sample: PoseSample, cipher, context: str) -> str:
+    payload = json.dumps({"v": 1, "pose": [sample.a, sample.b, sample.aspect, sample.scale, *sample.centre]},
+                         separators=(",", ":"), allow_nan=False).encode("utf-8")
+    sealed, key = cipher.seal(payload, context)
+    return key + "." + base64.urlsafe_b64encode(sealed).decode("ascii").rstrip("=")
+
+
+def _open_calibration(token: str, cipher, context: str, limits: LivenessLimits) -> PoseSample:
+    if cipher is None or not isinstance(token, str) or not 1 <= len(token) <= 2048:
+        raise ValueError("Calibration unavailable")
+    key, separator, encoded = token.rpartition(".")  # key versions may contain dots; base64url never does
+    if not separator or not 1 <= len(key) <= 64 or not encoded:
+        raise ValueError("Calibration envelope is invalid")
+    sealed = base64.b64decode(encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True)
+    payload = cipher.open(sealed, key, context)
+    if len(payload) > 1024:
+        raise ValueError("Calibration payload is too large")
+    document = json.loads(payload)
+    if not isinstance(document, dict) or set(document) != {"v", "pose"} or type(document["v"]) is not int or document["v"] != 1:
+        raise ValueError("Calibration schema is invalid")
+    values = document["pose"]
+    if (not isinstance(values, list) or len(values) != 6
+            or any(type(value) not in (int, float) or not math.isfinite(value) for value in values)):
+        raise ValueError("Calibration pose is invalid")
+    a, b, aspect, scale, x, y = values
+    if (abs(a) > 1 or not 0 <= b <= 1 or not 1e-3 <= aspect <= 1e3
+            or not 0 < scale <= limits.max_frame_pixels
+            or not 0 <= min(x, y) <= max(x, y) <= limits.max_frame_pixels):
+        raise ValueError("Calibration pose is outside its bounds")
+    return PoseSample(a, b, aspect, scale, (x, y))
+
+
 def guide_step(db: Session, tenant: TenantContext, session_id: UUID, challenge_id: UUID, nonce: str, step_index: int,
                frame: bytes, baseline: bytes | None, engine, policy: ActiveLivenessPolicy, limits: LivenessLimits,
-               request_id: UUID) -> dict | JSONResponse:
+               request_id: UUID, baseline_extra: list[bytes] | None = None, holding: bool = False,
+               calibration: str | None = None, cipher=None) -> dict | JSONResponse:
     """Live feedback for one step of an open challenge, from one frame (and the person's baseline frame).
 
     Advisory only: it neither uses the challenge nor records evidence, and frames are not kept.
@@ -184,23 +232,50 @@ def guide_step(db: Session, tenant: TenantContext, session_id: UUID, challenge_i
         return problem
     if not 0 <= step_index < len(item.steps):
         return _error(422, "FRAME_STEP_INVALID", "The step index is not part of this challenge.")
+    context = _calibration_context(record, item, policy)
+    if calibration is not None:
+        try:
+            base_sample = _open_calibration(calibration, cipher, context, limits)
+        except (InvalidTag, ValueError, TypeError, UnicodeError, binascii.Error, OverflowError):
+            return _error(422, "CALIBRATION_UNUSABLE", "Recheck the neutral frames and try this step again.")
     reason = engine.unavailable_reason() if engine is not None else "FACE_MODELS_UNAVAILABLE"
     if reason:
         return _error(503, reason, "Liveness checking is unavailable. Retry later.")
     step = item.steps[step_index]
     try:
-        face, sample = _single_face(engine, frame, limits)
-        if face != "OK" or baseline is None:
-            return {"step": step, "face": face, "state": None, "progress": 0.0}
-        base_face, base_sample = _single_face(engine, baseline, limits)
+        face, sample, instructions = _single_face(engine, frame, limits, frontal=step == challenges.BASELINE)
+        if face == "OK" and step == challenges.BASELINE and abs(sample.a) > policy.movement / 2:
+            return {"step": step, "face": "OK", "state": "NOT_CENTERED", "progress": 0.0, "instructions": ["LOOK_STRAIGHT"]}
+        if face != "OK" or (baseline is None and calibration is None):
+            return {"step": step, "face": face, "state": None, "progress": 0.0, "instructions": instructions}
+        if calibration is None:
+            base_face, base_sample, _ = _single_face(engine, baseline, limits, frontal=True)
+            base_samples = [base_sample] if base_face == "OK" else []
+            for extra in baseline_extra or []:
+                extra_face, extra_sample, _ = _single_face(engine, extra, limits, frontal=True)
+                if extra_face == "OK":
+                    base_samples.append(extra_sample)
+                else:
+                    base_face = "UNCLEAR"
+            if base_face == "OK":
+                base_sample = median_pose(base_samples)
+                if any(abs(sample.a) > policy.movement / 2
+                       or max(abs(sample.a - base_sample.a), abs(sample.b - base_sample.b)) > policy.movement / 2
+                       for sample in base_samples):
+                    base_face = "UNCLEAR"
+            if base_face != "OK":
+                return _error(422, "BASELINE_UNUSABLE", "The baseline frame must show exactly one clear face.")
+            if cipher is not None:
+                calibration = _seal_calibration(base_sample, cipher, context)
     except CaptureRejected as rejected:
         return _error(422, rejected.reason_code, str(rejected))
     except FaceEngineUnavailable:
         return _error(503, "FACE_MODELS_UNAVAILABLE", "Liveness checking is unavailable. Retry later.")
-    if base_face != "OK":
-        return _error(422, "BASELINE_UNUSABLE", "The baseline frame must show exactly one clear face.")
-    advice = guide(base_sample, sample, step, policy)
-    return {"step": step, "face": face, "state": advice.state, "progress": advice.progress}
+    advice = guide(base_sample, sample, step, policy, holding=holding)
+    response = {"step": step, "face": face, "state": advice.state, "progress": advice.progress}
+    if calibration is not None:
+        response["calibration"] = calibration
+    return response
 
 
 def _selfie_template(db, record):
