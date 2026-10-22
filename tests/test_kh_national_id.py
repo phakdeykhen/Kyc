@@ -281,6 +281,24 @@ class RealCardLayoutTests(unittest.TestCase):
         self.adapter = adapter_for(DocumentType.KH_NATIONAL_ID)
         self.mrz = td1()   # IDKHM…, 9003152F2912316KHM<<<<<<<<<<<4, SOK<<SOPHEA…
 
+    def test_issuer_misread_by_one_letter_still_identifies_the_front_and_fills_fields_for_review(self):
+        # Real card: OCR read "IDKHN…" for "IDKHM…". The TD1 composite does not cover the issuer, so digits stay valid.
+        misread = td1(state="KHN")
+        mrz_lines = [line(text, 0.7 + 0.08 * index) for index, text in enumerate(misread)]
+        front = self.adapter.classify(mrz_lines, "FRONT")
+        self.assertEqual((front.document_type, front.document_side), (DocumentType.KH_NATIONAL_ID, "FRONT"))
+        document = self.adapter.extract_fields({"FRONT": mrz_lines, "BACK": []})
+        self.assertEqual((document.full_name, str(document.date_of_birth), document.sex, str(document.expiry_date)),
+                         ("SOK SOPHEA", "1990-03-15", "F", "2029-12-31"))
+        mrz = self.adapter.parse_mrz(document.mrz, date(2026, 10, 22))
+        self.assertEqual((mrz.result, mrz.reason_codes), (CheckResult.REVIEW, ("MRZ_ISSUING_STATE_OCR_VARIANT",)))
+        for state, nationality in (("XYZ", "KHM"), ("KHN", "THA")):
+            with self.subTest(state=state, nationality=nationality):
+                other = [line(text, 0.7 + 0.08 * index) for index, text in enumerate(td1(state=state, nationality=nationality))]
+                document = self.adapter.extract_fields({"FRONT": other, "BACK": []})
+                self.assertIsNone(document.date_of_birth, "Another issuer never supplies fields")
+                self.assertIn("MRZ_ISSUING_STATE_UNEXPECTED", self.adapter.parse_mrz(document.mrz).reason_codes)
+
     def test_mrz_filler_noise_and_lost_tail_are_repaired_only_when_check_digits_agree(self):
         from kyc.mrz import parser
         head = self.mrz[1][:18]

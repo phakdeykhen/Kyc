@@ -1,0 +1,555 @@
+[
+  {
+    "viewport": {
+      "width": 320,
+      "height": 568
+    },
+    "camera": {
+      "width": 1920,
+      "height": 1080
+    },
+    "native": {
+      "width": 1920,
+      "height": 1080
+    },
+    "video": {
+      "width": 244,
+      "height": 320
+    },
+    "guide": {
+      "width": 168.546875,
+      "height": 106.265625,
+      "top": 106.859375,
+      "bottom": -106.875
+    },
+    "sourceCard": {
+      "width": 568.845703125,
+      "height": 358.646484375,
+      "cx": 0.4999862670898438,
+      "cy": 0.4999755859375
+    },
+    "assessment": {
+      "accepted": false,
+      "reasons": [
+        "DOCUMENT_TOO_FAR",
+        "RESOLUTION_TOO_LOW"
+      ],
+      "coverage": 0.104,
+      "resolution": 0.265
+    }
+  },
+  {
+    "viewport": {
+      "width": 320,
+      "height": 568
+    },
+    "camera": {
+      "width": 1920,
+      "height": 1440
+    },
+    "native": {
+      "width": 1920,
+      "height": 1440
+    },
+    "video": {
+      "width": 244,
+      "height": 320
+    },
+    "guide": {
+      "width": 168.546875,
+      "height": 106.265625,
+      "top": 106.859375,
+      "bottom": -106.875
+    },
+    "sourceCard": {
+      "width": 758.4609375,
+      "height": 478.1953125,
+      "cx": 0.499981689453125,
+      "cy": 0.4999755859375
+    },
+    "assessment": {
+      "accepted": false,
+      "reasons": [
+        "DOCUMENT_TOO_FAR"
+      ],
+      "coverage": 0.136,
+      "resolution": 0.581
+    }
+  },
+  {
+    "viewport": {
+      "width": 320,
+      "height": 568
+    },
+    "camera": {
+      "width": 1080,
+      "height": 1920
+    },
+    "native": {
+      "width": 1080,
+      "height": 1920
+    },
+    "video": {
+      "width": 244,
+      "height": 320
+    },
+    "guide": {
+      "width": 168.546875,
+      "height": 106.265625,
+      "top": 106.859375,
+      "bottom": -106.875
+    },
+    "sourceCard": {
+      "width": 746.0271516393443,
+      "height": 470.35604508196724,
+      "cx": 0.49996798155737704,
+      "cy": 0.4999819896260246
+    },
+    "assessment": {
+      "accepted": false,
+      "reasons": [
+        "DOCUMENT_TOO_FAR"
+      ],
+      "coverage": 0.176,
+      "resolution": 0.549
+    }
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "camera": {
+      "width": 1920,
+      "height": 1080
+    },
+    "native": {
+      "width": 1920,
+      "height": 1080
+    },
+    "video": {
+      "width": 314,
+      "height": 320
+    },
+    "guide": {
+      "width": 228.75,
+      "height": 144.21875,
+      "top": 87.890625,
+      "bottom": -87.890625
+    },
+    "sourceCard": {
+      "width": 772.03125,
+      "height": 486.73828125,
+      "cx": 0.5000000000000001,
+      "cy": 0.5
+    },
+    "assessment": {
+      "accepted": false,
+      "reasons": [
+        "DOCUMENT_TOO_FAR"
+      ],
+      "coverage": 0.187,
+      "resolution": 0.597
+    }
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "camera": {
+      "width": 1920,
+      "height": 1440
+    },
+    "native": {
+      "width": 1920,
+      "height": 1440
+    },
+    "video": {
+      "width": 314,
+      "height": 320
+    },
+    "guide": {
+      "width": 228.75,
+      "height": 144.21875,
+      "top": 87.890625,
+      "bottom": -87.890625
+    },
+    "sourceCard": {
+      "width": 1029.375,
+      "height": 648.984375,
+      "cx": 0.5,
+      "cy": 0.5
+    },
+    "assessment": {
+      "accepted": true,
+      "reasons": [],
+      "coverage": 0.246,
+      "resolution": 1
+    }
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "camera": {
+      "width": 1080,
+      "height": 1920
+    },
+    "native": {
+      "width": 1080,
+      "height": 1920
+    },
+    "video": {
+      "width": 314,
+      "height": 320
+    },
+    "guide": {
+      "width": 228.75,
+      "height": 144.21875,
+      "top": 87.890625,
+      "bottom": -87.890625
+    },
+    "sourceCard": {
+      "width": 786.7834394904459,
+      "height": 496.0390127388535,
+      "cx": 0.5,
+      "cy": 0.49999999999999994
+    },
+    "assessment": {
+      "accepted": false,
+      "reasons": [
+        "DOCUMENT_TOO_FAR"
+      ],
+      "coverage": 0.192,
+      "resolution": 0.621
+    }
+  },
+  {
+    "viewport": {
+      "width": 740,
+      "height": 390
+    },
+    "camera": {
+      "width": 1920,
+      "height": 1080
+    },
+    "native": {
+      "width": 1920,
+      "height": 1080
+    },
+    "video": {
+      "width": 664,
+      "height": 320
+    },
+    "guide": {
+      "width": 529.75,
+      "height": 334.015625,
+      "top": -7,
+      "bottom": 7.015625
+    },
+    "sourceCard": {
+      "width": 1531.8072289156628,
+      "height": 965.8283132530121,
+      "cx": 0.5,
+      "cy": 0.5000209170013388
+    },
+    "assessment": {
+      "accepted": true,
+      "reasons": [],
+      "coverage": 0.644,
+      "resolution": 1
+    }
+  },
+  {
+    "viewport": {
+      "width": 740,
+      "height": 390
+    },
+    "camera": {
+      "width": 1920,
+      "height": 1440
+    },
+    "native": {
+      "width": 1920,
+      "height": 1440
+    },
+    "video": {
+      "width": 664,
+      "height": 320
+    },
+    "guide": {
+      "width": 529.75,
+      "height": 334.015625,
+      "top": -7,
+      "bottom": 7.015625
+    },
+    "sourceCard": {
+      "width": 1531.8072289156628,
+      "height": 965.8283132530121,
+      "cx": 0.5,
+      "cy": 0.500015687751004
+    },
+    "assessment": {
+      "accepted": true,
+      "reasons": [],
+      "coverage": 0.537,
+      "resolution": 1
+    }
+  },
+  {
+    "viewport": {
+      "width": 740,
+      "height": 390
+    },
+    "camera": {
+      "width": 1080,
+      "height": 1920
+    },
+    "native": {
+      "width": 1080,
+      "height": 1920
+    },
+    "video": {
+      "width": 664,
+      "height": 320
+    },
+    "guide": {
+      "width": 529.75,
+      "height": 334.015625,
+      "top": -7,
+      "bottom": 7.015625
+    },
+    "sourceCard": {
+      "width": 861.6415662650602,
+      "height": 543.2784262048193,
+      "cx": 0.5,
+      "cy": 0.5000066182699547
+    },
+    "assessment": {
+      "accepted": true,
+      "reasons": [],
+      "coverage": 0.231,
+      "resolution": 0.749
+    }
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "camera": {
+      "width": 1920,
+      "height": 1080
+    },
+    "native": {
+      "width": 1920,
+      "height": 1080
+    },
+    "video": {
+      "width": 668,
+      "height": 420
+    },
+    "guide": {
+      "width": 533.1875,
+      "height": 336.171875,
+      "top": 41.90625,
+      "bottom": -41.921875
+    },
+    "sourceCard": {
+      "width": 1371.0535714285713,
+      "height": 864.4419642857142,
+      "cx": 0.49999999999999994,
+      "cy": 0.49998139880952375
+    },
+    "assessment": {
+      "accepted": true,
+      "reasons": [],
+      "coverage": 0.574,
+      "resolution": 1
+    }
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "camera": {
+      "width": 1920,
+      "height": 1440
+    },
+    "native": {
+      "width": 1920,
+      "height": 1440
+    },
+    "video": {
+      "width": 668,
+      "height": 420
+    },
+    "guide": {
+      "width": 533.1875,
+      "height": 336.171875,
+      "top": 41.90625,
+      "bottom": -41.921875
+    },
+    "sourceCard": {
+      "width": 1532.5149700598804,
+      "height": 966.2425149700599,
+      "cx": 0.5,
+      "cy": 0.49998440618762474
+    },
+    "assessment": {
+      "accepted": true,
+      "reasons": [],
+      "coverage": 0.538,
+      "resolution": 1
+    }
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 1024
+    },
+    "camera": {
+      "width": 1080,
+      "height": 1920
+    },
+    "native": {
+      "width": 1080,
+      "height": 1920
+    },
+    "video": {
+      "width": 668,
+      "height": 420
+    },
+    "guide": {
+      "width": 533.1875,
+      "height": 336.171875,
+      "top": 41.90625,
+      "bottom": -41.921875
+    },
+    "sourceCard": {
+      "width": 862.0396706586827,
+      "height": 543.5114146706587,
+      "cx": 0.5,
+      "cy": 0.4999934213604042
+    },
+    "assessment": {
+      "accepted": true,
+      "reasons": [],
+      "coverage": 0.231,
+      "resolution": 0.749
+    }
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "camera": {
+      "width": 1920,
+      "height": 1080
+    },
+    "native": {
+      "width": 1920,
+      "height": 1080
+    },
+    "video": {
+      "width": 860,
+      "height": 420
+    },
+    "guide": {
+      "width": 560,
+      "height": 353.078125,
+      "top": 33.453125,
+      "bottom": -33.46875
+    },
+    "sourceCard": {
+      "width": 1250.2325581395348,
+      "height": 788.267441860465,
+      "cx": 0.5,
+      "cy": 0.49998385012919894
+    },
+    "assessment": {
+      "accepted": true,
+      "reasons": [],
+      "coverage": 0.479,
+      "resolution": 1
+    }
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "camera": {
+      "width": 1920,
+      "height": 1440
+    },
+    "native": {
+      "width": 1920,
+      "height": 1440
+    },
+    "video": {
+      "width": 860,
+      "height": 420
+    },
+    "guide": {
+      "width": 560,
+      "height": 353.078125,
+      "top": 33.453125,
+      "bottom": -33.46875
+    },
+    "sourceCard": {
+      "width": 1250.2325581395348,
+      "height": 788.267441860465,
+      "cx": 0.5,
+      "cy": 0.49998788759689916
+    },
+    "assessment": {
+      "accepted": true,
+      "reasons": [],
+      "coverage": 0.361,
+      "resolution": 1
+    }
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "camera": {
+      "width": 1080,
+      "height": 1920
+    },
+    "native": {
+      "width": 1080,
+      "height": 1920
+    },
+    "video": {
+      "width": 860,
+      "height": 420
+    },
+    "guide": {
+      "width": 560,
+      "height": 353.078125,
+      "top": 33.453125,
+      "bottom": -33.46875
+    },
+    "sourceCard": {
+      "width": 703.2558139534884,
+      "height": 443.40043604651163,
+      "cx": 0.5,
+      "cy": 0.4999948900799419
+    },
+    "assessment": {
+      "accepted": false,
+      "reasons": [
+        "DOCUMENT_TOO_FAR"
+      ],
+      "coverage": 0.156,
+      "resolution": 0.485
+    }
+  }
+]

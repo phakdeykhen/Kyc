@@ -160,6 +160,18 @@ export type DocumentTypeCode =
   | "KH_NATIONAL_ID" | "KH_PASSPORT" | "KH_NSSF" | "PASSPORT" | "NATIONAL_ID" | "RESIDENCE_CARD" | "DRIVING_LICENSE" | "UNKNOWN";
 export type DocumentSide = "FRONT" | "BACK" | "DATA_PAGE";
 
+/** Safe applicant feedback and current retained-photo progress; contains no extracted identity values. */
+export interface DocumentCaptureState {
+  state: "READY" | "PROCESSING" | "RECAPTURE" | "TECHNICAL_ERROR" | "COMPLETE";
+  sides: Partial<Record<DocumentSide, "ACCEPTED" | "REQUIRED">>;
+  required_sides: DocumentSide[];
+  reason_codes: string[];
+  instructions: string[];
+  attempts_remaining: number;
+  retry_allowed: boolean;
+  retry_processing_allowed: boolean;
+}
+
 export interface KycSession {
   session_id: string;
   organization_id: string;
@@ -172,6 +184,7 @@ export interface KycSession {
   updated_at: string;
   expires_at: string;
   version: number;
+  document_capture?: DocumentCaptureState | null;
 }
 
 export interface ClientToken {

@@ -51,6 +51,8 @@ export const kycApi = {
     form.append("file", file, "document.jpg");
     return apiJson<CaptureResult>(credential, `${session(id)}/documents`, { method: "POST", form });
   },
+  retryDocumentProcessing: (credential: SessionCaller, id: string) =>
+    apiJson<KycSession>(credential, `${session(id)}/documents/retry`, { method: "POST", json: {} }),
   uploadSelfie: (credential: SessionCaller, id: string, file: Blob) => {
     const form = new FormData();
     form.append("biometric_consent", "true");

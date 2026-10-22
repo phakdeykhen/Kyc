@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from kyc.api.dependencies import TenantContext
-from kyc.api.schemas import SessionCreate, SessionResponse
+from kyc.api.schemas import DocumentCaptureFeedback, SessionCreate, SessionResponse
 from kyc.db.models import AuditLog, KYCSession, Organization
 from kyc.domain.enums import SessionStatus
 from kyc.domain.state_machine import Event, TERMINAL_STATUSES, VerificationEvidence, can_expire, transition
@@ -26,13 +26,13 @@ def is_expired(record: KYCSession, now: datetime | None = None) -> bool:
     return can_expire(record.status) and aware(record.expires_at) <= (now or datetime.now(timezone.utc))
 
 
-def respond(record: KYCSession) -> SessionResponse:
+def respond(record: KYCSession, document_capture: DocumentCaptureFeedback | None = None) -> SessionResponse:
     return SessionResponse(session_id=record.id, organization_id=record.organization_id,
                            user_id=record.user_id, country=record.country,
                            expected_document_type=record.expected_document_type,
                            verification_level=record.verification_level, status=record.status,
                            created_at=aware(record.created_at), updated_at=aware(record.updated_at),
-                           expires_at=aware(record.expires_at), version=record.version)
+                           expires_at=aware(record.expires_at), version=record.version, document_capture=document_capture)
 
 
 def audit(db: Session, record: KYCSession, tenant: TenantContext, request_id: UUID,

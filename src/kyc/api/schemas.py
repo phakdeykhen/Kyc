@@ -40,6 +40,20 @@ class SessionCreate(BaseModel):
         return self
 
 
+DocumentSide = Literal["FRONT", "BACK", "DATA_PAGE"]
+
+
+class DocumentCaptureFeedback(BaseModel):
+    state: Literal["READY", "PROCESSING", "RECAPTURE", "TECHNICAL_ERROR", "COMPLETE"]
+    sides: dict[DocumentSide, Literal["ACCEPTED", "REQUIRED"]]
+    required_sides: list[DocumentSide]
+    reason_codes: list[str]
+    instructions: list[str]
+    attempts_remaining: int = Field(ge=0)
+    retry_allowed: bool
+    retry_processing_allowed: bool
+
+
 class SessionResponse(BaseModel):
     session_id: UUID
     organization_id: UUID
@@ -52,6 +66,7 @@ class SessionResponse(BaseModel):
     updated_at: datetime
     expires_at: datetime
     version: int
+    document_capture: DocumentCaptureFeedback | None = None
 
 
 class ClientTokenResponse(BaseModel):
@@ -175,7 +190,6 @@ class ConsentResponse(BaseModel):
     granted_at: datetime
 
 
-DocumentSide = Literal["FRONT", "BACK", "DATA_PAGE"]
 
 
 class CaptureQuality(BaseModel):

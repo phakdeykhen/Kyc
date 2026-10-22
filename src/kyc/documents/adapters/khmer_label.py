@@ -125,6 +125,14 @@ def _similar(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b, autojunk=False).ratio()
 
 
+def has_marker(text: str, marker: str) -> bool:
+    """The card's MRZ prefix, allowing one OCR misread in the issuer (e.g. "IDKHN" for "IDKHM", seen on a real card)."""
+    head = text[:len(marker)]
+    if len(head) < len(marker) or head[:2] != marker[:2]:
+        return False
+    return sum(a != b for a, b in zip(head, marker)) <= 1
+
+
 def is_mrz_line(line: OCRLine) -> bool:
     """Noisy/fused MRZ reads must never become Khmer address continuation lines."""
     text = clean_mrz(line.text)
@@ -193,7 +201,7 @@ class KhmerLabelAdapter:
         if not labels and not has_number:
             front = 0.0  # headings alone (often printed on the back too) do not make a front
         mrz = [clean_mrz(line.text) for line in mrz_candidates(lines)]
-        marked = bool(layout.back_marker) and any(item.startswith(layout.back_marker) for item in mrz)
+        marked = bool(layout.back_marker) and any(has_marker(item, layout.back_marker) for item in mrz)
         back = 0.0
         if mrz and layout.mrz_on_front:
             # The card's own MRZ is printed under the portrait: evidence of the front, never of the back.
@@ -321,7 +329,7 @@ class KhmerLabelAdapter:
                 continue
             cleaned = clean_mrz(line.text)
             if ("MRZ_PASS" in line.notes or MRZ_LINE.fullmatch(cleaned)
-                    or (self.layout.back_marker and cleaned.startswith(self.layout.back_marker))
+                    or (self.layout.back_marker and has_marker(cleaned, self.layout.back_marker))
                     or cleaned.count("<") >= 2):
                 continue
             converted = khmer.digits_to_ascii(line.text)
@@ -447,7 +455,12 @@ class KhmerLabelAdapter:
         if layout.mrz_document_code and not parsed.document_code.startswith(layout.mrz_document_code):
             reasons.append("MRZ_DOCUMENT_CODE_UNEXPECTED")
         if layout.mrz_issuing_state and parsed.issuing_state != layout.mrz_issuing_state:
-            reasons.append("MRZ_ISSUING_STATE_UNEXPECTED")
+            # One misread letter (e.g. "KHN", real card) when the MRZ's own nationality is the expected state and every
+            # check digit holds: reported for review, but the MRZ may still fill fields.
+            expected = layout.mrz_issuing_state
+            variant = (parsed.mrz_valid and parsed.nationality == expected and len(parsed.issuing_state) == len(expected)
+                       and sum(a != b for a, b in zip(parsed.issuing_state, expected)) == 1)
+            reasons.append("MRZ_ISSUING_STATE_OCR_VARIANT" if variant else "MRZ_ISSUING_STATE_UNEXPECTED")
         return reasons
 
     def _fill_from_mrz(self, fields: list[OCRField], parsed: "mrz_parser.MRZResult", side: str,
@@ -459,7 +472,7 @@ class KhmerLabelAdapter:
         readings; their flags do not claim checksum verification. Disagreement is
         reported by MRZ_CONSISTENCY. A different document layout never supplies fields.
         """
-        if self._mrz_layout_reasons(parsed) or not getattr(parsed, "data_valid", True):
+        if set(self._mrz_layout_reasons(parsed)) - {"MRZ_ISSUING_STATE_OCR_VARIANT"} or not getattr(parsed, "data_valid", True):
             return
         candidates = {"document_number": (parsed.document_number, "document_number"),
                       "date_of_birth": (parsed.date_of_birth and parsed.date_of_birth.isoformat(), "date_of_birth"),
