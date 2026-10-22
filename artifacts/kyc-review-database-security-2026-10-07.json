@@ -1,0 +1,119 @@
+{
+  "database_role": "kyc_app",
+  "passed": 24,
+  "failed": 0,
+  "checks": [
+    {
+      "check": "api_role_exists",
+      "result": "PASS"
+    },
+    {
+      "check": "api_role_attributes",
+      "result": "PASS"
+    },
+    {
+      "check": "api_role_has_no_memberships",
+      "result": "PASS"
+    },
+    {
+      "check": "api_role_owns_nothing",
+      "result": "PASS"
+    },
+    {
+      "check": "api_role_cannot_create_in_schemas",
+      "result": "PASS"
+    },
+    {
+      "check": "forced_rls_on_every_table",
+      "result": "PASS"
+    },
+    {
+      "check": "rls_table_count",
+      "result": "PASS",
+      "detail": {
+        "tables_with_forced_rls": 25
+      }
+    },
+    {
+      "check": "no_privileges_beyond_matrix",
+      "result": "PASS"
+    },
+    {
+      "check": "matrix_privileges_present",
+      "result": "PASS"
+    },
+    {
+      "check": "no_column_privileges_beyond_matrix",
+      "result": "PASS"
+    },
+    {
+      "check": "matrix_column_updates_present",
+      "result": "PASS"
+    },
+    {
+      "check": "api_role_has_no_sequence_privileges",
+      "result": "PASS"
+    },
+    {
+      "check": "no_unexpected_executable_security_definer_functions",
+      "result": "PASS"
+    },
+    {
+      "check": "scoped_erasure_function_hardened",
+      "result": "PASS"
+    },
+    {
+      "check": "password_encryption_scram",
+      "result": "PASS",
+      "detail": "scram-sha-256"
+    },
+    {
+      "check": "probe_runs_as_api_role",
+      "result": "PASS"
+    },
+    {
+      "check": "api_has_no_default_tenant",
+      "result": "PASS"
+    },
+    {
+      "check": "api_connection_tls",
+      "result": "INFO",
+      "detail": "not encrypted (local socket/loopback; production requires sslmode)"
+    },
+    {
+      "check": "default_deny_without_tenant",
+      "result": "PASS",
+      "detail": {
+        "kyc_sessions": 0,
+        "identity_documents": 0,
+        "biometric_templates": 0,
+        "audit_logs": 0,
+        "api_keys": 0
+      }
+    },
+    {
+      "check": "append_only_audit_logs_update_refused",
+      "result": "PASS"
+    },
+    {
+      "check": "append_only_audit_logs_delete_refused",
+      "result": "PASS"
+    },
+    {
+      "check": "append_only_risk_assessments_update_refused",
+      "result": "PASS"
+    },
+    {
+      "check": "append_only_risk_assessments_delete_refused",
+      "result": "PASS"
+    },
+    {
+      "check": "append_only_manual_reviews_update_refused",
+      "result": "PASS"
+    },
+    {
+      "check": "append_only_manual_reviews_delete_refused",
+      "result": "PASS"
+    }
+  ]
+}

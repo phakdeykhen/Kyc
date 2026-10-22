@@ -40,10 +40,18 @@ LAYOUT = CardLayout(
     mrz_regions={"FRONT": (0.0, 0.62, 1.0, 1.0)},
     mrz_document_code="ID",
     mrz_issuing_state="KHM",
+    # Locate labels in the printed visual zone, away from portrait and MRZ interference.
+    viz_regions={"FRONT": (0.24, 0.015, 0.99, 0.65)},
     portrait_regions={"FRONT": (0.0, 0.15, 0.27, 0.83)},
+    # Fallback bands on a rectified portrait side. Detected labels/word boxes take priority.
+    khmer_field_regions={"full_name_local": (0.23, 0.055, 0.98, 0.155),
+                         "place_of_birth": (0.26, 0.26, 0.98, 0.37),
+                         "address": (0.26, 0.36, 0.98, 0.56)},
+    structured_rows=True,
+    value_starts={"zone_left": 0.225, "full_name_local": 0.40, "place_of_birth": 0.37, "address": 0.33},
 )
 
 
 class CambodiaNationalIDAdapter(KhmerLabelAdapter):
     layout = LAYOUT
-    policy = AdapterPolicy(version="KH-NID-ADAPTER-2026.10.3", typical_validity_years=(9, 11))
+    policy = AdapterPolicy(version="KH-NID-ADAPTER-2026.10.5", typical_validity_years=(9, 11))

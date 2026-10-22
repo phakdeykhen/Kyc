@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { ArrowRight, Plus, RefreshCw } from "lucide-react";
 import AppHeader from "@/components/feature/AppHeader";
 import SiteFooter from "@/components/feature/SiteFooter";
 import StatCard from "@/pages/console/components/StatCard";
@@ -16,14 +17,13 @@ const IN_PROGRESS: SessionStatus[] = [
 const REFRESH_MS = 30000;
 
 const pipelineStages = [
-  { icon: "ri-file-text-line", label: "Document engine", sub: "Quality gate, classification, Khmer/Latin OCR, MRZ, QR, chip" },
-  { icon: "ri-user-smile-line", label: "Biometric engine", sub: "Selfie, active liveness, 1:1 face match" },
-  { icon: "ri-git-compare-line", label: "Fraud engine", sub: "Cross-check every source, 7 detectors" },
-  { icon: "ri-scales-3-line", label: "Risk engine", sub: "Deterministic policy: PASS · REVIEW · FAIL" },
+  { icon: "ri-file-text-line", label: "Document checks", sub: "Capture quality, details, and document authenticity" },
+  { icon: "ri-user-smile-line", label: "Face & liveness", sub: "Selfie comparison and guided movement checks" },
+  { icon: "ri-git-compare-line", label: "Fraud signals", sub: "Cross-check the evidence for inconsistencies" },
+  { icon: "ri-scales-3-line", label: "Identity decision", sub: "Verified, rejected, or ready for your review" },
 ];
 
 export default function ConsoleHome() {
-  const navigate = useNavigate();
   const { credential, profile, signOut } = useReviewer();
   const [sessions, setSessions] = useState<SessionList | null>(null);
   const [queue, setQueue] = useState<{ total: number; items: QueueItem[] } | null>(null);
@@ -69,56 +69,29 @@ export default function ConsoleHome() {
       <AppHeader />
 
       <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-8 md:px-6 md:py-10">
-        <section className="overflow-hidden rounded-xl border border-background-200 bg-background-100/60">
-          <div className="grid grid-cols-1 gap-8 p-6 md:p-9 lg:grid-cols-[1.15fr_1fr] lg:items-center">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 font-label text-xs font-medium text-primary-800">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary-500"></span>
-                Signed in as {profile.display_name} · {profile.role.toLowerCase()}
-              </span>
-              <h1 className="mt-4 font-heading text-3xl font-semibold leading-tight tracking-tight text-foreground-950 md:text-4xl">
-                Verify identities across countries, from one console
-              </h1>
-              <p className="mt-3 max-w-xl font-label text-sm leading-relaxed text-foreground-600 md:text-base">
-                Start a session, send the person their capture link, and follow it through the document, biometric, fraud
-                and risk engines. Anything the rules cannot settle lands in the review queue.
-              </p>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <button type="button" onClick={() => navigate("/verify/new")}
-                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary-500 px-5 py-2.5 font-label text-sm font-medium text-background-50 transition-colors hover:bg-primary-600">
-                  <i className="ri-add-line text-base leading-none"></i>
-                  Start a verification
-                </button>
-                <button type="button" onClick={() => navigate("/review")}
-                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-background-300 bg-background-50 px-5 py-2.5 font-label text-sm font-medium text-foreground-800 transition-colors hover:bg-background-100">
-                  <i className="ri-eye-line text-base leading-none"></i>
-                  Review queue{queue ? ` (${queue.total})` : ""}
-                </button>
-              </div>
+        <section className="console-welcome">
+          <div>
+            <span className="eyebrow"><span className="status-dot" />YOUR IDENTITY WORKSPACE</span>
+            <h1>Every identity.<br />A clearer picture.</h1>
+            <p>Welcome back, {profile.display_name}. Start a verification, follow your sessions, and give the cases that need you a closer look.</p>
+            <div className="hero-actions">
+              <Link to="/verify/new" className="button button-white"><Plus size={17} />Start a verification</Link>
+              <Link to="/review" className="button button-dark">Review queue{queue ? ` (${queue.total})` : ""}<ArrowRight size={16} /></Link>
             </div>
-
-            <div className="rounded-lg border border-background-200 bg-background-50 p-5">
-              <div className="flex items-center justify-between">
-                <span className="font-label text-xs font-medium uppercase tracking-wide text-foreground-500">Verification pipeline</span>
-                <button type="button" onClick={load} disabled={loading}
-                        className="inline-flex items-center gap-1 rounded-full bg-primary-100 px-2 py-0.5 font-label text-[11px] font-medium text-primary-800 disabled:opacity-60">
-                  <i className={`ri-refresh-line text-xs leading-none ${loading ? "animate-spin" : ""}`}></i>
-                  {loadedAt ? new Date(loadedAt).toLocaleTimeString() : "live"}
-                </button>
-              </div>
-              <div className="mt-4 flex flex-col gap-2.5">
-                {pipelineStages.map((stage) => (
-                  <div key={stage.label} className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-secondary-100 text-secondary-700">
-                      <i className={`${stage.icon} text-base leading-none`}></i>
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-label text-sm font-medium text-foreground-900">{stage.label}</div>
-                      <div className="font-label text-[11px] text-foreground-500">{stage.sub}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          </div>
+          <div className="console-pipeline">
+            <div className="console-pipeline-heading">
+              <span>From capture to confidence</span>
+              <button type="button" onClick={load} disabled={loading} aria-label="Refresh verification data"><RefreshCw size={12} className={loading ? "animate-spin" : ""} />{loadedAt ? new Date(loadedAt).toLocaleTimeString() : "Refresh"}</button>
+            </div>
+            <div className="flex flex-col gap-5">
+              {pipelineStages.map((stage, index) => (
+                <div key={stage.label} className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-background-300 bg-background-100 text-foreground-800"><i className={`${stage.icon} text-lg leading-none`} aria-hidden="true"></i></span>
+                  <div className="min-w-0 flex-1"><div className="text-xs font-medium text-foreground-900">{stage.label}</div><div className="mt-1 text-[10px] leading-relaxed text-foreground-500">{stage.sub}</div></div>
+                  <span className="text-[10px] text-foreground-400">0{index + 1}</span>
+                </div>
+              ))}
             </div>
           </div>
         </section>

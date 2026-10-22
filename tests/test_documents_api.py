@@ -81,7 +81,7 @@ class DocumentProcessingTests(CaptureAPICase):
                                             "mrz_consistency": "PASS", "barcode": "NOT_APPLICABLE",
                                             "issuing_country": "PASS",
                                             "document_portrait": "UNAVAILABLE"})
-        self.assertEqual(result["review_flags"], [])
+        self.assertEqual(result["review_flags"], ["PORTRAIT_ENGINE_PHASE_8"])
         self.assertIsNone(result["decision"])  # extraction never decides
 
     async def test_document_only_level_goes_straight_to_processing(self):

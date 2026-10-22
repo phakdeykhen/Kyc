@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-07",
+  "python": {
+    "status": "passed_after_sandbox_retry",
+    "distinct_tests": 151,
+    "initial_suite_passed": 150,
+    "initial_suite_sandbox_errors": 1,
+    "sdk_security_retry_tests": 2,
+    "sdk_security_retry_status": "passed",
+    "log": "artifacts/government-verification-tests.txt"
+  },
+  "typescript_sdk": { "status": "passed", "tests": 6, "type_check": "passed" },
+  "frontend": { "type_check": "passed", "lint": "passed", "production_build": "passed" },
+  "git_diff_check": "passed",
+  "local_runtime": {
+    "kyc_api_restarted": true,
+    "api_pid": 70759,
+    "government_route_loaded": true,
+    "openapi_path_count": 38,
+    "readiness_http_status": 200,
+    "frontend_https_status": 200,
+    "government_panel_module_http_status": 200
+  },
+  "supplied_nssf_sample": { "supported_official_qr_found": true, "government_authenticity_confirmed": false },
+  "automatic_government_confirmation": "requires_authorized_government_api"
+}

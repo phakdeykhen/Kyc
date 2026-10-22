@@ -95,6 +95,11 @@ class BaseClient {
     return this.request("GET", `/v1/kyc/${sessionId}`);
   }
 
+  /** Read the official QR handoff; this does not perform government verification. */
+  governmentVerification(sessionId: string): Promise<Json> {
+    return this.request("GET", `/v1/kyc/${sessionId}/government-verification`);
+  }
+
   /** Record consent to document processing; call only after the person agreed, before uploadDocument. */
   giveDocumentConsent(sessionId: string): Promise<Json> {
     return this.request("POST", `/v1/kyc/${sessionId}/consent`, { json: { scope: "DOCUMENT_PROCESSING", granted: true } });

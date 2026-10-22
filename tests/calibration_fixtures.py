@@ -5,11 +5,12 @@ from pathlib import Path
 import random
 import tempfile
 
+from kyc.core.config import Settings
 from kyc.biometrics.calibration import calibrate_face, validate_liveness
 from kyc.biometrics.types import SFACE_NAME, SFACE_SHA256, SFACE_VERSION
 
 MODEL = {"name": SFACE_NAME, "version": SFACE_VERSION, "sha256": SFACE_SHA256}
-LIVENESS_VERSION = "ACTIVE-GEOMETRY-2026.10.2"
+LIVENESS_VERSION = Settings.model_fields["liveness_policy_version"].default  # the deployed policy
 _DIRECTORY = Path(tempfile.mkdtemp(prefix="kyc-calibration-"))
 
 

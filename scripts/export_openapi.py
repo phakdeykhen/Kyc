@@ -22,8 +22,8 @@ document["components"]["securitySchemes"] = {
 server_security = {"ApiKey": [], "Organization": []}
 device_security = {"SessionClientToken": [], "Organization": []}
 document["security"] = [server_security]
-capture_suffixes = {"", "/consent", "/documents", "/documents/front", "/documents/back", "/selfie",
-                    "/liveness", "/liveness/challenge", "/nfc", "/nfc/challenge"}
+capture_suffixes = {"", "/government-verification", "/consent", "/documents", "/documents/front", "/documents/back", "/selfie",
+                    "/liveness", "/liveness/position", "/liveness/guide", "/liveness/challenge", "/nfc", "/nfc/challenge"}
 for path, operations in document["paths"].items():
     for method, operation in operations.items():
         if method not in {"get", "post", "patch", "delete", "put", "head", "options", "trace"}:

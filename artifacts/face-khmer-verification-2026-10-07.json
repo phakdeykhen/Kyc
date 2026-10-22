@@ -1,0 +1,95 @@
+{
+  "date": "2026-10-07",
+  "production_readiness": "NOT_READY",
+  "backend_full_run": {
+    "tests": 495,
+    "passed": 490,
+    "skipped": 4,
+    "failed": 1,
+    "failure": "Stale capture-policy version assertion",
+    "assertion_corrected": true,
+    "source_log": "var/face-khmer-full-tests-final.log"
+  },
+  "corrected_capture_api_rerun": {
+    "tests": 18,
+    "failed": 0,
+    "source_log": "var/capture-policy-contract-tests.log"
+  },
+  "focused_backend_regressions": {
+    "tests": 151,
+    "skipped": 1,
+    "failed": 0,
+    "source_log": "var/face-khmer-final-regressions.log"
+  },
+  "frontend": {
+    "type_check": "PASS",
+    "lint": "PASS",
+    "production_build": "PASS"
+  },
+  "browser": {
+    "synthetic_camera": true,
+    "mocked_api": true,
+    "results": [
+      {
+        "scenario": "complete",
+        "passed": true,
+        "positioned": 4,
+        "challenges": 1,
+        "submitted": 1
+      },
+      {
+        "scenario": "successful_capture",
+        "passed": true,
+        "positioned": 4,
+        "challenges": 1,
+        "submitted": 1
+      },
+      {
+        "scenario": "exhausted",
+        "passed": true,
+        "positioned": 1,
+        "challenges": 0,
+        "submitted": 0
+      },
+      {
+        "scenario": "camera_denied",
+        "passed": true,
+        "positioned": 0,
+        "challenges": 0,
+        "submitted": 0
+      },
+      {
+        "scenario": "cancel_positioning",
+        "passed": true,
+        "positioned": 1,
+        "challenges": 0,
+        "submitted": 0
+      },
+      {
+        "scenario": "position_body_timeout",
+        "passed": true,
+        "positioned": 0,
+        "challenges": 0,
+        "submitted": 0
+      }
+    ]
+  },
+  "native_khmer_ocr": {
+    "samples": 1,
+    "front_classifications": 1,
+    "names_present": 1,
+    "addresses_present": 1,
+    "birthplaces_present": 1,
+    "addresses_without_mrz": true,
+    "exact_field_accuracy_measured": false,
+    "all_candidates_uncertain": true,
+    "other_samples_pending_after_crop_correction": 3
+  },
+  "phone_proxy": {
+    "api_port": 8010,
+    "position_route_loaded": true,
+    "unauthenticated_position_post_status": 401
+  },
+  "physical_iphone_validation": "NOT_REAL_WORLD_TESTED",
+  "physical_android_validation": "NOT_REAL_WORLD_TESTED"
+}

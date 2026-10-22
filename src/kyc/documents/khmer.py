@@ -80,13 +80,20 @@ def latin_name(text: str) -> Normalized:
 
 
 def khmer_text(text: str) -> Normalized:
-    value = clean(text).strip(" :;.-")
+    value = clean(text).strip(" :;.-ៈ៖")
     if not value:
         return Normalized(None, ("EMPTY_VALUE",))
     if not has_khmer(value):
         # A Khmer-script field with no Khmer text is a misread, not a value.
         return Normalized(None, ("EXPECTED_KHMER_SCRIPT",))
-    return Normalized(value)
+    flags = []
+    # Preserve the reading, while preventing mixed MRZ/Latin debris from looking like trustworthy Khmer.
+    if re.search(r"[A-Za-z<>{}|]", value) or re.search(r"[.:;]\s*[:.;]", value):
+        flags.append("OCR_NOISE_DETECTED")
+    # COENG must introduce a consonant. An isolated subscript or leading mark is damaged OCR.
+    if re.search(r"\u17d2(?![\u1780-\u17a2])", value) or re.match(r"[\u17b4-\u17d3]", value):
+        flags.append("KHMER_ORDERING_UNCERTAIN")
+    return Normalized(value, tuple(flags))
 
 
 LATIN_MONTHS = {name: index for index, name in enumerate(

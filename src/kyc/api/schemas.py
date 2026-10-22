@@ -138,6 +138,14 @@ class CheckResultItem(BaseModel):
     reason_codes: list[str] = Field(default_factory=list)
 
 
+class ResultGovernmentVerification(BaseModel):
+    provider: Literal["VERIFY_GOV_KH"] = "VERIFY_GOV_KH"
+    status: Literal["PENDING", "LINK_AVAILABLE", "LINK_RESTRICTED", "NO_OFFICIAL_QR", "UNAVAILABLE", "LINK_EXPIRED", "ERASED"]
+    verified: Literal[False] = Field(default=False, description="A decoded link is not an official verification result.")
+    verification_url: str | None = Field(default=None, description="Private official QR link; shown only to the applicant or a caller with identity access.")
+    portal_url: Literal["https://verify.gov.kh/"] = "https://verify.gov.kh/"
+
+
 class SessionResult(BaseModel):
     session_id: UUID
     status: SessionStatus
@@ -145,6 +153,7 @@ class SessionResult(BaseModel):
     identity: ResultIdentity | None = None
     identity_masked: bool = Field(default=False, description="True when the credential lacks the results:identity scope.")
     mrz: ResultMRZ | None = None
+    government_verification: ResultGovernmentVerification | None = None
     face_comparison: FaceComparisonSummary | None = None
     checks: dict[str, str] = Field(default_factory=dict)
     review_flags: list[str] = Field(default_factory=list, description="Reason codes that a reviewer or the risk engine must consider.")
@@ -222,6 +231,8 @@ class CaptureError(BaseModel):
     detail: str
     reason_code: str
     attempts_remaining: int | None = None
+    result: Literal["TECHNICAL_ERROR"] | None = None
+    retry_allowed: bool | None = None
 
 
 class SelfieComparisonReceipt(BaseModel):

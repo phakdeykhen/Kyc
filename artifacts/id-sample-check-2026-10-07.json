@@ -1,0 +1,1199 @@
+{
+  "date": "2026-10-07",
+  "scope": "Read-only local image quality, preprocessing, OCR, side classification and adapter field-validation diagnostics. OCR was also run on quality-rejected images for diagnosis. Adapter BARCODE/PORTRAIT rows are placeholders; the barcode decoder was run separately. No API sessions, biometric matching, liveness or database writes were performed. Original images were not modified.",
+  "issuer_authenticated": false,
+  "images": [
+    {
+      "file": "KhmerID/photo_1_2026-05-19_17-14-41.jpg",
+      "manual_side": "FRONT",
+      "sha256": "6cae645f0b85544ee07d34b7eaa9b57bf5995be06d9dd253d827e41c73edb516",
+      "dimensions": [
+        1280,
+        773
+      ],
+      "quality_accepted": true,
+      "quality_reasons": [],
+      "quality_scores": {
+        "blur_score": 1.0,
+        "glare_score": 0.999,
+        "brightness_score": 1.0,
+        "shadow_score": 0.576,
+        "document_coverage": 1.0,
+        "perspective_score": 1.0,
+        "resolution_score": 1.0,
+        "overall_quality": 0.924
+      },
+      "document_located": true,
+      "classification": {
+        "country": "KH",
+        "document_family": "NATIONAL_ID",
+        "document_type": "KH_NATIONAL_ID",
+        "document_side": "FRONT",
+        "document_version": null,
+        "confidence": 0.8
+      },
+      "barcodes": [],
+      "field_matches_manual_transcription": {
+        "document_number": true,
+        "latin_name": true,
+        "date_of_birth": true,
+        "sex": true,
+        "expiry_date": true
+      },
+      "extracted_document_number_digit_count": 9,
+      "field_validation": [
+        {
+          "type": "REQUIRED_FIELDS",
+          "result": "REVIEW",
+          "reasons": [
+            "FIELD_MISSING"
+          ]
+        },
+        {
+          "type": "DOCUMENT_NUMBER_FORMAT",
+          "result": "PASS",
+          "reasons": [
+            "DOCUMENT_NUMBER_FORMAT_VALID"
+          ]
+        },
+        {
+          "type": "DATE_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "DATES_CONSISTENT"
+          ]
+        },
+        {
+          "type": "EXPIRY",
+          "result": "PASS",
+          "reasons": [
+            "DOCUMENT_NOT_EXPIRED"
+          ]
+        },
+        {
+          "type": "OCR_CONFIDENCE",
+          "result": "REVIEW",
+          "reasons": [
+            "LOW_OCR_CONFIDENCE"
+          ]
+        },
+        {
+          "type": "SCRIPT_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "SCRIPT_CONSISTENT"
+          ]
+        },
+        {
+          "type": "MRZ",
+          "result": "REVIEW",
+          "reasons": [
+            "MRZ_CHECK_DIGIT_FAILED"
+          ]
+        },
+        {
+          "type": "MRZ_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "MRZ_VISUAL_CONSISTENT"
+          ]
+        },
+        {
+          "type": "BARCODE",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "NO_BARCODE_PAYLOAD"
+          ]
+        },
+        {
+          "type": "PORTRAIT",
+          "result": "UNAVAILABLE",
+          "reasons": [
+            "PORTRAIT_ENGINE_PHASE_8"
+          ]
+        }
+      ],
+      "elapsed_seconds": 7.35
+    },
+    {
+      "file": "KhmerID/photo_2_2026-05-19_17-14-41.jpg",
+      "manual_side": "BACK",
+      "sha256": "9cd03b8defdb48935256f9e9da664a4d48559cb4851dbc9d83e9f56d6bcc6094",
+      "dimensions": [
+        1280,
+        816
+      ],
+      "quality_accepted": true,
+      "quality_reasons": [],
+      "quality_scores": {
+        "blur_score": 1.0,
+        "glare_score": 1.0,
+        "brightness_score": 1.0,
+        "shadow_score": 0.866,
+        "document_coverage": 1.0,
+        "perspective_score": 1.0,
+        "resolution_score": 1.0,
+        "overall_quality": 0.98
+      },
+      "document_located": true,
+      "classification": {
+        "country": "KH",
+        "document_family": "NATIONAL_ID",
+        "document_type": "KH_NATIONAL_ID",
+        "document_side": "BACK",
+        "document_version": null,
+        "confidence": 0.4
+      },
+      "barcodes": [],
+      "elapsed_seconds": 5.54
+    },
+    {
+      "file": "KhmerID/photo_2026-09-29_14-49-17.jpg",
+      "manual_side": "FRONT",
+      "sha256": "a9820ec064c70e8fc22b164e4b473c6d279e0d9dec0d6e5be9cc6e112fa46ebe",
+      "dimensions": [
+        1280,
+        804
+      ],
+      "quality_accepted": false,
+      "quality_reasons": [
+        "MULTIPLE_DOCUMENTS",
+        "DOCUMENT_CROPPED",
+        "PERSPECTIVE_DISTORTED",
+        "GLARE_DETECTED"
+      ],
+      "quality_scores": {
+        "blur_score": 1.0,
+        "glare_score": 0.0,
+        "brightness_score": 1.0,
+        "shadow_score": 1.0,
+        "document_coverage": 0.378,
+        "perspective_score": 0.322,
+        "resolution_score": 1.0,
+        "overall_quality": 0.317
+      },
+      "document_located": true,
+      "classification": {
+        "country": "KH",
+        "document_family": "NATIONAL_ID",
+        "document_type": "UNKNOWN",
+        "document_side": "UNKNOWN",
+        "document_version": null,
+        "confidence": 0.0
+      },
+      "barcodes": [],
+      "field_matches_manual_transcription": {
+        "document_number": false,
+        "latin_name": false,
+        "date_of_birth": false,
+        "sex": false,
+        "expiry_date": false
+      },
+      "extracted_document_number_digit_count": 0,
+      "field_validation": [
+        {
+          "type": "REQUIRED_FIELDS",
+          "result": "FAIL",
+          "reasons": [
+            "CRITICAL_FIELD_MISSING"
+          ]
+        },
+        {
+          "type": "DATE_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "DATES_CONSISTENT"
+          ]
+        },
+        {
+          "type": "EXPIRY",
+          "result": "REVIEW",
+          "reasons": [
+            "EXPIRY_UNKNOWN"
+          ]
+        },
+        {
+          "type": "OCR_CONFIDENCE",
+          "result": "PASS",
+          "reasons": [
+            "OCR_CONFIDENCE_OK"
+          ]
+        },
+        {
+          "type": "SCRIPT_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "SCRIPT_CONSISTENT"
+          ]
+        },
+        {
+          "type": "MRZ",
+          "result": "REVIEW",
+          "reasons": [
+            "MRZ_NOT_FOUND"
+          ]
+        },
+        {
+          "type": "BARCODE",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "NO_BARCODE_PAYLOAD"
+          ]
+        },
+        {
+          "type": "PORTRAIT",
+          "result": "UNAVAILABLE",
+          "reasons": [
+            "PORTRAIT_ENGINE_PHASE_8"
+          ]
+        }
+      ],
+      "elapsed_seconds": 4.73
+    },
+    {
+      "file": "KhmerID/photo_2026-09-29_14-51-04.jpg",
+      "manual_side": "FRONT",
+      "sha256": "aa1e6b65a6ec77772f0bf7e8eb86c0297a437689e273da447f4397cd56686e6f",
+      "dimensions": [
+        960,
+        1280
+      ],
+      "quality_accepted": false,
+      "quality_reasons": [
+        "MULTIPLE_DOCUMENTS"
+      ],
+      "quality_scores": {
+        "blur_score": 1.0,
+        "glare_score": 1.0,
+        "brightness_score": 1.0,
+        "shadow_score": 1.0,
+        "document_coverage": 0.262,
+        "perspective_score": 0.938,
+        "resolution_score": 0.445,
+        "overall_quality": 0.84
+      },
+      "document_located": true,
+      "classification": {
+        "country": "KH",
+        "document_family": "NATIONAL_ID",
+        "document_type": "KH_NATIONAL_ID",
+        "document_side": "FRONT",
+        "document_version": null,
+        "confidence": 0.6
+      },
+      "barcodes": [],
+      "field_matches_manual_transcription": {
+        "document_number": true,
+        "latin_name": true,
+        "date_of_birth": true,
+        "sex": true,
+        "expiry_date": true
+      },
+      "extracted_document_number_digit_count": 9,
+      "field_validation": [
+        {
+          "type": "REQUIRED_FIELDS",
+          "result": "PASS",
+          "reasons": [
+            "REQUIRED_FIELDS_PRESENT"
+          ]
+        },
+        {
+          "type": "DOCUMENT_NUMBER_FORMAT",
+          "result": "PASS",
+          "reasons": [
+            "DOCUMENT_NUMBER_FORMAT_VALID"
+          ]
+        },
+        {
+          "type": "DATE_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "DATES_CONSISTENT"
+          ]
+        },
+        {
+          "type": "EXPIRY",
+          "result": "PASS",
+          "reasons": [
+            "DOCUMENT_NOT_EXPIRED"
+          ]
+        },
+        {
+          "type": "OCR_CONFIDENCE",
+          "result": "REVIEW",
+          "reasons": [
+            "LOW_OCR_CONFIDENCE"
+          ]
+        },
+        {
+          "type": "SCRIPT_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "SCRIPT_CONSISTENT"
+          ]
+        },
+        {
+          "type": "MRZ",
+          "result": "PASS",
+          "reasons": [
+            "MRZ_CHECK_DIGITS_VALID"
+          ]
+        },
+        {
+          "type": "MRZ_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "MRZ_VISUAL_CONSISTENT"
+          ]
+        },
+        {
+          "type": "BARCODE",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "NO_BARCODE_PAYLOAD"
+          ]
+        },
+        {
+          "type": "PORTRAIT",
+          "result": "UNAVAILABLE",
+          "reasons": [
+            "PORTRAIT_ENGINE_PHASE_8"
+          ]
+        }
+      ],
+      "elapsed_seconds": 8.77
+    },
+    {
+      "file": "KhmerID/photo_2026-10-06_23-39-48.jpg",
+      "manual_side": "FRONT",
+      "sha256": "2b8d166639bbd4e5997ec369d18ede8e59014ab4fd8afea04faaa46fa84c6a15",
+      "dimensions": [
+        960,
+        1280
+      ],
+      "quality_accepted": false,
+      "quality_reasons": [
+        "DOCUMENT_CROPPED",
+        "DOCUMENT_TOO_CLOSE"
+      ],
+      "quality_scores": {
+        "blur_score": 1.0,
+        "glare_score": 0.999,
+        "brightness_score": 1.0,
+        "shadow_score": 0.593,
+        "document_coverage": 0.993,
+        "perspective_score": 1.0,
+        "resolution_score": 1.0,
+        "overall_quality": 0.599
+      },
+      "document_located": true,
+      "classification": {
+        "country": "KH",
+        "document_family": "NATIONAL_ID",
+        "document_type": "KH_NATIONAL_ID",
+        "document_side": "BACK",
+        "document_version": null,
+        "confidence": 0.1
+      },
+      "barcodes": [],
+      "field_matches_manual_transcription": {
+        "document_number": false,
+        "latin_name": false,
+        "date_of_birth": false,
+        "sex": false,
+        "expiry_date": false
+      },
+      "extracted_document_number_digit_count": 0,
+      "field_validation": [
+        {
+          "type": "REQUIRED_FIELDS",
+          "result": "FAIL",
+          "reasons": [
+            "CRITICAL_FIELD_MISSING"
+          ]
+        },
+        {
+          "type": "DATE_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "DATES_CONSISTENT"
+          ]
+        },
+        {
+          "type": "EXPIRY",
+          "result": "REVIEW",
+          "reasons": [
+            "EXPIRY_UNKNOWN"
+          ]
+        },
+        {
+          "type": "OCR_CONFIDENCE",
+          "result": "REVIEW",
+          "reasons": [
+            "LOW_OCR_CONFIDENCE"
+          ]
+        },
+        {
+          "type": "SCRIPT_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "SCRIPT_CONSISTENT"
+          ]
+        },
+        {
+          "type": "MRZ",
+          "result": "REVIEW",
+          "reasons": [
+            "MRZ_FORMAT_UNRECOGNIZED"
+          ]
+        },
+        {
+          "type": "BARCODE",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "NO_BARCODE_PAYLOAD"
+          ]
+        },
+        {
+          "type": "PORTRAIT",
+          "result": "UNAVAILABLE",
+          "reasons": [
+            "PORTRAIT_ENGINE_PHASE_8"
+          ]
+        }
+      ],
+      "elapsed_seconds": 18.99
+    },
+    {
+      "file": "KhmerID/photo_2026-10-06_23-39-53.jpg",
+      "manual_side": "BACK",
+      "sha256": "b83786242d1c04836917f43f1d09839e62609694a9f3d2417a44b50bd0e3c85c",
+      "dimensions": [
+        960,
+        1280
+      ],
+      "quality_accepted": false,
+      "quality_reasons": [
+        "DOCUMENT_CROPPED",
+        "DOCUMENT_TOO_CLOSE"
+      ],
+      "quality_scores": {
+        "blur_score": 1.0,
+        "glare_score": 1.0,
+        "brightness_score": 1.0,
+        "shadow_score": 0.774,
+        "document_coverage": 0.967,
+        "perspective_score": 1.0,
+        "resolution_score": 1.0,
+        "overall_quality": 0.777
+      },
+      "document_located": true,
+      "classification": {
+        "country": "KH",
+        "document_family": "NATIONAL_ID",
+        "document_type": "KH_NATIONAL_ID",
+        "document_side": "BACK",
+        "document_version": null,
+        "confidence": 0.2
+      },
+      "barcodes": [],
+      "elapsed_seconds": 11.3
+    },
+    {
+      "file": "KhmerID/photo_2026-10-07_10-26-41.jpg",
+      "manual_side": "FRONT",
+      "sha256": "df3eaa3522ff34c360a2d5a41f8e51f1f93e9f30034b078bf9d216bbafcd32b8",
+      "dimensions": [
+        1280,
+        821
+      ],
+      "quality_accepted": true,
+      "quality_reasons": [],
+      "quality_scores": {
+        "blur_score": 1.0,
+        "glare_score": 1.0,
+        "brightness_score": 1.0,
+        "shadow_score": 1.0,
+        "document_coverage": 0.785,
+        "perspective_score": 0.915,
+        "resolution_score": 1.0,
+        "overall_quality": 0.987
+      },
+      "document_located": true,
+      "classification": {
+        "country": "KH",
+        "document_family": "NATIONAL_ID",
+        "document_type": "KH_NATIONAL_ID",
+        "document_side": "FRONT",
+        "document_version": null,
+        "confidence": 0.8
+      },
+      "barcodes": [],
+      "field_matches_manual_transcription": {
+        "document_number": false,
+        "latin_name": true,
+        "date_of_birth": true,
+        "sex": true,
+        "expiry_date": true
+      },
+      "extracted_document_number_digit_count": 9,
+      "field_validation": [
+        {
+          "type": "REQUIRED_FIELDS",
+          "result": "PASS",
+          "reasons": [
+            "REQUIRED_FIELDS_PRESENT"
+          ]
+        },
+        {
+          "type": "DOCUMENT_NUMBER_FORMAT",
+          "result": "PASS",
+          "reasons": [
+            "DOCUMENT_NUMBER_FORMAT_VALID"
+          ]
+        },
+        {
+          "type": "DATE_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "DATES_CONSISTENT"
+          ]
+        },
+        {
+          "type": "EXPIRY",
+          "result": "PASS",
+          "reasons": [
+            "DOCUMENT_NOT_EXPIRED"
+          ]
+        },
+        {
+          "type": "OCR_CONFIDENCE",
+          "result": "REVIEW",
+          "reasons": [
+            "LOW_OCR_CONFIDENCE"
+          ]
+        },
+        {
+          "type": "SCRIPT_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "SCRIPT_CONSISTENT"
+          ]
+        },
+        {
+          "type": "MRZ",
+          "result": "PASS",
+          "reasons": [
+            "MRZ_CHECK_DIGITS_VALID"
+          ]
+        },
+        {
+          "type": "MRZ_CONSISTENCY",
+          "result": "REVIEW",
+          "reasons": [
+            "MRZ_VISUAL_DOCUMENT_NUMBER_MISMATCH"
+          ]
+        },
+        {
+          "type": "BARCODE",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "NO_BARCODE_PAYLOAD"
+          ]
+        },
+        {
+          "type": "PORTRAIT",
+          "result": "UNAVAILABLE",
+          "reasons": [
+            "PORTRAIT_ENGINE_PHASE_8"
+          ]
+        }
+      ],
+      "elapsed_seconds": 7.39
+    },
+    {
+      "file": "KhmerID/photo_2026-10-07_10-27-01.jpg",
+      "manual_side": "FRONT",
+      "sha256": "0d6b506958fcbae22cf3ad1d281198c0401328b6b06a195c365843a11dfbad20",
+      "dimensions": [
+        960,
+        1280
+      ],
+      "quality_accepted": true,
+      "quality_reasons": [],
+      "quality_scores": {
+        "blur_score": 0.827,
+        "glare_score": 1.0,
+        "brightness_score": 1.0,
+        "shadow_score": 1.0,
+        "document_coverage": 0.675,
+        "perspective_score": 0.974,
+        "resolution_score": 1.0,
+        "overall_quality": 0.97
+      },
+      "document_located": true,
+      "classification": {
+        "country": "KH",
+        "document_family": "NATIONAL_ID",
+        "document_type": "KH_NATIONAL_ID",
+        "document_side": "FRONT",
+        "document_version": null,
+        "confidence": 0.7
+      },
+      "barcodes": [],
+      "field_matches_manual_transcription": {
+        "document_number": true,
+        "latin_name": true,
+        "date_of_birth": true,
+        "sex": true,
+        "expiry_date": true
+      },
+      "extracted_document_number_digit_count": 9,
+      "field_validation": [
+        {
+          "type": "REQUIRED_FIELDS",
+          "result": "REVIEW",
+          "reasons": [
+            "FIELD_MISSING"
+          ]
+        },
+        {
+          "type": "DOCUMENT_NUMBER_FORMAT",
+          "result": "PASS",
+          "reasons": [
+            "DOCUMENT_NUMBER_FORMAT_VALID"
+          ]
+        },
+        {
+          "type": "DATE_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "DATES_CONSISTENT"
+          ]
+        },
+        {
+          "type": "EXPIRY",
+          "result": "PASS",
+          "reasons": [
+            "DOCUMENT_NOT_EXPIRED"
+          ]
+        },
+        {
+          "type": "OCR_CONFIDENCE",
+          "result": "REVIEW",
+          "reasons": [
+            "LOW_OCR_CONFIDENCE"
+          ]
+        },
+        {
+          "type": "SCRIPT_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "SCRIPT_CONSISTENT"
+          ]
+        },
+        {
+          "type": "MRZ",
+          "result": "PASS",
+          "reasons": [
+            "MRZ_CHECK_DIGITS_VALID"
+          ]
+        },
+        {
+          "type": "MRZ_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "MRZ_VISUAL_CONSISTENT"
+          ]
+        },
+        {
+          "type": "BARCODE",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "NO_BARCODE_PAYLOAD"
+          ]
+        },
+        {
+          "type": "PORTRAIT",
+          "result": "UNAVAILABLE",
+          "reasons": [
+            "PORTRAIT_ENGINE_PHASE_8"
+          ]
+        }
+      ],
+      "elapsed_seconds": 9.09
+    },
+    {
+      "file": "NSSF/photo_2026-10-06_23-39-58.jpg",
+      "manual_side": "FRONT",
+      "sha256": "4b63d2aad526938e872d36426d7f2555d2439b087d6ab5af0fcb49347b43c8ce",
+      "dimensions": [
+        960,
+        1280
+      ],
+      "quality_accepted": false,
+      "quality_reasons": [
+        "DOCUMENT_CROPPED",
+        "PERSPECTIVE_DISTORTED"
+      ],
+      "quality_scores": {
+        "blur_score": 1.0,
+        "glare_score": 1.0,
+        "brightness_score": 1.0,
+        "shadow_score": 0.978,
+        "document_coverage": 0.664,
+        "perspective_score": 0.699,
+        "resolution_score": 0.825,
+        "overall_quality": 0.921
+      },
+      "document_located": true,
+      "classification": {
+        "country": "KH",
+        "document_family": "SOCIAL_SECURITY",
+        "document_type": "KH_NSSF",
+        "document_side": "FRONT",
+        "document_version": null,
+        "confidence": 0.2
+      },
+      "barcodes": [
+        {
+          "symbology": "QR_CODE",
+          "payload_bytes": 130,
+          "url_scheme": "https",
+          "url_host": "verify.gov.kh",
+          "authenticated": false
+        }
+      ],
+      "field_matches_manual_transcription": {
+        "document_number": false,
+        "latin_name": false,
+        "date_of_birth": true,
+        "sex": false,
+        "expiry_date": true
+      },
+      "extracted_document_number_digit_count": 0,
+      "field_validation": [
+        {
+          "type": "REQUIRED_FIELDS",
+          "result": "FAIL",
+          "reasons": [
+            "CRITICAL_FIELD_MISSING"
+          ]
+        },
+        {
+          "type": "DATE_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "DATES_CONSISTENT"
+          ]
+        },
+        {
+          "type": "EXPIRY",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "EXPIRY_NOT_PRINTED"
+          ]
+        },
+        {
+          "type": "OCR_CONFIDENCE",
+          "result": "REVIEW",
+          "reasons": [
+            "LOW_OCR_CONFIDENCE"
+          ]
+        },
+        {
+          "type": "SCRIPT_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "SCRIPT_CONSISTENT"
+          ]
+        },
+        {
+          "type": "MRZ",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "NO_MRZ_ON_DOCUMENT"
+          ]
+        },
+        {
+          "type": "BARCODE",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "NO_BARCODE_PAYLOAD"
+          ]
+        },
+        {
+          "type": "PORTRAIT",
+          "result": "UNAVAILABLE",
+          "reasons": [
+            "PORTRAIT_ENGINE_PHASE_8"
+          ]
+        }
+      ],
+      "elapsed_seconds": 5.64
+    },
+    {
+      "file": "NSSF/photo_2026-10-06_23-40-12.jpg",
+      "manual_side": "BACK",
+      "sha256": "0a0645ea093fd03a4744928301eed71ba36a01437f7088bb69f0d8170da59d15",
+      "dimensions": [
+        960,
+        1280
+      ],
+      "quality_accepted": false,
+      "quality_reasons": [
+        "DOCUMENT_CROPPED",
+        "PERSPECTIVE_DISTORTED"
+      ],
+      "quality_scores": {
+        "blur_score": 1.0,
+        "glare_score": 1.0,
+        "brightness_score": 1.0,
+        "shadow_score": 0.371,
+        "document_coverage": 0.872,
+        "perspective_score": 0.715,
+        "resolution_score": 1.0,
+        "overall_quality": 0.809
+      },
+      "document_located": true,
+      "classification": {
+        "country": "KH",
+        "document_family": "SOCIAL_SECURITY",
+        "document_type": "UNKNOWN",
+        "document_side": "UNKNOWN",
+        "document_version": null,
+        "confidence": 0.0
+      },
+      "barcodes": [],
+      "elapsed_seconds": 3.92
+    }
+  ],
+  "pairs": [
+    {
+      "front": "KhmerID/photo_1_2026-05-19_17-14-41.jpg",
+      "back": "KhmerID/photo_2_2026-05-19_17-14-41.jpg",
+      "pairing_basis": "Filename timing and visible capture context; back contains no unique identifier connecting it to front.",
+      "field_matches_manual_transcription": {
+        "document_number": true,
+        "latin_name": true,
+        "date_of_birth": true,
+        "sex": true,
+        "expiry_date": true
+      },
+      "field_validation": [
+        {
+          "type": "REQUIRED_FIELDS",
+          "result": "REVIEW",
+          "reasons": [
+            "FIELD_MISSING"
+          ]
+        },
+        {
+          "type": "DOCUMENT_NUMBER_FORMAT",
+          "result": "PASS",
+          "reasons": [
+            "DOCUMENT_NUMBER_FORMAT_VALID"
+          ]
+        },
+        {
+          "type": "DATE_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "DATES_CONSISTENT"
+          ]
+        },
+        {
+          "type": "EXPIRY",
+          "result": "PASS",
+          "reasons": [
+            "DOCUMENT_NOT_EXPIRED"
+          ]
+        },
+        {
+          "type": "OCR_CONFIDENCE",
+          "result": "REVIEW",
+          "reasons": [
+            "LOW_OCR_CONFIDENCE"
+          ]
+        },
+        {
+          "type": "SCRIPT_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "SCRIPT_CONSISTENT"
+          ]
+        },
+        {
+          "type": "MRZ",
+          "result": "REVIEW",
+          "reasons": [
+            "MRZ_CHECK_DIGIT_FAILED"
+          ]
+        },
+        {
+          "type": "MRZ_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "MRZ_VISUAL_CONSISTENT"
+          ]
+        },
+        {
+          "type": "BARCODE",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "NO_BARCODE_PAYLOAD"
+          ]
+        },
+        {
+          "type": "PORTRAIT",
+          "result": "UNAVAILABLE",
+          "reasons": [
+            "PORTRAIT_ENGINE_PHASE_8"
+          ]
+        }
+      ]
+    },
+    {
+      "front": "KhmerID/photo_2026-10-06_23-39-48.jpg",
+      "back": "KhmerID/photo_2026-10-06_23-39-53.jpg",
+      "pairing_basis": "Filename timing and visible capture context; back contains no unique identifier connecting it to front.",
+      "field_matches_manual_transcription": {
+        "document_number": false,
+        "latin_name": false,
+        "date_of_birth": false,
+        "sex": false,
+        "expiry_date": false
+      },
+      "field_validation": [
+        {
+          "type": "REQUIRED_FIELDS",
+          "result": "FAIL",
+          "reasons": [
+            "CRITICAL_FIELD_MISSING"
+          ]
+        },
+        {
+          "type": "DATE_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "DATES_CONSISTENT"
+          ]
+        },
+        {
+          "type": "EXPIRY",
+          "result": "REVIEW",
+          "reasons": [
+            "EXPIRY_UNKNOWN"
+          ]
+        },
+        {
+          "type": "OCR_CONFIDENCE",
+          "result": "REVIEW",
+          "reasons": [
+            "LOW_OCR_CONFIDENCE"
+          ]
+        },
+        {
+          "type": "SCRIPT_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "SCRIPT_CONSISTENT"
+          ]
+        },
+        {
+          "type": "MRZ",
+          "result": "REVIEW",
+          "reasons": [
+            "MRZ_FORMAT_UNRECOGNIZED"
+          ]
+        },
+        {
+          "type": "BARCODE",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "NO_BARCODE_PAYLOAD"
+          ]
+        },
+        {
+          "type": "PORTRAIT",
+          "result": "UNAVAILABLE",
+          "reasons": [
+            "PORTRAIT_ENGINE_PHASE_8"
+          ]
+        }
+      ]
+    },
+    {
+      "front": "NSSF/photo_2026-10-06_23-39-58.jpg",
+      "back": "NSSF/photo_2026-10-06_23-40-12.jpg",
+      "pairing_basis": "Filename timing and visible capture context; back contains no unique identifier connecting it to front.",
+      "field_matches_manual_transcription": {
+        "document_number": false,
+        "latin_name": false,
+        "date_of_birth": true,
+        "sex": false,
+        "expiry_date": true
+      },
+      "field_validation": [
+        {
+          "type": "REQUIRED_FIELDS",
+          "result": "FAIL",
+          "reasons": [
+            "CRITICAL_FIELD_MISSING"
+          ]
+        },
+        {
+          "type": "DATE_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "DATES_CONSISTENT"
+          ]
+        },
+        {
+          "type": "EXPIRY",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "EXPIRY_NOT_PRINTED"
+          ]
+        },
+        {
+          "type": "OCR_CONFIDENCE",
+          "result": "REVIEW",
+          "reasons": [
+            "LOW_OCR_CONFIDENCE"
+          ]
+        },
+        {
+          "type": "SCRIPT_CONSISTENCY",
+          "result": "PASS",
+          "reasons": [
+            "SCRIPT_CONSISTENT"
+          ]
+        },
+        {
+          "type": "MRZ",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "NO_MRZ_ON_DOCUMENT"
+          ]
+        },
+        {
+          "type": "BARCODE",
+          "result": "NOT_APPLICABLE",
+          "reasons": [
+            "NO_BARCODE_PAYLOAD"
+          ]
+        },
+        {
+          "type": "PORTRAIT",
+          "result": "UNAVAILABLE",
+          "reasons": [
+            "PORTRAIT_ENGINE_PHASE_8"
+          ]
+        }
+      ]
+    }
+  ],
+  "manual_mrz_checks": [
+    {
+      "file": "KhmerID/photo_1_2026-05-19_17-14-41.jpg",
+      "method": "Manual transcription of photographed TD1 text; ICAO 7-3-1 modulo-10 calculation.",
+      "check_digits": {
+        "document_number": true,
+        "date_of_birth": true,
+        "expiry_date": true,
+        "composite": true
+      },
+      "expiry_date": "2030-06-02",
+      "expired_on_review_date": false,
+      "issuer_authenticated": false
+    },
+    {
+      "file": "KhmerID/photo_2026-09-29_14-49-17.jpg",
+      "method": "Manual transcription of photographed TD1 text; ICAO 7-3-1 modulo-10 calculation.",
+      "check_digits": {
+        "document_number": true,
+        "date_of_birth": true,
+        "expiry_date": true,
+        "composite": true
+      },
+      "expiry_date": "2031-11-17",
+      "expired_on_review_date": false,
+      "issuer_authenticated": false
+    },
+    {
+      "file": "KhmerID/photo_2026-09-29_14-51-04.jpg",
+      "method": "Manual transcription of photographed TD1 text; ICAO 7-3-1 modulo-10 calculation.",
+      "check_digits": {
+        "document_number": true,
+        "date_of_birth": true,
+        "expiry_date": true,
+        "composite": true
+      },
+      "expiry_date": "2027-10-19",
+      "expired_on_review_date": false,
+      "issuer_authenticated": false
+    },
+    {
+      "file": "KhmerID/photo_2026-10-06_23-39-48.jpg",
+      "method": "Manual transcription of photographed TD1 text; ICAO 7-3-1 modulo-10 calculation.",
+      "check_digits": {
+        "document_number": true,
+        "date_of_birth": true,
+        "expiry_date": true,
+        "composite": true
+      },
+      "expiry_date": "2031-11-04",
+      "expired_on_review_date": false,
+      "issuer_authenticated": false
+    },
+    {
+      "file": "KhmerID/photo_2026-10-07_10-26-41.jpg",
+      "method": "Manual transcription of photographed TD1 text; ICAO 7-3-1 modulo-10 calculation.",
+      "check_digits": {
+        "document_number": true,
+        "date_of_birth": true,
+        "expiry_date": true,
+        "composite": true
+      },
+      "expiry_date": "2032-08-29",
+      "expired_on_review_date": false,
+      "issuer_authenticated": false
+    },
+    {
+      "file": "KhmerID/photo_2026-10-07_10-27-01.jpg",
+      "method": "Manual transcription of photographed TD1 text; ICAO 7-3-1 modulo-10 calculation.",
+      "check_digits": {
+        "document_number": true,
+        "date_of_birth": true,
+        "expiry_date": true,
+        "composite": true
+      },
+      "expiry_date": "2031-11-03",
+      "expired_on_review_date": false,
+      "issuer_authenticated": false
+    }
+  ],
+  "official_nssf_qr_check": {
+    "domain": "verify.gov.kh",
+    "qr_decoded": true,
+    "issuer_authenticated": false,
+    "result": "The decoded official verification link was not accessible through the web tool. No verification result was obtained.",
+    "private_url_omitted": true
+  },
+  "summary": {
+    "images": 10,
+    "khmer_id_fronts": 6,
+    "khmer_id_backs": 2,
+    "nssf_fronts": 1,
+    "nssf_backs": 1,
+    "capture_quality_accepted": 4,
+    "capture_quality_rejected": 6,
+    "manual_mrz_check_digits_passed": 24,
+    "manual_mrz_check_digits_total": 24,
+    "khmer_fronts_all_five_compared_fields_match": 3,
+    "issuer_authenticated_documents": 0
+  },
+  "app_version_limitation": "Application source changes appeared elsewhere in the workspace during this review. App diagnostics describe the modules loaded by the diagnostic process and may differ from subsequent edits. This check did not edit application source."
+}

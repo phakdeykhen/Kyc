@@ -3,6 +3,7 @@ import unittest
 
 import numpy as np
 from PIL import Image, ImageFilter
+from unittest.mock import patch
 
 from kyc.documents.requirements import ID1_ASPECT, TD3_ASPECT
 from kyc.engines.capture_quality import SCORE_NAMES, CaptureRejected, DocumentQualityPolicy, HeuristicDocumentQualityEngine, decode_capture
@@ -16,6 +17,25 @@ def assess(image, aspect=ID1_ASPECT, fmt="JPEG", **options):
 
 
 class QualityGateTests(unittest.TestCase):
+    def test_printed_region_with_wrong_aspect_is_not_used_as_a_card_quadrilateral(self):
+        engine = HeuristicDocumentQualityEngine()
+        ink = (np.array([[0, 0], [340, 0], [385, 60], [30, 140]], dtype=np.float32), .35, 2, False)
+        crop = np.asarray(images.card(1280))
+        with patch.object(engine, "_locate", return_value=ink):
+            self.assertEqual(engine.locate_corners(crop, ID1_ASPECT).tolist(),
+                             [[0, 0], [1279, 0], [1279, crop.shape[0] - 1], [0, crop.shape[0] - 1]])
+
+    def test_whole_portrait_camera_frame_cannot_rotate_the_landscape_card(self):
+        engine = HeuristicDocumentQualityEngine()
+        photo = np.asarray(images.scene(images.card(760), size=(960, 1280)))
+        whole_frame = (np.array([[0, 0], [299, 0], [299, 399], [0, 399]], dtype=np.float32), 1., 4, False)
+        with patch.object(engine, "_locate", return_value=whole_frame):
+            corners = engine.locate_corners(photo, ID1_ASPECT)
+        self.assertIsNotNone(corners)
+        self.assertGreater(np.linalg.norm(corners[1] - corners[0]), np.linalg.norm(corners[2] - corners[1]))
+        self.assertGreater(corners[:, 1].min(), 350)
+        self.assertLess(corners[:, 1].max(), 930)
+
     def test_usable_captures_are_accepted(self):
         for name, image, aspect in [("card", images.good(), ID1_ASPECT),
                                     ("passport", images.passport_page(), TD3_ASPECT),

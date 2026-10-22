@@ -1,0 +1,106 @@
+{
+  "review_date": "2026-10-07",
+  "completed_date": "2026-10-08",
+  "scope": "Local KYC correctness review and implementation fixes; existing work preserved",
+  "readiness": "NOT_READY",
+  "report": "docs/kyc-review-2026-10-07.md",
+  "backend": {
+    "result": "PASS",
+    "command": "PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v",
+    "tests_run": 507,
+    "skipped_entries": 4,
+    "duration_seconds": 217.166,
+    "log": "var/kyc-review-full-final-tests.log",
+    "added_regression_cases": 12,
+    "skip_details": [
+      {
+        "target": "test_face_engines.NativeModelSmokeTests.setUpClass",
+        "kind": "class_setup",
+        "reason": "Pinned native face models and public fixture are not installed"
+      },
+      {
+        "target": "test_liveness.NativePhotoAttackTests.test_moving_and_tilting_a_photo_never_completes_the_challenge",
+        "kind": "test",
+        "reason": "Native face models and the public OpenCV sample face are not installed"
+      },
+      {
+        "target": "test_postgres.PostgreSQLIsolationTests.test_migration_and_database_enforced_tenant_isolation",
+        "kind": "test",
+        "reason": "TEST_DATABASE_URL is not configured for an isolated test database"
+      },
+      {
+        "target": "test_postgres_phase17.PostgreSQLPrivacyHardeningTests.test_restricted_erasure_preserves_decisions_and_enforces_tenant_scope",
+        "kind": "test",
+        "reason": "TEST_DATABASE_URL is not configured for an isolated test database"
+      }
+    ]
+  },
+  "browser": {
+    "result": "PASS",
+    "passed_scenarios": 11,
+    "evidence_type": "Synthetic camera and mocked API responses; not physical-device or biometric accuracy evidence",
+    "scenarios": [
+      "complete",
+      "successful_capture",
+      "exhausted",
+      "camera_denied",
+      "cancel_positioning",
+      "position_body_timeout",
+      "challenge_body_timeout",
+      "cancel_challenge",
+      "camera_interrupted",
+      "challenge_expired_offline",
+      "poll_recovery"
+    ],
+    "log": "var/kyc-review-browser-tests.log",
+    "results": "var/liveness-browser-results.json"
+  },
+  "frontend": {
+    "type_check": "PASS",
+    "lint": "PASS",
+    "production_build": "PASS",
+    "commands": ["npm run type-check", "npm run lint", "npm run build"],
+    "build_advisory": "Existing JavaScript bundle is approximately 517 KB; chunk-size advisory remains"
+  },
+  "typescript_sdk": {
+    "tests": "PASS",
+    "test_count": 6,
+    "type_check": "PASS",
+    "type_check_command": "../../Frontend/node_modules/.bin/tsc -p tsconfig.json --noEmit",
+    "working_directory": "sdk/typescript",
+    "compiler_source": "Existing frontend TypeScript installation"
+  },
+  "contracts_and_dependencies": {
+    "capture_client_smoke": "PASS",
+    "openapi_session_token_security_on_position_and_guide": "PASS",
+    "openapi_technical_error_fields": "PASS",
+    "python_dependency_check": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "local_postgresql_security": {
+    "result": "PASS",
+    "passed_checks": 24,
+    "failed_checks": 0,
+    "tables_with_forced_rls": 25,
+    "report": "artifacts/kyc-review-database-security-2026-10-07.json",
+    "log": "var/kyc-review-database-security.log",
+    "probe_transactions": "Rolled back",
+    "scope_limit": "Local database only; loopback connection does not use TLS and does not validate a production deployment"
+  },
+  "liveness": {
+    "default_policy_version": "ACTIVE-GEOMETRY-2026.10.5",
+    "default_calibrated": false,
+    "frame_selection_policy": "BEST_ACCEPTED_FRONTAL_FRAME_V1",
+    "raw_liveness_frames_retained": false,
+    "retained_live_embedding": "Encrypted LIVE_SELFIE template with existing reference retention limits"
+  },
+  "remaining_release_work": [
+    "Single-use expiring phone claim, atomic consumption, device binding and mobile-only capture enforcement",
+    "Server-driven challenge-step disclosure and desktop progress states",
+    "Standalone signed result envelope and asynchronous worker/result availability contract",
+    "Native Android/iOS passport readers and governed issuer barcode/CSCA trust inputs",
+    "Human-confirmed Khmer ground truth and field accuracy/CER measurement",
+    "Face/PAD calibration, attack-media evaluation and physical iPhone/Android testing",
+    "Deployed cloud KMS, secret, storage and queue integrations; dependency health, monitoring, backup/restore and target-database validation"
+  ]
+}

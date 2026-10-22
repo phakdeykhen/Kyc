@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     pii_hmac_key: SecretStr | None = None
     tesseract_cmd: str = "tesseract"
     ocr_languages: str = "khm,eng"
+    ocr_tessdata_dir: str | None = None
     ocr_timeout_seconds: float = Field(default=20.0, ge=1, le=120)
     document_processing_mode: Literal["inline", "deferred"] = "inline"
     # Phase 7: JSON file of key id → PEM public key for signed barcode payloads (JWS). None → nothing verifiable.
@@ -62,7 +63,7 @@ class Settings(BaseSettings):
     liveness_challenge_ttl_seconds: int = Field(default=120, ge=30, le=600)
     max_liveness_attempts: int = Field(default=5, ge=1, le=20)
     max_liveness_bytes: int = Field(default=16 * 1024 * 1024, ge=500_000, le=64 * 1024 * 1024)
-    liveness_policy_version: str = Field(default="ACTIVE-GEOMETRY-2026.10.2", min_length=1, max_length=80)
+    liveness_policy_version: str = Field(default="ACTIVE-GEOMETRY-2026.10.5", min_length=1, max_length=80)
     liveness_calibrated: bool = False
     # Measured liveness validation report (scripts/calibrate_liveness.py). Required in production.
     liveness_validation_file: Path | None = None

@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from kyc.api.dependencies import TenantContext
 from kyc.api.schemas import CaptureGeometry, CaptureQuality, CaptureResponse
+from kyc.core.errors import error_response
 from kyc.db.models import AuditLog, DocumentCheck, DocumentImage, IdentityDocument, KYCSession, Organization
 from kyc.documents.requirements import requirement_for
 from kyc.domain.enums import CheckResult, SessionStatus
@@ -36,8 +37,7 @@ class CaptureLimits:
 
 
 def _error(status_code: int, reason_code: str, detail: str, attempts_remaining: int | None = None) -> JSONResponse:
-    return JSONResponse(status_code=status_code, content={"detail": detail, "reason_code": reason_code,
-                                                          "attempts_remaining": attempts_remaining})
+    return error_response(status_code, reason_code, detail, attempts_remaining=attempts_remaining)
 
 
 def _audit(db: Session, record: KYCSession, tenant: TenantContext, request_id: UUID, action: str,

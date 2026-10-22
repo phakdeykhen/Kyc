@@ -29,8 +29,8 @@ export default function NewVerification() {
           </button>
           <h1 className="mt-3 font-heading text-2xl font-semibold tracking-tight text-foreground-950 md:text-3xl">New verification</h1>
           <p className="mt-1.5 max-w-2xl font-label text-sm text-foreground-600">
-            Creates a session with <code className="font-mono">POST /v1/kyc/sessions</code>, then a one-session client token for
-            the person's device. The person gives consent and captures their evidence on that device.
+            Choose the document and checks you need, then share a secure link.
+            The applicant gives consent and completes verification on their own device.
           </p>
         </div>
         <ApiKeyGate purpose="create verification sessions" scopes={["sessions:write"]}>

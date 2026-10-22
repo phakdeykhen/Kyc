@@ -71,6 +71,30 @@ class ParserTests(unittest.TestCase):
         single = parser.read(["P<UTOLI<<A<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<", ICAO_TD3[1]], TODAY)
         self.assertEqual(single.given_names, "A")  # a genuine one-letter name survives
 
+    def test_name_line_most_passes_agree_on_wins_over_a_stray_letter(self):
+        # Real-OCR regression: one pass reads filler as "<K", the others agree on the clean name;
+        # the overlong constrained read ("…<K<K", 31 characters) still counts as a vote.
+        first, second, _ = td1()
+        passes = [first, second, "SOK<<SOPHEA<<<<<<<<<<<<<<<<<K<K", "SOK<<SOPHEA<K<<<<<<<<", "SOK<<SOPHEA<<<<<<<<<<<<<<<<KKK"]
+        result = parser.read(passes, TODAY)
+        self.assertEqual((result.surname, result.given_names), ("SOK", "SOPHEA"))
+
+    def test_td1_first_line_with_lost_or_misread_filler_and_o_for_zero_is_repaired(self):
+        # Real-card regression: line 1 was never read at full width, and '0' in the number came out as 'O'.
+        first, second, third = td1(number="010203040")
+        passes = ["IDKHMO102030402<<<<<<<", "IDKHMO102030402<<<<<CCECEECCECCC", second, third]
+        result = parser.read(passes, TODAY)
+        self.assertEqual(result.document_number, "010203040")
+        self.assertTrue(result.check_digits["document_number"]["valid"])
+        self.assertIn("MRZ_CHAR_CORRECTED", result.flags)
+
+    def test_td1_first_line_shifted_by_an_inserted_character_is_not_repaired(self):
+        # "IDKHM" + "O" + "010203040" + check: the real check digit lands in the optional zone.
+        first, second, third = td1(number="010203040")
+        shifted = "IDKHMO" + first[5:15] + "K<<<<<<<"
+        self.assertEqual(parser._td1_head_repairs(shifted), [])
+        self.assertIsNone(parser.read([shifted, second, third], TODAY))
+
     def test_comparison_reports_disagreement_without_resolving_it(self):
         result = parser.read(td3(), TODAY)
         outcome = parser.compare(result, {"document_number": "NO1234567", "date_of_birth": "1990-03-15",

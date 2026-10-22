@@ -17,6 +17,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from kyc.api.dependencies import TenantContext
+from kyc.core.errors import error_response
 from kyc.db.models import (AuditLog, BarcodeResult, DocumentField, DocumentImage, FaceComparison, FraudSignal,
                            IdentityDocument, KYCSession, LivenessCheck, ManualReview, MRZResult, NFCResult,
                            Reviewer, RiskAssessmentRecord, SelfieCapture)
@@ -27,13 +28,14 @@ from kyc.services.biometrics import clear_identity_evidence
 from kyc.services.verdict import check_results, final_result, review_summary, timeline
 from kyc.services.results import collect_evidence, mask
 from kyc.services.sessions import apply_event, aware, is_expired
+from kyc.services.government import build_government_verification
 
 IDENTITY_FIELDS = ("full_name", "full_name_local", "date_of_birth", "sex", "nationality", "document_number",
                    "expiry_date", "issue_date", "place_of_birth", "address", "national_id_number", "mrz")
 
 
 def _error(code: int, reason: str, detail: str, **extra) -> JSONResponse:
-    return JSONResponse(status_code=code, content={"detail": detail, "reason_code": reason, **extra})
+    return error_response(code, reason, detail, **extra)
 
 
 def _audit(db, reviewer: ReviewerContext, record, request_id, action, reasons=(), **metadata):
@@ -196,6 +198,8 @@ def case(db: Session, reviewer: ReviewerContext, session_id: UUID, field_cipher,
             "assessed_at": aware(assessment.created_at), "trace": assessment.check_summary.get("trace", []),
             "authenticity_sources": assessment.check_summary.get("authenticity_sources", [])},
         "checks": evidence.checks,
+        "government_verification": build_government_verification(db, record, field_cipher,
+                                                                 reveal_link=identity).model_dump(mode="json"),
         "fraud_signals": signals,
         "document": None if document is None else {
             "type": document.document_type, "issuing_country": document.issuing_country,

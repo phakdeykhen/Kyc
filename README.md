@@ -1,4 +1,9 @@
-# Universal Identity Platform — Phases 1–5 and 8–9
+# Universal Identity Platform — Phases 1–18
+
+The React client is connected to the FastAPI backend. The current implementation
+and verification evidence are recorded in the [correctness review](docs/kyc-review-2026-10-07.md)
+and [production readiness report](docs/production-readiness-2026-10-07.md).
+Production readiness remains **NOT_READY** pending the release gates in those reports.
 
 Phase 1 implements the architecture contracts, a 17-table PostgreSQL schema with
 tenant policies, a frozen Alembic migration, and the KYC session state machine.
@@ -38,6 +43,11 @@ single-use sequence of head movements. Facial landmark geometry checks the movem
 and the person must stay the same throughout. Frames are never stored. The uncalibrated
 geometry heuristic returns REVIEW at best, including uncertain flat-face findings;
 identical-image replay remains a FAIL. See [Phase 10](docs/architecture-phase10.md).
+
+The [face liveness detector source](realtime-face-liveness-detector/README.md)
+is vendored as ordinary files in this KYC repository. Its KYC notes identify the
+application's liveness entry points and preserve the upstream documentation and
+license.
 
 Phases 8–9 add CPU face detection, selfie quality recapture, aligned face embeddings,
 and 1:1 comparison against the accepted document portrait. Selfie submission requires

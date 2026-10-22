@@ -2,6 +2,7 @@ README.md
 pyproject.toml
 src/kyc/__init__.py
 src/kyc/main.py
+src/kyc/readiness.py
 src/kyc/api/__init__.py
 src/kyc/api/dependencies.py
 src/kyc/api/review_routes.py
@@ -15,6 +16,7 @@ src/kyc/barcode/evaluate.py
 src/kyc/barcode/payload.py
 src/kyc/barcode/signatures.py
 src/kyc/biometrics/__init__.py
+src/kyc/biometrics/calibration.py
 src/kyc/biometrics/embeddings.py
 src/kyc/biometrics/opencv.py
 src/kyc/biometrics/quality.py
@@ -23,13 +25,18 @@ src/kyc/core/__init__.py
 src/kyc/core/admission.py
 src/kyc/core/config.py
 src/kyc/core/crypto.py
+src/kyc/core/errors.py
 src/kyc/core/hardening.py
+src/kyc/core/health.py
+src/kyc/core/metrics.py
 src/kyc/core/observability.py
 src/kyc/db/__init__.py
 src/kyc/db/models.py
 src/kyc/db/privileges.py
 src/kyc/db/session.py
 src/kyc/documents/__init__.py
+src/kyc/documents/card_rows.py
+src/kyc/documents/field_ocr.py
 src/kyc/documents/iso3166.py
 src/kyc/documents/khmer.py
 src/kyc/documents/preprocess.py
@@ -82,6 +89,7 @@ src/kyc/services/consent.py
 src/kyc/services/documents.py
 src/kyc/services/erasure.py
 src/kyc/services/fraud.py
+src/kyc/services/government.py
 src/kyc/services/liveness.py
 src/kyc/services/nfc.py
 src/kyc/services/rekey.py
@@ -91,6 +99,7 @@ src/kyc/services/review.py
 src/kyc/services/risk.py
 src/kyc/services/sessions.py
 src/kyc/services/tenancy.py
+src/kyc/services/verdict.py
 src/kyc/services/webhooks.py
 src/kyc/storage/__init__.py
 src/kyc/storage/biometrics.py
@@ -121,6 +130,7 @@ tests/test_api.py
 tests/test_barcode.py
 tests/test_biometric_storage.py
 tests/test_biometrics_api.py
+tests/test_calibration.py
 tests/test_capture_quality.py
 tests/test_capture_store.py
 tests/test_captures_api.py
@@ -128,8 +138,10 @@ tests/test_documents_api.py
 tests/test_face_engines.py
 tests/test_fraud.py
 tests/test_generic_documents.py
+tests/test_government_verification.py
 tests/test_hardening.py
 tests/test_kh_national_id.py
+tests/test_khmer_field_ocr.py
 tests/test_liveness.py
 tests/test_mrz.py
 tests/test_mrz_reader.py
@@ -139,6 +151,7 @@ tests/test_performance.py
 tests/test_postgres.py
 tests/test_postgres_phase17.py
 tests/test_privacy.py
+tests/test_readiness.py
 tests/test_rekey.py
 tests/test_review.py
 tests/test_risk.py

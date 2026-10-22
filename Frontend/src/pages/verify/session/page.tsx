@@ -9,6 +9,7 @@ import SelfieStage from "@/pages/verify/components/SelfieStage";
 import LivenessStage from "@/pages/verify/components/LivenessStage";
 import NfcStage from "@/pages/verify/components/NfcStage";
 import ProcessingStage from "@/pages/verify/components/ProcessingStage";
+import ApplicantGovernmentVerification from "@/pages/verify/components/ApplicantGovernmentVerification";
 import { kycApi, type Client } from "@/api/client";
 import { ApiError } from "@/api/http";
 import type { KycSession, SessionStatus, VerificationLevel } from "@/api/types";
@@ -47,13 +48,14 @@ export default function VerificationSession() {
     }
   });
   const [now, setNow] = useState(Date.now());
+  // Shown above the card capture when the selfie step sent the person back to retake the card.
+  const [portraitRecapture, setPortraitRecapture] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!credential) return;
     try {
       const current = await kycApi.getSession(credential, sessionId);
       setSession(current);
-      setCheckedAt(Date.now());
       setError("");
       if (APPLICANT_FINISHED.has(current.status)) navigate(`/verify/${encodeURIComponent(sessionId)}/done`, { replace: true });
     } catch (caught) {
@@ -61,6 +63,9 @@ export default function VerificationSession() {
       setError(failure.status === 401 ? "This link is no longer valid. It may have expired, or a newer link was sent to you."
         : failure.status === 404 || failure.status === 422 ? "This verification link is not valid."
         : failure.message);
+    } finally {
+      // Schedule the next poll after failed requests too, so a brief outage can recover.
+      setCheckedAt(Date.now());
     }
   }, [credential, sessionId, navigate]);
 
@@ -70,6 +75,9 @@ export default function VerificationSession() {
 
   // The server works on its own in these statuses; keep checking until it moves on.
   const status = session?.status;
+  useEffect(() => {
+    if (status && status !== "CREATED" && status !== "DOCUMENT_REQUIRED") setPortraitRecapture(false);
+  }, [status]);
   useEffect(() => {
     if (status !== "DOCUMENT_PROCESSING" && status !== "PROCESSING") return;
     const timer = window.setTimeout(refresh, POLL_MS);
@@ -120,11 +128,29 @@ export default function VerificationSession() {
       stage = <ConsentStage credential={credential} sessionId={sessionId} documentType={session.expected_document_type}
                             onConsented={markConsented} onSessionChanged={onSessionChanged} />;
     } else if (s === "CREATED" || s === "DOCUMENT_REQUIRED") {
-      stage = <CaptureStage key="document" credential={credential} sessionId={sessionId}
-                            documentType={session.expected_document_type} sides={sides}
-                            onSessionChanged={onSessionChanged} onConsentMissing={consentMissing} onUploaded={refresh} />;
+      stage = (
+        <>
+          {portraitRecapture && (
+            <div role="alert" className="mb-4 flex gap-3 rounded-lg border border-accent-200 bg-accent-50 px-4 py-3">
+              <i className="ri-error-warning-line mt-0.5 text-lg leading-none text-accent-700"></i>
+              <div className="font-label text-sm text-accent-900">
+                <p className="font-semibold">Please take your ID card photos again</p>
+                <p className="mt-1">
+                  We couldn't see the face photo on your card clearly enough to compare it with your selfie.
+                  Lay the card flat in good light without reflections, tap the photo on the card to focus,
+                  and hold the phone still while it takes the picture.
+                </p>
+              </div>
+            </div>
+          )}
+          <CaptureStage key="document" credential={credential} sessionId={sessionId}
+                        documentType={session.expected_document_type} sides={sides}
+                        onSessionChanged={onSessionChanged} onConsentMissing={consentMissing} onUploaded={refresh} />
+        </>
+      );
     } else if (s === "SELFIE_REQUIRED") {
-      stage = <SelfieStage credential={credential} sessionId={sessionId} onSessionChanged={onSessionChanged} />;
+      stage = <SelfieStage credential={credential} sessionId={sessionId} onSessionChanged={onSessionChanged}
+                           onDocumentRecapture={() => setPortraitRecapture(true)} />;
     } else if (s === "LIVENESS_REQUIRED") {
       stage = <LivenessStage credential={credential} sessionId={sessionId} onSessionChanged={onSessionChanged} />;
     } else if (s === "NFC_REQUIRED") {
@@ -164,6 +190,11 @@ export default function VerificationSession() {
             <Stepper steps={steps} current={current} />
           </div>
           <div className="mt-4 rounded-lg border border-background-200 bg-background-50 p-5 md:p-6">{stage}</div>
+          {["SELFIE_REQUIRED", "LIVENESS_REQUIRED", "NFC_REQUIRED", "PROCESSING"].includes(session.status) && (
+            <div className="mt-4">
+              <ApplicantGovernmentVerification credential={credential} sessionId={sessionId} version={session.version} />
+            </div>
+          )}
           <p className="mt-4 flex items-start gap-2 font-label text-xs text-foreground-500">
             <i className="ri-shield-check-line mt-0.5 text-sm leading-none"></i>
             Your photos are encrypted and only used to verify you. Face data is never shared through the API and is deleted after the retention period.

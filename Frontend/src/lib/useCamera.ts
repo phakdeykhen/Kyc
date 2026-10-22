@@ -9,9 +9,11 @@ export type CameraState = "idle" | "starting" | "live" | "unavailable";
 export function useCamera(facing: "user" | "environment") {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const generationRef = useRef(0);
   const [state, setState] = useState<CameraState>("idle");
 
   const stop = useCallback(() => {
+    generationRef.current += 1;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -20,6 +22,7 @@ export function useCamera(facing: "user" | "environment") {
 
   const start = useCallback(async () => {
     stop();
+    const generation = generationRef.current;
     if (!navigator.mediaDevices?.getUserMedia) {
       setState("unavailable");
       return;
@@ -29,13 +32,35 @@ export function useCamera(facing: "user" | "environment") {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false, video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1440 } },
       });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => undefined);
+      // A permission request can finish after unmount or a newer request (including Strict Mode).
+      if (generation !== generationRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
       }
+      streamRef.current = stream;
+      stream.getVideoTracks().forEach((track) => track.addEventListener("ended", () => {
+        if (generation !== generationRef.current) return;
+        stop();
+        setState("unavailable");
+      }, { once: true }));
+      const video = videoRef.current;
+      if (!video) throw new Error("Camera preview is unavailable");
+      video.srcObject = stream;
+      await video.play();
+      // Safari can resolve play() before dimensions are available. A live state must mean usable pixels.
+      const deadline = Date.now() + 10000;
+      while (!video.videoWidth || !video.videoHeight || video.readyState < 2) {
+        if (generation !== generationRef.current) return;
+        if (Date.now() > deadline) throw new Error("Camera did not provide frames");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      if (generation !== generationRef.current) return;
       setState("live");
     } catch {
+      if (generation !== generationRef.current) return;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
       setState("unavailable");
     }
   }, [facing, stop]);
@@ -45,7 +70,8 @@ export function useCamera(facing: "user" | "environment") {
   /** A JPEG of the current frame, scaled down to maxWidth when given. */
   const grab = useCallback((maxWidth?: number, quality = 0.92): Promise<Blob | null> => {
     const video = videoRef.current;
-    if (!video || !video.videoWidth || !video.videoHeight) return Promise.resolve(null);
+    if (!video || !video.videoWidth || !video.videoHeight || video.paused || video.readyState < 2
+        || !streamRef.current?.getVideoTracks().some((track) => track.readyState === "live" && track.enabled && !track.muted)) return Promise.resolve(null);
     const scale = maxWidth ? Math.min(1, maxWidth / video.videoWidth) : 1;
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(video.videoWidth * scale);

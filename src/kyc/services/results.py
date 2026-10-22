@@ -12,17 +12,19 @@ from kyc.db.models import BiometricTemplate, DocumentCheck, DocumentField, FaceC
 from kyc.domain.enums import CheckResult
 from kyc.services.captures import side_progress
 from kyc.services.verdict import check_results, final_result, latest_assessment
+from kyc.services.government import build_government_verification
 
 # NFC_VERIFIED means signed by a trusted issuer and unaltered; it is still evidence, not a decision.
 NFC_CHECK = {"NFC_VERIFIED": "PASS", "NFC_READ": "REVIEW", "NFC_FAILED": "FAIL", "NFC_NOT_AVAILABLE": "REVIEW",
              "NFC_NOT_SUPPORTED": "NOT_APPLICABLE"}
 
-SEVERITY = {CheckResult.FAIL: 3, CheckResult.REVIEW: 2, CheckResult.PASS: 1, CheckResult.NOT_APPLICABLE: 0}
+SEVERITY = {CheckResult.FAIL: 3, CheckResult.REVIEW: 2, CheckResult.UNAVAILABLE: 2,
+            CheckResult.PASS: 1, CheckResult.NOT_APPLICABLE: 0}
 CHECK_GROUPS = {"CLASSIFICATION": "document_classification", "EXPIRY": "expiry", "MRZ": "mrz", "PORTRAIT": "document_portrait",
                 "MRZ_CONSISTENCY": "mrz_consistency", "BARCODE": "barcode", "ISSUING_COUNTRY": "issuing_country",
                 "CROSS_CHECK": "cross_check", "FRAUD_ANALYSIS": "fraud"}
 DATA_CHECKS = {"REQUIRED_FIELDS", "DOCUMENT_NUMBER_FORMAT", "NATIONAL_ID_NUMBER_FORMAT", "DATE_CONSISTENCY",
-               "OCR_CONFIDENCE", "SCRIPT_CONSISTENCY"}
+               "OCR_CONFIDENCE", "SCRIPT_CONSISTENCY", "KHMER_NAME", "KHMER_TEXT"}
 
 
 def mask(value: str | None) -> str | None:
@@ -70,7 +72,7 @@ def collect_evidence(db: Session, record: KYCSession) -> Evidence:
         quality = db.scalar(query.order_by(FaceQualityCheck.created_at.desc()).limit(1))
         if quality is not None:
             checks[key] = quality.result.value
-            if quality.result in (CheckResult.REVIEW, CheckResult.FAIL):
+            if quality.result in (CheckResult.REVIEW, CheckResult.FAIL, CheckResult.UNAVAILABLE):
                 flags.extend(quality.evidence_metadata.get("reason_codes", []))
                 unverified_codes = {"EYES_VISIBLE": "FACE_EYE_VISIBILITY_UNVERIFIED",
                                     "SEVERE_OCCLUSION": "FACE_OCCLUSION_UNVERIFIED"}
@@ -107,6 +109,7 @@ def collect_evidence(db: Session, record: KYCSession) -> Evidence:
         .join(live, FaceComparison.live_template_id == live.id).where(
             FaceComparison.organization_id == record.organization_id, FaceComparison.session_id == record.id,
             reference.organization_id == record.organization_id, live.organization_id == record.organization_id,
+            reference.source == "DOCUMENT_PORTRAIT",
             reference.delete_after > now, live.delete_after > now)
         .order_by(FaceComparison.created_at.desc()).limit(1))
     summary = None
@@ -140,7 +143,7 @@ def collect_evidence(db: Session, record: KYCSession) -> Evidence:
                 checks[CHECK_GROUPS[row.check_type]] = row.result.value
             if row.check_type in DATA_CHECKS and (data_result is None or SEVERITY.get(row.result, 0) > SEVERITY.get(data_result, 0)):
                 data_result = row.result
-            if row.result in (CheckResult.REVIEW, CheckResult.FAIL):
+            if row.result in (CheckResult.REVIEW, CheckResult.FAIL, CheckResult.UNAVAILABLE):
                 flags.extend(row.evidence_metadata.get("reason_codes", []))
         if data_result is not None:
             checks["document_data"] = data_result.value
@@ -178,10 +181,11 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None, re
     if summary is not None:
         summary = summary.model_copy(update={"score": None})  # raw similarity stays internal (reviewers only)
     erased_at = record.erased_at.replace(tzinfo=record.erased_at.tzinfo or timezone.utc) if record.erased_at else None
+    government = build_government_verification(db, record, cipher, reveal_link=reveal_identity)
     if document is None or cipher is None:
         return SessionResult(session_id=record.id, status=record.status, checks=checks, fraud_signals=signals,
                              face_comparison=summary, review_flags=sorted(set(flags)), decision=decision, review=review,
-                             erased_at=erased_at, **common)
+                             erased_at=erased_at, government_verification=government, **common)
 
     values: dict[str, str] = {}
     for field in db.scalars(sa.select(DocumentField).where(DocumentField.organization_id == record.organization_id,
@@ -206,6 +210,6 @@ def build_result(db: Session, record: KYCSession, cipher: FieldCipher | None, re
         ResultIdentity(full_name=mask_name(values.get("full_name")), full_name_local=mask_name(values.get("full_name_local")),
                        date_of_birth=mask_date(values.get("date_of_birth")), sex=values.get("sex"),
                        nationality=values.get("nationality")),
-        identity_masked=not reveal_identity,
+        identity_masked=not reveal_identity, government_verification=government,
         mrz=ResultMRZ(format=mrz.format, mrz_valid=mrz.mrz_valid, check_digit_results=mrz.check_digit_results,
                       field_consistency=mrz.field_consistency) if mrz else None)
