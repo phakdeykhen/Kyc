@@ -6,6 +6,7 @@ row (one date, sex/height cues) and the Latin-name row are reliable anchors; the
 name sits above the Latin name, place of birth follows the birth row and the address
 fills the rows up to validity. When the anchors are not found nothing is assigned, so
 the caller falls back to label matching. No value is inferred from position alone.
+The birth and validity rows are also returned so their dates can be re-read on their own.
 """
 
 from dataclasses import dataclass
@@ -226,4 +227,5 @@ def assign_rows(rows: list[Row]) -> dict[str, list[Row]]:
     if _number_row(rows[name]):
         return {}
     address = rows[birth + 2:validity][:MAX_ADDRESS_ROWS]
-    return {"full_name_local": [rows[name]], "place_of_birth": [rows[birth + 1]], "address": address}
+    return {"full_name_local": [rows[name]], "place_of_birth": [rows[birth + 1]], "address": address,
+            "date_of_birth": [rows[birth]], "validity": [rows[validity]]}
