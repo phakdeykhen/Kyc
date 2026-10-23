@@ -22,7 +22,10 @@ export default function SelfieStage({ credential, sessionId, onSessionChanged, o
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [last, setLast] = useState<SelfieResult | null>(null);
+  const [exhausted, setExhausted] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  // State updates land after the next render; this ref stops a second click from sending (and spending) another attempt.
+  const inFlight = useRef(false);
   const lightHint = useLightHint(camera.videoRef, camera.state === "live" && !busy);
   const { start } = camera;
 
@@ -30,13 +33,17 @@ export default function SelfieStage({ credential, sessionId, onSessionChanged, o
     start();
   }, [start]);
 
-  const submit = async (blob: Blob | null) => {
-    if (!blob || busy || !consent) return;
+  const capture = async (grab: () => Promise<Blob | null>) => {
+    if (inFlight.current || exhausted || !consent) return;
+    inFlight.current = true;
     setBusy(true);
     setError("");
     try {
+      const blob = await grab();
+      if (!blob) return;
       const result = await kycApi.uploadSelfie(credential, sessionId, blob);
       setLast(result);
+      if (result.capture_status !== "ACCEPTED" && result.attempts_remaining === 0) setExhausted(true);
       if (result.status !== "SELFIE_REQUIRED") {
         camera.stop();
         if (result.status === "DOCUMENT_REQUIRED") onDocumentRecapture?.();
@@ -48,10 +55,12 @@ export default function SelfieStage({ credential, sessionId, onSessionChanged, o
         camera.stop();
         return onSessionChanged("SELFIE_REQUIRED");
       }
+      if (failure.status === 429) setExhausted(true);
       setError(failure.status === 429 ? "Too many selfie attempts for this session. Ask the service that sent you for a new link."
         : failure.status === 503 ? "Face checking is unavailable right now. Try again in a moment."
         : failure.message);
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   };
@@ -85,12 +94,12 @@ export default function SelfieStage({ credential, sessionId, onSessionChanged, o
                   ) : undefined} />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-        <button type="button" disabled={!consent || busy || camera.state !== "live"} onClick={async () => submit(await camera.grab())}
+        <button type="button" disabled={!consent || busy || exhausted || camera.state !== "live"} onClick={() => capture(() => camera.grab())}
                 className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary-500 px-5 py-2.5 font-label text-sm font-medium text-background-50 transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50">
           <i className="ri-camera-lens-line text-base leading-none"></i>
           Take selfie
         </button>
-        <button type="button" disabled={!consent || busy} onClick={() => fileRef.current?.click()}
+        <button type="button" disabled={!consent || busy || exhausted} onClick={() => fileRef.current?.click()}
                 className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-background-300 px-5 py-2.5 font-label text-sm font-medium text-foreground-800 transition-colors hover:bg-background-100 disabled:cursor-not-allowed disabled:opacity-50">
           <i className="ri-upload-2-line text-base leading-none"></i>
           Upload a selfie
@@ -99,7 +108,7 @@ export default function SelfieStage({ credential, sessionId, onSessionChanged, o
                onChange={(event) => {
                  const [file] = Array.from(event.target.files ?? []);
                  event.target.value = "";
-                 if (file) submit(file);
+                 if (file) capture(async () => file);
                }} />
       </div>
       {!consent && <p className="text-center font-label text-xs text-foreground-500">Tick the consent box to continue.</p>}

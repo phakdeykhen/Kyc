@@ -33,6 +33,8 @@ export default function CaptureStage({ credential, sessionId, documentType, side
   const [capturing, setCapturing] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
+  // State updates land after the next render; this ref stops a second click from sending (and spending) another attempt.
+  const inFlight = useRef(false);
   const current = nextDocumentSide(sides, accepted);
   const working = busy || capturing;
   const exhausted = remaining === 0 || capture?.retry_allowed === false;
@@ -50,7 +52,8 @@ export default function CaptureStage({ credential, sessionId, documentType, side
   }, [capture]);
 
   const submit = async (blob: Blob | null) => {
-    if (!blob || !current || busy || exhausted) return;
+    if (!blob || !current || inFlight.current || exhausted) return;
+    inFlight.current = true;
     setBusy(true);
     setError("");
     try {
@@ -82,12 +85,13 @@ export default function CaptureStage({ credential, sessionId, documentType, side
         : failure.status === 413 ? "That photo is too large. Use the camera, or a smaller photo."
         : failure.message);
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   };
 
   const takePhoto = async () => {
-    if (working || exhausted || !current) return;
+    if (working || inFlight.current || exhausted || !current) return;
     setCapturing(true);
     setError("");
     try {
