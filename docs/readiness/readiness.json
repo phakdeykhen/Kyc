@@ -1,0 +1,554 @@
+{
+  "overall": "NOT_READY",
+  "facts": null,
+  "blockers": [
+    {
+      "component": "Document Capture",
+      "blocker": "Quality thresholds not calibrated on real phone captures."
+    },
+    {
+      "component": "KH National ID",
+      "blocker": "Real-card extraction rate unmeasured."
+    },
+    {
+      "component": "KH NSSF",
+      "blocker": "No measured extraction on real NSSF cards."
+    },
+    {
+      "component": "KH Passport",
+      "blocker": "No real passport tested."
+    },
+    {
+      "component": "OCR (Latin)",
+      "blocker": "No CER/WER benchmark."
+    },
+    {
+      "component": "Khmer OCR",
+      "blocker": "No per-field ROI cropping, multi-variant preprocessing or voting; Khmer name/address accuracy unmeasured."
+    },
+    {
+      "component": "MRZ",
+      "blocker": "Real-card MRZ read rate unmeasured (1 of 2 real cards failed check digits)."
+    },
+    {
+      "component": "Document Authenticity",
+      "blocker": "No forensic detectors for Cambodian cards, so KH ID/NSSF can never auto-PASS."
+    },
+    {
+      "component": "Portrait Extraction",
+      "blocker": "Not measured on real cards."
+    },
+    {
+      "component": "Face Detection",
+      "blocker": "No real-device detection benchmark."
+    },
+    {
+      "component": "Face Match",
+      "blocker": "Face calibration missing."
+    },
+    {
+      "component": "Liveness",
+      "blocker": "Liveness not validated against presentation attacks."
+    },
+    {
+      "component": "Android Mobile",
+      "blocker": "No validated mobile capture."
+    },
+    {
+      "component": "iPhone Mobile",
+      "blocker": "No validated mobile capture."
+    },
+    {
+      "component": "QR Handoff",
+      "blocker": "Spec QR handoff (QR_ALREADY_USED, MOBILE_SESSION_ALREADY_CLAIMED, desktop live status) not built."
+    },
+    {
+      "component": "Fraud",
+      "blocker": "No screen/print reproduction (moire) detection."
+    },
+    {
+      "component": "Risk Engine",
+      "blocker": "Depends on calibrated inputs before any auto-PASS."
+    },
+    {
+      "component": "Manual Review",
+      "blocker": "Not used by real reviewers yet."
+    },
+    {
+      "component": "RLS",
+      "blocker": "Not verified on the production Cloud SQL instance."
+    },
+    {
+      "component": "Encryption",
+      "blocker": "No Cloud KMS; production key management unverified."
+    },
+    {
+      "component": "GCP",
+      "blocker": "No production deployment."
+    },
+    {
+      "component": "Monitoring",
+      "blocker": "Not connected to a monitoring system; queue/webhook backlog, KMS and certificate alerts missing."
+    },
+    {
+      "component": "Backup",
+      "blocker": "Database backup not configured."
+    },
+    {
+      "component": "Restore",
+      "blocker": "Restore never tested."
+    },
+    {
+      "component": "Repository Data Hygiene",
+      "blocker": "Real personal data is published in a public repository."
+    }
+  ],
+  "components": [
+    {
+      "name": "Document Capture",
+      "critical": true,
+      "status": "NOT_REAL_WORLD_TESTED",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "PARTIAL",
+      "calibrated": "NO",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Deterministic quality gate (blur, glare, brightness, shadow, coverage, perspective, resolution, multiple documents); 6 real KH ID photos: 2 accepted, 4 sent to recapture with correct instructions.",
+      "blocker": "Quality thresholds not calibrated on real phone captures.",
+      "next_action": "Collect 200+ real captures per document across Android and iPhone; set thresholds from measured OCR success.",
+      "limitations": [
+        "No live best-frame selection for document capture; the first accepted upload is processed."
+      ]
+    },
+    {
+      "name": "KH National ID",
+      "critical": true,
+      "status": "NOT_REAL_WORLD_TESTED",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "PARTIAL",
+      "calibrated": "NO",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Adapter KH-NID-ADAPTER-2026.10.3; front MRZ (TD1) parsing; on 2 usable real cards the MRZ failed check digits or was not found, so both went to recapture/review (fail-safe).",
+      "blocker": "Real-card extraction rate unmeasured.",
+      "next_action": "Build a labelled set of 200 consented KH ID captures and measure field accuracy.",
+      "limitations": []
+    },
+    {
+      "name": "KH NSSF",
+      "critical": true,
+      "status": "NOT_REAL_WORLD_TESTED",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "NO",
+      "calibrated": "NO",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Adapter on the shared Khmer label engine; synthetic fixtures only.",
+      "blocker": "No measured extraction on real NSSF cards.",
+      "next_action": "Collect 100 consented NSSF captures; confirm whether the last number digit is a check digit.",
+      "limitations": []
+    },
+    {
+      "name": "KH Passport",
+      "critical": true,
+      "status": "NOT_REAL_WORLD_TESTED",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "NO",
+      "calibrated": "NO",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Visual fields + TD3 MRZ engine; synthetic specimens only.",
+      "blocker": "No real passport tested.",
+      "next_action": "Test 30+ real Cambodian passports (data page) with consent.",
+      "limitations": []
+    },
+    {
+      "name": "OCR (Latin)",
+      "critical": true,
+      "status": "NOT_REAL_WORLD_TESTED",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "PARTIAL",
+      "calibrated": "NO",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Tesseract 5 full-image OCR with a constrained numeric re-read.",
+      "blocker": "No CER/WER benchmark.",
+      "next_action": "Run scripts on a labelled set; report CER/WER per field and per capture condition.",
+      "limitations": []
+    },
+    {
+      "name": "Khmer OCR",
+      "critical": true,
+      "status": "PARTIAL",
+      "implemented": "PARTIAL",
+      "automated_tests": "YES",
+      "real_tested": "PARTIAL",
+      "calibrated": "NO",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Full-page khm+eng OCR plus a Khmer-digit re-read. On 2 usable real KH IDs the Khmer name read at confidence 0.37-0.38 and sex, address and issue date were not found. Fixed: the Khmer digit model was silently skipped in the container image (Debian names it Khmer, not script/Khmer).",
+      "blocker": "No per-field ROI cropping, multi-variant preprocessing or voting; Khmer name/address accuracy unmeasured.",
+      "next_action": "Add per-field ROIs for KH ID front, 2-3x upscale + CLAHE variants with --psm 7 and voting; measure CER on 200 cards.",
+      "limitations": [
+        "Low-confidence Khmer fields go to recapture/review, never PASS."
+      ]
+    },
+    {
+      "name": "MRZ",
+      "critical": true,
+      "status": "NOT_REAL_WORLD_TESTED",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "PARTIAL",
+      "calibrated": "N/A",
+      "security_reviewed": "PARTIAL",
+      "evidence": "TD1/TD2/TD3 parsing, all check digits, visual-zone comparison; dedicated MRZ OCR pass.",
+      "blocker": "Real-card MRZ read rate unmeasured (1 of 2 real cards failed check digits).",
+      "next_action": "Measure MRZ read rate on the labelled KH ID set; tune the MRZ band crop.",
+      "limitations": []
+    },
+    {
+      "name": "QR/Barcode",
+      "critical": false,
+      "status": "NOT_REAL_WORLD_TESTED",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "PARTIAL",
+      "evidence": "zxing decode, JWS/JSON/AAMVA/ICAO VDS parsing; signatures only against BARCODE_TRUST_STORE.",
+      "blocker": null,
+      "next_action": "Decode the NSSF 'VERIFY gov.kh' QR on real cards and document what it contains.",
+      "limitations": [
+        "A decoded QR never counts as authenticity without a trusted signature."
+      ]
+    },
+    {
+      "name": "Document Authenticity",
+      "critical": true,
+      "status": "PARTIAL",
+      "implemented": "PARTIAL",
+      "automated_tests": "YES",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Authenticity accepted only from a verified chip or signed barcode; font, layout, text-region and pixel forensics are reported NOT_SUPPORTED; unverified documents go to REVIEW.",
+      "blocker": "No forensic detectors for Cambodian cards, so KH ID/NSSF can never auto-PASS.",
+      "next_action": "Decide the operating model: human review of authenticity, or an evaluated forensics vendor/model.",
+      "limitations": [
+        "Every KH ID/NSSF session ends in MANUAL_REVIEW at best."
+      ]
+    },
+    {
+      "name": "Portrait Extraction",
+      "critical": true,
+      "status": "NOT_REAL_WORLD_TESTED",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "NO",
+      "calibrated": "NO",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Portrait located by face detection with DOCUMENT_PORTRAIT quality gate; unusable portraits trigger recapture.",
+      "blocker": "Not measured on real cards.",
+      "next_action": "Measure portrait detection rate on the labelled KH ID set.",
+      "limitations": []
+    },
+    {
+      "name": "Face Detection",
+      "critical": true,
+      "status": "NOT_REAL_WORLD_TESTED",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "PARTIAL",
+      "calibrated": "N/A",
+      "security_reviewed": "PARTIAL",
+      "evidence": "OpenCV YuNet 2023mar with pinned hashes; selfie quality gate.",
+      "blocker": "No real-device detection benchmark.",
+      "next_action": "Measure detection and recapture rates on pilot selfies (Android + iPhone).",
+      "limitations": []
+    },
+    {
+      "name": "Face Match",
+      "critical": true,
+      "status": "UNCALIBRATED",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "NO",
+      "calibrated": "NO",
+      "security_reviewed": "PARTIAL",
+      "evidence": "SFace 2021dec 1:1 cosine; uncalibrated policy always REVIEW; calibration framework (FAR/FRR/TAR/AUC, distributions) added; production refuses to start without a measured report.",
+      "blocker": "Face calibration missing.",
+      "next_action": "Collect consented genuine/impostor pairs (100+ / 1000+ minimum) and run scripts/calibrate_face.py.",
+      "limitations": [
+        "Face match uses the uploaded selfie; liveness frames are bound to it, but the best liveness frame is not yet the comparison source."
+      ]
+    },
+    {
+      "name": "Liveness",
+      "critical": true,
+      "status": "UNCALIBRATED",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "PARTIAL",
+      "calibrated": "NO",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Random single-use 4-step head-movement challenge, landmark geometry, replay and identity-continuity checks; uncalibrated policy is REVIEW at best; validation framework per attack type added.",
+      "blocker": "Liveness not validated against presentation attacks.",
+      "next_action": "Run printed-photo, phone-screen and video-replay attacks (20+ each) and 50+ genuine sessions; run scripts/calibrate_liveness.py.",
+      "limitations": [
+        "3D masks, AI-generated media and virtual-camera injection are NOT_SUPPORTED."
+      ]
+    },
+    {
+      "name": "Android Mobile",
+      "critical": true,
+      "status": "NOT_IMPLEMENTED",
+      "implemented": "NO",
+      "automated_tests": "NO",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "NO",
+      "evidence": "Only the development web capture page and the Verix front-end prototype exist; no native app or mobile SDK.",
+      "blocker": "No validated mobile capture.",
+      "next_action": "Build the mobile web flow or SDK and test on 5+ Android models.",
+      "limitations": []
+    },
+    {
+      "name": "iPhone Mobile",
+      "critical": true,
+      "status": "NOT_IMPLEMENTED",
+      "implemented": "NO",
+      "automated_tests": "NO",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "NO",
+      "evidence": "As Android.",
+      "blocker": "No validated mobile capture.",
+      "next_action": "Test on 3+ iPhone models (Safari camera permissions).",
+      "limitations": []
+    },
+    {
+      "name": "QR Handoff",
+      "critical": true,
+      "status": "PARTIAL",
+      "implemented": "PARTIAL",
+      "automated_tests": "PARTIAL",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Single-session client tokens (kst_) exist; no desktop-to-phone QR handoff screen, claim-once or live status channel.",
+      "blocker": "Spec QR handoff (QR_ALREADY_USED, MOBILE_SESSION_ALREADY_CLAIMED, desktop live status) not built.",
+      "next_action": "Add a handoff token endpoint with single claim and a status stream.",
+      "limitations": []
+    },
+    {
+      "name": "NFC Android",
+      "critical": false,
+      "status": "MOCK_ONLY",
+      "implemented": "NO",
+      "automated_tests": "PARTIAL",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "NO",
+      "evidence": "Server verification exists; the chip reader is only scripts/nfc_simulator.py.",
+      "blocker": null,
+      "next_action": "Keep NFC_ENABLED=false until a mobile reader is built and physically tested.",
+      "limitations": []
+    },
+    {
+      "name": "NFC iOS",
+      "critical": false,
+      "status": "MOCK_ONLY",
+      "implemented": "NO",
+      "automated_tests": "PARTIAL",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "NO",
+      "evidence": "As Android.",
+      "blocker": null,
+      "next_action": "Keep NFC_ENABLED=false until physically tested.",
+      "limitations": []
+    },
+    {
+      "name": "CSCA",
+      "critical": false,
+      "status": "NOT_IMPLEMENTED",
+      "implemented": "PARTIAL",
+      "automated_tests": "YES",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Trust store loads a CSCA folder and checks validity windows; no ICAO PKD/master-list import, update process or revocation (CRL) checking. Unknown issuers stay REVIEW.",
+      "blocker": null,
+      "next_action": "Define the CSCA source and update process before enabling NFC.",
+      "limitations": []
+    },
+    {
+      "name": "Fraud",
+      "critical": true,
+      "status": "PARTIAL",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Duplicate/replay/velocity within the tenant, MRZ/barcode/chip mismatches, metadata markers; forensic detectors NOT_SUPPORTED and reported as such.",
+      "blocker": "No screen/print reproduction (moire) detection.",
+      "next_action": "Measure signal precision during the pilot; add screen-replay detection.",
+      "limitations": []
+    },
+    {
+      "name": "Risk Engine",
+      "critical": true,
+      "status": "COMPLETE",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "PARTIAL",
+      "calibrated": "N/A",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Deterministic, versioned, tighten-only policy; FAIL > REVIEW > PASS; trace stored; uncalibrated face PASS now REVIEW; determinism test added.",
+      "blocker": "Depends on calibrated inputs before any auto-PASS.",
+      "next_action": "Pilot with 100% human review; compare reviewer and engine decisions.",
+      "limitations": []
+    },
+    {
+      "name": "Manual Review",
+      "critical": true,
+      "status": "COMPLETE",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Separate reviewer tokens, REVIEWER/AUDITOR roles, reason codes, optimistic concurrency (409 CASE_CHANGED), approval blockers, audited views; case now shows check results, summary and timeline.",
+      "blocker": "Not used by real reviewers yet.",
+      "next_action": "Run reviewer training on pilot cases.",
+      "limitations": []
+    },
+    {
+      "name": "RLS",
+      "critical": true,
+      "status": "COMPLETE",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "PARTIAL",
+      "calibrated": "N/A",
+      "security_reviewed": "YES",
+      "evidence": "Forced RLS on 25 tenant tables; live PostgreSQL isolation tests and scripts/security_check.py (24/24).",
+      "blocker": "Not verified on the production Cloud SQL instance.",
+      "next_action": "Run scripts/security_check.py against production before launch.",
+      "limitations": []
+    },
+    {
+      "name": "Encryption",
+      "critical": true,
+      "status": "PARTIAL",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "PARTIAL",
+      "evidence": "AES-256-GCM per data class with separate keyrings and rotation; keys come from environment secrets.",
+      "blocker": "No Cloud KMS; production key management unverified.",
+      "next_action": "Move keyrings to Cloud KMS envelope encryption (Phase 19).",
+      "limitations": []
+    },
+    {
+      "name": "Webhooks",
+      "critical": false,
+      "status": "COMPLETE",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "YES",
+      "evidence": "Transactional outbox, HMAC-SHA256 with timestamp, retries, SSRF re-check per delivery.",
+      "blocker": null,
+      "next_action": "Test retries against a real receiver during the pilot.",
+      "limitations": []
+    },
+    {
+      "name": "Workers",
+      "critical": false,
+      "status": "PERFORMANCE_RISK",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "PARTIAL",
+      "calibrated": "N/A",
+      "security_reviewed": "PARTIAL",
+      "evidence": "SKIP LOCKED document worker and webhook worker; OCR is the capacity limit (~24 docs/min on a laptop).",
+      "blocker": null,
+      "next_action": "Re-measure on Cloud Run sizes; add worker backlog metrics.",
+      "limitations": []
+    },
+    {
+      "name": "GCP",
+      "critical": true,
+      "status": "NOT_IMPLEMENTED",
+      "implemented": "NO",
+      "automated_tests": "NO",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "NO",
+      "evidence": "Phase 19 not started; Dockerfile exists but the image build was never verified.",
+      "blocker": "No production deployment.",
+      "next_action": "Build and scan the image; provision Cloud Run, Cloud SQL (private IP), GCS, KMS, Secret Manager.",
+      "limitations": []
+    },
+    {
+      "name": "Monitoring",
+      "critical": true,
+      "status": "PARTIAL",
+      "implemented": "YES",
+      "automated_tests": "YES",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "PARTIAL",
+      "evidence": "Dependency health (/health/ready, /health/dependencies), Prometheus /metrics, alert rules (infra/monitoring).",
+      "blocker": "Not connected to a monitoring system; queue/webhook backlog, KMS and certificate alerts missing.",
+      "next_action": "Wire /metrics into Cloud Monitoring/Prometheus and route alerts to on-call.",
+      "limitations": []
+    },
+    {
+      "name": "Backup",
+      "critical": true,
+      "status": "NOT_IMPLEMENTED",
+      "implemented": "NO",
+      "automated_tests": "NO",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "NO",
+      "evidence": "No backup configuration in the repository.",
+      "blocker": "Database backup not configured.",
+      "next_action": "Enable Cloud SQL automated backups + PITR; define capture-bucket retention.",
+      "limitations": []
+    },
+    {
+      "name": "Restore",
+      "critical": true,
+      "status": "NOT_IMPLEMENTED",
+      "implemented": "NO",
+      "automated_tests": "NO",
+      "real_tested": "NO",
+      "calibrated": "N/A",
+      "security_reviewed": "NO",
+      "evidence": "Restore never tested.",
+      "blocker": "Restore never tested.",
+      "next_action": "Run and document a timed restore drill.",
+      "limitations": []
+    },
+    {
+      "name": "Repository Data Hygiene",
+      "critical": true,
+      "status": "SECURITY_RISK",
+      "implemented": "N/A",
+      "automated_tests": "NO",
+      "real_tested": "N/A",
+      "calibrated": "N/A",
+      "security_reviewed": "NO",
+      "evidence": "The public repository contains real identity-card photos (ID/KhmerID, ID/NSSF) and personal data fragments in BUILD_PROGRESS.md.",
+      "blocker": "Real personal data is published in a public repository.",
+      "next_action": "Make the repository private, remove the files and purge them from git history; keep test data outside the repo.",
+      "limitations": []
+    }
+  ]
+}

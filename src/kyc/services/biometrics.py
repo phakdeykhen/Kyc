@@ -318,11 +318,12 @@ def submit_selfie(db: Session, tenant: TenantContext, session_id: UUID, data: by
     apply_event(db, record, tenant, Event.SELFIE_ACCEPTED, request_id)
     db.flush()
     next_step = "CAPTURE_LIVENESS" if record.status == SessionStatus.LIVENESS_REQUIRED else "AWAIT_ASSESSMENT"
-    reasons = tuple(dict.fromkeys((*live_quality.reason_codes, *reference_quality.reason_codes, *comparison.reason_codes)))
+    reasons = tuple(dict.fromkeys((*live_quality.reason_codes, *reference_quality.reason_codes)))
     return _response(record, live_quality, remaining, accepted=True, reasons=reasons,
                      instructions=(), next_step=next_step,
-                     comparison={"score": comparison.score, "metric": "COSINE_SIMILARITY",
-                                 "result": CheckResult(comparison.decision).value,
+                     # The capturing device never learns the score or the match result: that would let
+                     # an attacker tune selfies against the comparison. The decision comes from the risk engine.
+                     comparison={"recorded": True, "metric": "COSINE_SIMILARITY",
                                  "policy_version": comparison.threshold_policy_version,
                                  "model_name": comparison.model_name, "model_version": comparison.model_version,
                                  "calibrated": comparison.calibrated})

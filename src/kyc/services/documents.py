@@ -10,7 +10,7 @@ Raw OCR text and field values are PII: they never enter checks or audit logs.
 """
 
 import base64
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone
 import logging
 from uuid import UUID
@@ -25,7 +25,7 @@ from kyc.db.session import set_tenant
 from kyc.documents.adapters import adapter_for
 from kyc.documents.preprocess import normalize, prepare_side
 from kyc.documents.field_ocr import read_khmer_fields
-from kyc.documents.refine import refine_numeric_words
+from kyc.documents.refine import installed_languages, refine_numeric_words
 from kyc.documents.requirements import requirement_for
 from kyc.domain.enums import CheckResult, SessionStatus
 from kyc.domain.identity import OCRLine
@@ -156,8 +156,9 @@ class DocumentProcessor:
                 read += [line for line in self.ocr.read_region(prepared, viz, languages, mode=11) if line.text not in seen]
                 read.sort(key=lambda line: (line.bbox[1], line.bbox[0]))
             refinement = getattr(adapter, "numeric_refinement", None)
-            if refinement and set(refinement.languages) <= self.ocr.available_languages():
-                read = refine_numeric_words(self.ocr, prepared, read, refinement)
+            installed = installed_languages(refinement.languages, self.ocr.available_languages()) if refinement else None
+            if refinement and installed:
+                read = refine_numeric_words(self.ocr, prepared, read, replace(refinement, languages=installed))
             region = layout.mrz_regions.get(side) if layout else None
             if layout and getattr(layout, "mrz_on_front", False):
                 # Either upload may be the MRZ side, so both get the MRZ pass (Phase 18 real-card test).

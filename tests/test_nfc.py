@@ -193,7 +193,8 @@ class NFCAPITests(NFCAPICase):
         self.assertEqual(code, 200, result)
         self.assertEqual(result["checks"]["face_match"], "FAIL")
         self.assertEqual(result["checks"]["chip_face_match"], "PASS")
-        self.assertEqual(result["face_comparison"]["score"], 0.1)
+        self.assertEqual(result["face_comparison"]["result"], "FAIL")
+        self.assertIsNone(result["face_comparison"]["score"])  # raw similarity stays with reviewers
         self.assertEqual(result["decision"]["result"], "FAIL")
         self.assertIn("FACE_MISMATCH", result["decision"]["reason_codes"])
 

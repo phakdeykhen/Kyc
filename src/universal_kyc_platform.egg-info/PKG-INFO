@@ -1,0 +1,23 @@
+Metadata-Version: 2.4
+Name: universal-kyc-platform
+Version: 0.18.0
+Summary: Identity verification with document OCR, MRZ, face quality and 1:1 biometrics
+Requires-Python: >=3.12
+Requires-Dist: fastapi<1,>=0.121
+Requires-Dist: starlette<2,>=1.3.1
+Requires-Dist: anyio<5,>=4.14.2
+Requires-Dist: idna<4,>=3.15
+Requires-Dist: python-dotenv<2,>=1.2.2
+Requires-Dist: pydantic<3,>=2.9
+Requires-Dist: pydantic-settings<3,>=2.7
+Requires-Dist: SQLAlchemy<2.1,>=2.0.36
+Requires-Dist: alembic<2,>=1.14
+Requires-Dist: psycopg2-binary<3,>=2.9
+Requires-Dist: uvicorn<1,>=0.32
+Requires-Dist: python-multipart<1,>=0.0.18
+Requires-Dist: numpy<3,>=2.1
+Requires-Dist: pillow<13,>=11
+Requires-Dist: cryptography<51,>=50
+Requires-Dist: zxing-cpp<4,>=2.3
+Requires-Dist: asn1crypto<2,>=1.5
+Requires-Dist: opencv-python-headless<5,>=4.10

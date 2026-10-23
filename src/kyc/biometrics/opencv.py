@@ -8,6 +8,8 @@ import threading
 import numpy as np
 from PIL import Image
 
+from kyc.core.metrics import REGISTRY
+
 from .quality import FaceQualityPolicy, assess_face_quality
 from .types import (
     FaceAssessment, FaceDetection, FaceEmbedding, FaceEngineUnavailable, FaceSource,
@@ -94,6 +96,10 @@ class OpenCVFaceEngine:
         return np.ascontiguousarray(np.asarray(image.convert("RGB"), dtype=np.uint8)[:, :, ::-1])
 
     def detect(self, image: Image.Image) -> list[FaceDetection]:
+        with REGISTRY.timer("kyc_face_seconds", operation="detect"):
+            return self._detect(image)
+
+    def _detect(self, image: Image.Image) -> list[FaceDetection]:
         self._ensure_loaded()
         original = self._bgr(image)
         original_height, original_width = original.shape[:2]
@@ -136,6 +142,10 @@ class OpenCVFaceEngine:
         return assess_face_quality(image, self.detect(image), source, self.quality_policy)
 
     def embed(self, image: Image.Image, detection: FaceDetection) -> FaceEmbedding:
+        with REGISTRY.timer("kyc_face_seconds", operation="embed"):
+            return self._embed(image, detection)
+
+    def _embed(self, image: Image.Image, detection: FaceDetection) -> FaceEmbedding:
         self._ensure_loaded()
         pixels = self._bgr(image)
         if not isinstance(detection, FaceDetection):

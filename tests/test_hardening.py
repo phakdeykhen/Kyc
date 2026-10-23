@@ -37,6 +37,7 @@ from kyc.webhooks.secrets import WebhookSecretCipher
 from tests.helpers import call, multipart
 from tests.test_api import TEST_KEY
 from tests.test_capture_store import keyring
+from tests import calibration_fixtures
 from tests.test_review import ReviewCase
 from tests.test_tenancy import TenantCase
 
@@ -51,7 +52,8 @@ def production(**overrides) -> Settings:
                   capture_encryption_keys=keyring("cap-v1"), pii_encryption_keys=keyring("pii-v1"), pii_hmac_key=key(),
                   biometric_encryption_keys=keyring("bio-v1"), webhook_secret_keys=keyring("wh-v1"),
                   allowed_hosts="kyc.example.com", require_document_consent=True, development_api_key=None,
-                  development_organization_id=None)
+                  development_organization_id=None, face_match_calibration_file=calibration_fixtures.face_file(),
+                  liveness_validation_file=calibration_fixtures.liveness_file(), nfc_enabled=False)
     return Settings(**(values | overrides))
 
 
@@ -71,7 +73,8 @@ class ProductionGateTests(unittest.TestCase):
         message = str(raised.exception)
         for expected in ("DEVELOPMENT_API_KEY", "sslmode", "CAPTURE_ENCRYPTION_KEYS", "PII_ENCRYPTION_KEYS",
                          "BIOMETRIC_ENCRYPTION_KEYS", "WEBHOOK_SECRET_KEYS", "PII_HMAC_KEY", "WEBHOOK_ALLOW_PRIVATE_TARGETS",
-                         "ALLOWED_HOSTS", "REQUIRE_DOCUMENT_CONSENT", "ENABLE_CAPTURE_CLIENT"):
+                         "ALLOWED_HOSTS", "REQUIRE_DOCUMENT_CONSENT", "ENABLE_CAPTURE_CLIENT",
+                         "FACE_MATCH_CALIBRATION_FILE", "LIVENESS_VALIDATION_FILE", "NFC_CSCA_TRUST_STORE"):
             self.assertIn(expected, message)
         self.assertNotIn(password, message)
         self.assertNotIn(TEST_KEY, message)

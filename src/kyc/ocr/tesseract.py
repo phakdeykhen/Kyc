@@ -14,6 +14,7 @@ import subprocess
 
 from PIL import Image
 
+from kyc.core.metrics import REGISTRY
 from kyc.documents.khmer import clean
 from kyc.domain.identity import OCRLine, OCRWord
 
@@ -52,8 +53,9 @@ class TesseractOCREngine:
         if self.tessdata_dir:
             environment["TESSDATA_PREFIX"] = self.tessdata_dir
         try:
-            completed = subprocess.run(arguments, input=payload, capture_output=True, timeout=self.timeout,
-                                       check=True, env=environment)
+            with REGISTRY.timer("kyc_ocr_seconds", engine="tesseract"):
+                completed = subprocess.run(arguments, input=payload, capture_output=True, timeout=self.timeout,
+                                           check=True, env=environment)
         except FileNotFoundError:
             raise OCRUnavailable("Tesseract is not installed.") from None
         except subprocess.TimeoutExpired:

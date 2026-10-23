@@ -109,7 +109,8 @@ class ResultMRZ(BaseModel):
 
 
 class FaceComparisonSummary(BaseModel):
-    score: float = Field(ge=-1, le=1, allow_inf_nan=False, description="Cosine similarity; not an identity probability.")
+    score: float | None = Field(default=None, ge=-1, le=1, allow_inf_nan=False,
+                                description="Withheld from client results: a raw similarity is not an identity probability.")
     metric: Literal["COSINE_SIMILARITY"]
     result: CheckResult
     policy_version: str
@@ -145,6 +146,13 @@ class VerifyResponse(BaseModel):
     decision: ResultDecision
 
 
+class CheckResultItem(BaseModel):
+    check_name: str
+    group: str
+    status: Literal["PASS", "FAIL", "REVIEW", "NOT_SUPPORTED", "NOT_APPLICABLE", "NOT_RUN", "ERROR"]
+    reason_codes: list[str] = Field(default_factory=list)
+
+
 class ResultGovernmentVerification(BaseModel):
     provider: Literal["VERIFY_GOV_KH"] = "VERIFY_GOV_KH"
     status: Literal["PENDING", "LINK_AVAILABLE", "LINK_RESTRICTED", "NO_OFFICIAL_QR", "UNAVAILABLE", "LINK_EXPIRED", "ERASED"]
@@ -168,6 +176,13 @@ class SessionResult(BaseModel):
     decision: ResultDecision | None = Field(default=None, description="Set only by the deterministic risk engine (Phase 13).")
     review: ResultReview | None = Field(default=None, description="Latest manual review outcome (Phase 14), if any.")
     erased_at: datetime | None = Field(default=None, description="Set when personal and biometric data was erased (Phase 17).")
+    final_result: Literal["VERIFIED", "MANUAL_REVIEW", "REJECTED", "EXPIRED", "TECHNICAL_ERROR", "IN_PROGRESS"] = Field(
+        default="IN_PROGRESS", description="TECHNICAL_ERROR is a system failure, never an identity decision; the session stays retryable.")
+    outcome: Literal["PASS", "REVIEW", "FAIL"] | None = Field(default=None, description="Identity decision; None while undecided, expired or after a technical error.")
+    retry_allowed: bool = False
+    end_user_message: str | None = Field(default=None, description="Plain message safe to show the person; never accuses them of fraud.")
+    end_user_message_code: str | None = None
+    check_results: list[CheckResultItem] = Field(default_factory=list, description="Every check with PASS / FAIL / REVIEW / NOT_SUPPORTED / NOT_APPLICABLE / NOT_RUN / ERROR. NOT_RUN is never PASS.")
 
 
 class ConsentRequest(BaseModel):
@@ -234,6 +249,16 @@ class CaptureError(BaseModel):
     retry_allowed: bool | None = None
 
 
+class SelfieComparisonReceipt(BaseModel):
+    """Confirms a comparison was recorded; the score and result are never sent to the capturing device."""
+    recorded: bool
+    metric: Literal["COSINE_SIMILARITY"]
+    policy_version: str
+    model_name: str
+    model_version: str
+    calibrated: bool
+
+
 class SelfieResponse(BaseModel):
     session_id: UUID
     status: SessionStatus
@@ -243,4 +268,4 @@ class SelfieResponse(BaseModel):
     instructions: list[str]
     next_step: str
     attempts_remaining: int
-    comparison: FaceComparisonSummary | None = None
+    comparison: SelfieComparisonReceipt | None = None

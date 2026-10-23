@@ -235,11 +235,17 @@ def assess(frames: list[tuple[int, Image.Image, str]], steps: tuple[str, ...], e
             scores.append(compare_embeddings(reference, embedding, match_policy).score)
             embeddings[frame_number] = embedding
         metrics["identity_frames"] = len(scores)
+        if scores and min(scores) < match_policy.fail_threshold and match_policy.calibrated:
+            # A calibrated "different person" between the selfie and the challenge is a confirmed swap.
+            return LivenessOutcome(CheckResult.FAIL, 0.0, ["LIVENESS_IDENTITY_CHANGED"], False,
+                                   attack_type="FACE_SWAP", steps=step_results, metrics=metrics)
         if scores and min(scores) < match_policy.pass_threshold:
             reasons_out = ["IDENTITY_CONTINUITY_NOT_ESTABLISHED"]
             return LivenessOutcome(CheckResult.REVIEW, round(completed / (len(steps) - 1) * 0.5, 3), reasons_out, False,
                                    attack_type="POSSIBLE_FACE_SWAP", steps=step_results, metrics=metrics)
     else:
+        # Without the selfie template the challenge cannot be bound to the face that is compared
+        # with the document, so a completed challenge is never enough on its own.
         metrics["identity_frames"] = 0
         return LivenessOutcome(CheckResult.REVIEW, score=1.0,
                                reason_codes=["CHALLENGE_COMPLETED", "IDENTITY_CONTINUITY_NOT_ESTABLISHED"],

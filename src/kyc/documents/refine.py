@@ -27,6 +27,20 @@ class NumericRefinement:
     min_digits: int = 3
 
 
+def installed_languages(wanted: tuple[str, ...], available: set[str]) -> tuple[str, ...] | None:
+    """Resolve script models across tessdata layouts: Homebrew installs `script/Khmer`, while the
+    Debian/Ubuntu package used by the container image installs the same model as `Khmer`."""
+    resolved = []
+    for name in wanted:
+        if name in available:
+            resolved.append(name)
+        elif name.startswith("script/") and name.removeprefix("script/") in available:
+            resolved.append(name.removeprefix("script/"))
+        else:
+            return None
+    return tuple(resolved)
+
+
 def _digit_count(text: str) -> int:
     return sum(character.isdigit() for character in text)
 
