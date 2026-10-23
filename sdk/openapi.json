@@ -56,7 +56,7 @@
             "items": {
               "type": "string"
             },
-            "maxItems": 6,
+            "maxItems": 13,
             "minItems": 1,
             "title": "Scopes",
             "type": "array"
@@ -275,6 +275,181 @@
         "title": "ApiKeyView",
         "type": "object"
       },
+      "ApplicationCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "branding": {
+            "$ref": "#/components/schemas/Branding"
+          },
+          "check_fields": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "title": "Check Fields",
+            "type": "array"
+          },
+          "daily_session_quota": {
+            "default": 1000,
+            "maximum": 1000000.0,
+            "minimum": 1.0,
+            "title": "Daily Session Quota",
+            "type": "integer"
+          },
+          "identity_fields": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Identity Fields",
+            "type": "array"
+          },
+          "mode": {
+            "default": "sandbox",
+            "enum": [
+              "sandbox",
+              "production"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "populations": {
+            "items": {
+              "enum": [
+                "STAFF",
+                "CUSTOMER"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "title": "Populations",
+            "type": "array"
+          },
+          "profile_fields": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Profile Fields",
+            "type": "array"
+          },
+          "purposes": {
+            "items": {
+              "enum": [
+                "self_profile",
+                "staff_lookup",
+                "customer_service"
+              ],
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Purposes",
+            "type": "array"
+          },
+          "rate_limit_per_minute": {
+            "default": 120,
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Rate Limit Per Minute",
+            "type": "integer"
+          },
+          "return_urls": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Return Urls",
+            "type": "array"
+          },
+          "workflows": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Workflow"
+            },
+            "maxProperties": 30,
+            "minProperties": 1,
+            "title": "Workflows",
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "workflows",
+          "return_urls",
+          "branding"
+        ],
+        "title": "ApplicationCreate",
+        "type": "object"
+      },
+      "Body_enrollment_frame_v1_face_enrollments_sessions__identifier__frames_post": {
+        "properties": {
+          "frame": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Frame",
+            "type": "string"
+          },
+          "ticket": {
+            "maxLength": 128,
+            "minLength": 32,
+            "title": "Ticket",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket",
+          "frame"
+        ],
+        "title": "Body_enrollment_frame_v1_face_enrollments_sessions__identifier__frames_post",
+        "type": "object"
+      },
+      "Body_frame_v1_face_enrollment_sessions__session_id__frames_post": {
+        "properties": {
+          "frame": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Frame",
+            "type": "string"
+          },
+          "ticket": {
+            "maxLength": 128,
+            "minLength": 32,
+            "title": "Ticket",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket",
+          "frame"
+        ],
+        "title": "Body_frame_v1_face_enrollment_sessions__session_id__frames_post",
+        "type": "object"
+      },
+      "Body_frame_v1_recognition_sessions__session_id__frames_post": {
+        "properties": {
+          "frame": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Frame",
+            "type": "string"
+          },
+          "ticket": {
+            "maxLength": 128,
+            "minLength": 32,
+            "title": "Ticket",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket",
+          "frame"
+        ],
+        "title": "Body_frame_v1_recognition_sessions__session_id__frames_post",
+        "type": "object"
+      },
       "Body_guide_liveness_v1_kyc__session_id__liveness_guide_post": {
         "properties": {
           "baseline": {
@@ -287,8 +462,37 @@
                 "type": "null"
               }
             ],
-            "description": "The frame accepted for step 0",
+            "description": "First accepted neutral frame",
             "title": "Baseline"
+          },
+          "baseline_extra": {
+            "anyOf": [
+              {
+                "items": {
+                  "contentMediaType": "application/octet-stream",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Other accepted neutral frames (at most two)",
+            "title": "Baseline Extra"
+          },
+          "calibration": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opaque advisory neutral calibration for this challenge",
+            "title": "Calibration"
           },
           "challenge_id": {
             "format": "uuid",
@@ -300,6 +504,12 @@
             "description": "Current raw (unmirrored) camera frame",
             "title": "Frame",
             "type": "string"
+          },
+          "holding": {
+            "default": false,
+            "description": "Advisory hysteresis only; never evidence",
+            "title": "Holding",
+            "type": "boolean"
           },
           "nonce": {
             "maxLength": 128,
@@ -335,6 +545,27 @@
           "frame"
         ],
         "title": "Body_position_liveness_v1_kyc__session_id__liveness_position_post",
+        "type": "object"
+      },
+      "Body_recognition_frame_v1_recognition_sessions__identifier__frames_post": {
+        "properties": {
+          "frame": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Frame",
+            "type": "string"
+          },
+          "ticket": {
+            "maxLength": 128,
+            "minLength": 32,
+            "title": "Ticket",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket",
+          "frame"
+        ],
+        "title": "Body_recognition_frame_v1_recognition_sessions__identifier__frames_post",
         "type": "object"
       },
       "Body_upload_back_v1_kyc__session_id__documents_back_post": {
@@ -554,6 +785,28 @@
         "title": "Body_upload_selfie_v1_kyc__session_id__selfie_post",
         "type": "object"
       },
+      "Branding": {
+        "additionalProperties": false,
+        "properties": {
+          "color": {
+            "default": "#164e63",
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "title": "Color",
+            "type": "string"
+          },
+          "display_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "display_name"
+        ],
+        "title": "Branding",
+        "type": "object"
+      },
       "CaptureError": {
         "properties": {
           "attempts_remaining": {
@@ -725,6 +978,79 @@
           "policy_version"
         ],
         "title": "CaptureQuality",
+        "type": "object"
+      },
+      "CaptureReply": {
+        "properties": {
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "held": {
+            "title": "Held",
+            "type": "integer"
+          },
+          "instruction": {
+            "title": "Instruction",
+            "type": "string"
+          },
+          "instructions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Instructions",
+            "type": "array"
+          },
+          "required": {
+            "title": "Required",
+            "type": "integer"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "step_index": {
+            "title": "Step Index",
+            "type": "integer"
+          },
+          "steps_total": {
+            "title": "Steps Total",
+            "type": "integer"
+          },
+          "ticket": {
+            "title": "Ticket",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "expires_at",
+          "step",
+          "instruction",
+          "step_index",
+          "steps_total",
+          "held",
+          "required",
+          "state",
+          "ticket",
+          "instructions"
+        ],
+        "title": "CaptureReply",
         "type": "object"
       },
       "CaptureResponse": {
@@ -904,6 +1230,46 @@
         "title": "ConsentResponse",
         "type": "object"
       },
+      "CredentialCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_in_days": {
+            "default": 90,
+            "maximum": 730.0,
+            "minimum": 1.0,
+            "title": "Expires In Days",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "rate_limit_per_minute": {
+            "default": 120,
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Rate Limit Per Minute",
+            "type": "integer"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Scopes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "scopes"
+        ],
+        "title": "CredentialCreate",
+        "type": "object"
+      },
       "DeliveryView": {
         "properties": {
           "attempts": {
@@ -1014,6 +1380,141 @@
         "title": "DeliveryView",
         "type": "object"
       },
+      "DeviceCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_in_days": {
+            "default": 90,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Expires In Days",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "populations": {
+            "items": {
+              "enum": [
+                "STAFF",
+                "CUSTOMER"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Populations",
+            "type": "array"
+          },
+          "purposes": {
+            "items": {
+              "enum": [
+                "staff_lookup",
+                "customer_service"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Purposes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "populations",
+          "purposes"
+        ],
+        "title": "DeviceCreate",
+        "type": "object"
+      },
+      "DocumentCaptureFeedback": {
+        "properties": {
+          "attempts_remaining": {
+            "minimum": 0.0,
+            "title": "Attempts Remaining",
+            "type": "integer"
+          },
+          "instructions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Instructions",
+            "type": "array"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reason Codes",
+            "type": "array"
+          },
+          "required_sides": {
+            "items": {
+              "enum": [
+                "FRONT",
+                "BACK",
+                "DATA_PAGE"
+              ],
+              "type": "string"
+            },
+            "title": "Required Sides",
+            "type": "array"
+          },
+          "retry_allowed": {
+            "title": "Retry Allowed",
+            "type": "boolean"
+          },
+          "retry_processing_allowed": {
+            "title": "Retry Processing Allowed",
+            "type": "boolean"
+          },
+          "sides": {
+            "additionalProperties": {
+              "enum": [
+                "ACCEPTED",
+                "REQUIRED"
+              ],
+              "type": "string"
+            },
+            "propertyNames": {
+              "enum": [
+                "FRONT",
+                "BACK",
+                "DATA_PAGE"
+              ]
+            },
+            "title": "Sides",
+            "type": "object"
+          },
+          "state": {
+            "enum": [
+              "READY",
+              "PROCESSING",
+              "RECAPTURE",
+              "TECHNICAL_ERROR",
+              "COMPLETE"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "sides",
+          "required_sides",
+          "reason_codes",
+          "instructions",
+          "attempts_remaining",
+          "retry_allowed",
+          "retry_processing_allowed"
+        ],
+        "title": "DocumentCaptureFeedback",
+        "type": "object"
+      },
       "DocumentType": {
         "enum": [
           "KH_NATIONAL_ID",
@@ -1027,6 +1528,34 @@
         ],
         "title": "DocumentType",
         "type": "string"
+      },
+      "DuplicateDecision": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "REJECT",
+              "ALLOW_DISTINCT"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "reason_code": {
+            "enum": [
+              "CONFIRMED_DUPLICATE",
+              "REVIEWED_DISTINCT_PERSONS",
+              "INSUFFICIENT_EVIDENCE"
+            ],
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "reason_code"
+        ],
+        "title": "DuplicateDecision",
+        "type": "object"
       },
       "EndpointCreate": {
         "additionalProperties": false,
@@ -1048,7 +1577,7 @@
             "items": {
               "type": "string"
             },
-            "maxItems": 8,
+            "maxItems": 9,
             "title": "Event Types",
             "type": "array"
           },
@@ -1086,7 +1615,7 @@
                 "items": {
                   "type": "string"
                 },
-                "maxItems": 8,
+                "maxItems": 9,
                 "type": "array"
               },
               {
@@ -1117,6 +1646,18 @@
           "active": {
             "title": "Active",
             "type": "boolean"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
           },
           "consecutive_failures": {
             "title": "Consecutive Failures",
@@ -1199,6 +1740,18 @@
             "title": "Active",
             "type": "boolean"
           },
+          "application_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          },
           "consecutive_failures": {
             "title": "Consecutive Failures",
             "type": "integer"
@@ -1280,6 +1833,54 @@
         "title": "EndpointWithSecret",
         "type": "object"
       },
+      "EnrollmentReply": {
+        "properties": {
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "DUPLICATE_REVIEW"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "message",
+          "expires_at"
+        ],
+        "title": "EnrollmentReply",
+        "type": "object"
+      },
+      "EnrollmentStart": {
+        "additionalProperties": false,
+        "properties": {
+          "consent": {
+            "title": "Consent",
+            "type": "boolean"
+          },
+          "notice_version": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Notice Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "consent",
+          "notice_version"
+        ],
+        "title": "EnrollmentStart",
+        "type": "object"
+      },
       "FaceComparisonSummary": {
         "properties": {
           "calibrated": {
@@ -1324,6 +1925,111 @@
           "calibrated"
         ],
         "title": "FaceComparisonSummary",
+        "type": "object"
+      },
+      "FaceSessionCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "device_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          },
+          "external_subject_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Subject Id"
+          },
+          "population": {
+            "enum": [
+              "STAFF",
+              "CUSTOMER"
+            ],
+            "title": "Population",
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "self_profile",
+              "staff_lookup",
+              "customer_service"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "verification_session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Session Id"
+          }
+        },
+        "required": [
+          "purpose",
+          "population"
+        ],
+        "title": "FaceSessionCreate",
+        "type": "object"
+      },
+      "FaceSessionCreated": {
+        "properties": {
+          "capture_token": {
+            "title": "Capture Token",
+            "type": "string"
+          },
+          "consent_required": {
+            "title": "Consent Required",
+            "type": "boolean"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "population": {
+            "title": "Population",
+            "type": "string"
+          },
+          "purpose": {
+            "title": "Purpose",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "capture_token",
+          "expires_at",
+          "purpose",
+          "population",
+          "consent_required"
+        ],
+        "title": "FaceSessionCreated",
         "type": "object"
       },
       "FraudSignalSummary": {
@@ -1392,6 +2098,189 @@
           "valid"
         ],
         "title": "MRZCheckDigit",
+        "type": "object"
+      },
+      "RecognitionConsent": {
+        "additionalProperties": false,
+        "properties": {
+          "consent": {
+            "const": true,
+            "title": "Consent",
+            "type": "boolean"
+          },
+          "notice_version": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Notice Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "consent",
+          "notice_version"
+        ],
+        "title": "RecognitionConsent",
+        "type": "object"
+      },
+      "RecognitionReply": {
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "MATCHED",
+              "NO_MATCH",
+              "AMBIGUOUS",
+              "RETRY_REQUIRED",
+              "LIVENESS_FAILED",
+              "EXPIRED",
+              "TECHNICAL_ERROR"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "recognition_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recognition Reference"
+          }
+        },
+        "required": [
+          "outcome",
+          "message"
+        ],
+        "title": "RecognitionReply",
+        "type": "object"
+      },
+      "RecognitionResult": {
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "external_subject_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Subject Id"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "outcome": {
+            "enum": [
+              "MATCHED",
+              "NO_MATCH",
+              "AMBIGUOUS",
+              "RETRY_REQUIRED",
+              "LIVENESS_FAILED",
+              "EXPIRED",
+              "TECHNICAL_ERROR"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "recognition_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recognition Reference"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "RecognitionResult",
+        "type": "object"
+      },
+      "RecognitionStart": {
+        "additionalProperties": false,
+        "properties": {
+          "purpose": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Purpose",
+            "type": "string"
+          }
+        },
+        "required": [
+          "purpose"
+        ],
+        "title": "RecognitionStart",
+        "type": "object"
+      },
+      "Reference": {
+        "additionalProperties": false,
+        "properties": {
+          "recognition_reference": {
+            "maxLength": 128,
+            "minLength": 32,
+            "title": "Recognition Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recognition_reference"
+        ],
+        "title": "Reference",
         "type": "object"
       },
       "ResultDecision": {
@@ -1845,6 +2734,16 @@
             "title": "Created At",
             "type": "string"
           },
+          "document_capture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentCaptureFeedback"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "expected_document_type": {
             "$ref": "#/components/schemas/DocumentType"
           },
@@ -2048,6 +2947,27 @@
         "title": "SessionStatus",
         "type": "string"
       },
+      "Simulation": {
+        "additionalProperties": false,
+        "properties": {
+          "outcome": {
+            "enum": [
+              "VERIFIED",
+              "MANUAL_REVIEW",
+              "REJECTED",
+              "EXPIRED",
+              "TECHNICAL_ERROR"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "Simulation",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -2088,6 +3008,104 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VerificationCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "external_subject_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "External Subject Id",
+            "type": "string"
+          },
+          "locale": {
+            "default": "en",
+            "enum": [
+              "en",
+              "km"
+            ],
+            "title": "Locale",
+            "type": "string"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "return_url": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Return Url",
+            "type": "string"
+          },
+          "workflow_id": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Workflow Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "external_subject_id",
+          "workflow_id",
+          "return_url"
+        ],
+        "title": "VerificationCreate",
+        "type": "object"
+      },
+      "VerificationCreated": {
+        "properties": {
+          "capture_expires_at": {
+            "format": "date-time",
+            "title": "Capture Expires At",
+            "type": "string"
+          },
+          "capture_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Token"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "hosted_verification_url": {
+            "title": "Hosted Verification Url",
+            "type": "string"
+          },
+          "sandbox": {
+            "title": "Sandbox",
+            "type": "boolean"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "hosted_verification_url",
+          "expires_at",
+          "capture_expires_at",
+          "sandbox"
+        ],
+        "title": "VerificationCreated",
+        "type": "object"
+      },
       "VerificationLevel": {
         "enum": [
           "DOCUMENT_ONLY",
@@ -2097,6 +3115,134 @@
         ],
         "title": "VerificationLevel",
         "type": "string"
+      },
+      "VerificationResult": {
+        "properties": {
+          "checks": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Checks",
+            "type": "object"
+          },
+          "identity": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Identity",
+            "type": "object"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "VERIFIED",
+                  "MANUAL_REVIEW",
+                  "REJECTED",
+                  "EXPIRED",
+                  "TECHNICAL_ERROR"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "result_version": {
+            "title": "Result Version",
+            "type": "integer"
+          },
+          "sandbox": {
+            "title": "Sandbox",
+            "type": "boolean"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "outcome",
+          "result_version",
+          "sandbox"
+        ],
+        "title": "VerificationResult",
+        "type": "object"
+      },
+      "VerificationStatus": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "external_subject_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Subject Id"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "result_version": {
+            "title": "Result Version",
+            "type": "integer"
+          },
+          "sandbox": {
+            "title": "Sandbox",
+            "type": "boolean"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "workflow_id": {
+            "title": "Workflow Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "external_subject_id",
+          "reference",
+          "workflow_id",
+          "status",
+          "expires_at",
+          "result_version",
+          "sandbox"
+        ],
+        "title": "VerificationStatus",
+        "type": "object"
       },
       "VerifyResponse": {
         "properties": {
@@ -2119,6 +3265,29 @@
         ],
         "title": "VerifyResponse",
         "type": "object"
+      },
+      "Workflow": {
+        "additionalProperties": false,
+        "properties": {
+          "country": {
+            "pattern": "^[A-Z]{2}$",
+            "title": "Country",
+            "type": "string"
+          },
+          "expected_document_type": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "verification_level": {
+            "$ref": "#/components/schemas/VerificationLevel",
+            "default": "DOCUMENT_FACE_LIVENESS"
+          }
+        },
+        "required": [
+          "country",
+          "expected_document_type"
+        ],
+        "title": "Workflow",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -2127,6 +3296,22 @@
         "in": "header",
         "name": "X-API-Key",
         "type": "apiKey"
+      },
+      "DeviceToken": {
+        "description": "Required alongside a face capture token for registered-device captures.",
+        "in": "header",
+        "name": "X-Device-Token",
+        "type": "apiKey"
+      },
+      "FaceActorToken": {
+        "description": "Person-bound account or registered device credential (fri_\u2026). KYC applicant links and API keys are not accepted.",
+        "scheme": "bearer",
+        "type": "http"
+      },
+      "FaceCaptureToken": {
+        "description": "Short-lived face capture token (fct_\u2026) bound to one application, purpose, subject/device and capture session.",
+        "scheme": "bearer",
+        "type": "http"
       },
       "Organization": {
         "description": "Organization UUID; required on every request.",
@@ -2153,6 +3338,26 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/health/face-recognition": {
+      "get": {
+        "operationId": "face_recognition_ready_health_face_recognition_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [],
+        "summary": "Face Recognition Ready",
+        "tags": [
+          "health"
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "operationId": "live_health_live_get",
@@ -2460,6 +3665,942 @@
         ]
       }
     },
+    "/v1/applications": {
+      "get": {
+        "operationId": "applications_v1_applications_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Applications",
+        "tags": [
+          "integrations"
+        ]
+      },
+      "post": {
+        "operationId": "create_application_v1_applications_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplicationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Application",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/applications/{application_id}": {
+      "delete": {
+        "operationId": "disable_application_v1_applications__application_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Application Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disable Application",
+        "tags": [
+          "integrations"
+        ]
+      },
+      "put": {
+        "operationId": "configure_application_v1_applications__application_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Application Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplicationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Configure Application",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/applications/{application_id}/credentials": {
+      "get": {
+        "operationId": "credentials_v1_applications__application_id__credentials_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Application Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Credentials",
+        "tags": [
+          "integrations"
+        ]
+      },
+      "post": {
+        "operationId": "credential_v1_applications__application_id__credentials_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Application Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Credential",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/applications/{application_id}/credentials/{credential_id}": {
+      "delete": {
+        "operationId": "revoke_credential_v1_applications__application_id__credentials__credential_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Application Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Credential",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/applications/{application_id}/devices": {
+      "post": {
+        "operationId": "register_device_v1_applications__application_id__devices_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Application Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Device",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/applications/{application_id}/devices/{device_id}": {
+      "delete": {
+        "operationId": "revoke_device_v1_applications__application_id__devices__device_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Application Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Device Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Device",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/applications/{application_id}/webhooks": {
+      "post": {
+        "operationId": "webhook_v1_applications__application_id__webhooks_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Application Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndpointCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointWithSecret"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Webhook",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
     "/v1/countries": {
       "get": {
         "operationId": "countries_v1_countries_get",
@@ -2610,6 +4751,1192 @@
           }
         },
         "summary": "Document Types"
+      }
+    },
+    "/v1/face-enrollment-sessions": {
+      "post": {
+        "operationId": "enrollment_v1_face_enrollment_sessions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FaceSessionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FaceSessionCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enrollment",
+        "tags": [
+          "integration-face-identity"
+        ]
+      }
+    },
+    "/v1/face-enrollment-sessions/{session_id}/capture": {
+      "post": {
+        "operationId": "begin_capture_v1_face_enrollment_sessions__session_id__capture_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-device-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Device-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RecognitionConsent"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureReply"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceCaptureToken": [],
+            "Organization": []
+          },
+          {
+            "DeviceToken": [],
+            "FaceCaptureToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Begin Capture",
+        "tags": [
+          "integration-face-identity"
+        ]
+      }
+    },
+    "/v1/face-enrollment-sessions/{session_id}/complete": {
+      "post": {
+        "operationId": "complete_v1_face_enrollment_sessions__session_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-device-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Device-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/EnrollmentReply"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RecognitionReply"
+                    }
+                  ],
+                  "title": "Response Complete V1 Face Enrollment Sessions  Session Id  Complete Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceCaptureToken": [],
+            "Organization": []
+          },
+          {
+            "DeviceToken": [],
+            "FaceCaptureToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Complete",
+        "tags": [
+          "integration-face-identity"
+        ]
+      }
+    },
+    "/v1/face-enrollment-sessions/{session_id}/frames": {
+      "post": {
+        "operationId": "frame_v1_face_enrollment_sessions__session_id__frames_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-device-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Device-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_frame_v1_face_enrollment_sessions__session_id__frames_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CaptureReply"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RecognitionReply"
+                    }
+                  ],
+                  "title": "Response Frame V1 Face Enrollment Sessions  Session Id  Frames Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceCaptureToken": [],
+            "Organization": []
+          },
+          {
+            "DeviceToken": [],
+            "FaceCaptureToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Frame",
+        "tags": [
+          "integration-face-identity"
+        ]
+      }
+    },
+    "/v1/face-enrollments/duplicates": {
+      "get": {
+        "operationId": "duplicates_v1_face_enrollments_duplicates_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceActorToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Duplicates",
+        "tags": [
+          "optional-face-identity"
+        ]
+      }
+    },
+    "/v1/face-enrollments/duplicates/{identifier}/resolve": {
+      "post": {
+        "operationId": "resolve_duplicate_v1_face_enrollments_duplicates__identifier__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identifier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DuplicateDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceActorToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Resolve Duplicate",
+        "tags": [
+          "optional-face-identity"
+        ]
+      }
+    },
+    "/v1/face-enrollments/sessions": {
+      "post": {
+        "operationId": "enrollment_session_v1_face_enrollments_sessions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollmentStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureReply"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceActorToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Enrollment Session",
+        "tags": [
+          "optional-face-identity"
+        ]
+      }
+    },
+    "/v1/face-enrollments/sessions/{identifier}/complete": {
+      "post": {
+        "operationId": "enrollment_complete_v1_face_enrollments_sessions__identifier__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identifier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/EnrollmentReply"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RecognitionReply"
+                    }
+                  ],
+                  "title": "Response Enrollment Complete V1 Face Enrollments Sessions  Identifier  Complete Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceActorToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Enrollment Complete",
+        "tags": [
+          "optional-face-identity"
+        ]
+      }
+    },
+    "/v1/face-enrollments/sessions/{identifier}/frames": {
+      "post": {
+        "operationId": "enrollment_frame_v1_face_enrollments_sessions__identifier__frames_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identifier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_enrollment_frame_v1_face_enrollments_sessions__identifier__frames_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CaptureReply"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RecognitionReply"
+                    }
+                  ],
+                  "title": "Response Enrollment Frame V1 Face Enrollments Sessions  Identifier  Frames Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceActorToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Enrollment Frame",
+        "tags": [
+          "optional-face-identity"
+        ]
+      }
+    },
+    "/v1/face-recognition/capabilities": {
+      "get": {
+        "operationId": "capabilities_v1_face_recognition_capabilities_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceActorToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Capabilities",
+        "tags": [
+          "optional-face-identity"
+        ]
+      }
+    },
+    "/v1/integration/capabilities": {
+      "get": {
+        "operationId": "capabilities_v1_integration_capabilities_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Capabilities",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/integration/dashboard": {
+      "get": {
+        "description": "Render behind the client's authenticated admin proxy; secrets are never embedded in this page.",
+        "operationId": "dashboard_v1_integration_dashboard_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dashboard",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/integration/subjects/{external_subject_id}": {
+      "delete": {
+        "operationId": "erase_subject_v1_integration_subjects__external_subject_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "external_subject_id",
+            "required": true,
+            "schema": {
+              "title": "External Subject Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Erase Subject",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/integration/usage": {
+      "get": {
+        "operationId": "usage_v1_integration_usage_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Usage",
+        "tags": [
+          "integrations"
+        ]
       }
     },
     "/v1/kyc/sessions": {
@@ -4640,6 +7967,116 @@
         "summary": "Verify"
       }
     },
+    "/v1/me/face-enrollment": {
+      "delete": {
+        "operationId": "withdraw_v1_me_face_enrollment_delete",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceActorToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Withdraw",
+        "tags": [
+          "optional-face-identity"
+        ]
+      },
+      "get": {
+        "operationId": "enrollment_status_v1_me_face_enrollment_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceActorToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Enrollment Status",
+        "tags": [
+          "optional-face-identity"
+        ]
+      }
+    },
     "/v1/organization": {
       "get": {
         "description": "The calling organization and the credential in use.",
@@ -4717,6 +8154,895 @@
         "summary": "Organization",
         "tags": [
           "organization"
+        ]
+      }
+    },
+    "/v1/recognition-sessions": {
+      "post": {
+        "operationId": "recognition_v1_recognition_sessions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FaceSessionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FaceSessionCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recognition",
+        "tags": [
+          "integration-face-identity"
+        ]
+      }
+    },
+    "/v1/recognition-sessions/{session_id}/capture": {
+      "post": {
+        "operationId": "begin_capture_v1_recognition_sessions__session_id__capture_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-device-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Device-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RecognitionConsent"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureReply"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceCaptureToken": [],
+            "Organization": []
+          },
+          {
+            "DeviceToken": [],
+            "FaceCaptureToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Begin Capture",
+        "tags": [
+          "integration-face-identity"
+        ]
+      }
+    },
+    "/v1/recognition-sessions/{session_id}/complete": {
+      "post": {
+        "operationId": "complete_v1_recognition_sessions__session_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-device-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Device-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecognitionReply"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceCaptureToken": [],
+            "Organization": []
+          },
+          {
+            "DeviceToken": [],
+            "FaceCaptureToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Complete",
+        "tags": [
+          "integration-face-identity"
+        ]
+      }
+    },
+    "/v1/recognition-sessions/{session_id}/frames": {
+      "post": {
+        "operationId": "frame_v1_recognition_sessions__session_id__frames_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-device-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Device-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_frame_v1_recognition_sessions__session_id__frames_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CaptureReply"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RecognitionReply"
+                    }
+                  ],
+                  "title": "Response Frame V1 Recognition Sessions  Session Id  Frames Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceCaptureToken": [],
+            "Organization": []
+          },
+          {
+            "DeviceToken": [],
+            "FaceCaptureToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Frame",
+        "tags": [
+          "integration-face-identity"
+        ]
+      }
+    },
+    "/v1/recognition-sessions/{session_id}/result": {
+      "get": {
+        "operationId": "recognition_result_v1_recognition_sessions__session_id__result_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecognitionResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recognition Result",
+        "tags": [
+          "integration-face-identity"
+        ]
+      }
+    },
+    "/v1/recognition/sessions": {
+      "post": {
+        "operationId": "recognition_session_v1_recognition_sessions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecognitionStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureReply"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceActorToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Recognition Session",
+        "tags": [
+          "optional-face-identity"
+        ]
+      }
+    },
+    "/v1/recognition/sessions/{identifier}/complete": {
+      "post": {
+        "operationId": "recognition_complete_v1_recognition_sessions__identifier__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identifier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecognitionReply"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceActorToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Recognition Complete",
+        "tags": [
+          "optional-face-identity"
+        ]
+      }
+    },
+    "/v1/recognition/sessions/{identifier}/frames": {
+      "post": {
+        "operationId": "recognition_frame_v1_recognition_sessions__identifier__frames_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identifier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_recognition_frame_v1_recognition_sessions__identifier__frames_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CaptureReply"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RecognitionReply"
+                    }
+                  ],
+                  "title": "Response Recognition Frame V1 Recognition Sessions  Identifier  Frames Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceActorToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Recognition Frame",
+        "tags": [
+          "optional-face-identity"
+        ]
+      }
+    },
+    "/v1/recognition/sessions/{identifier}/profile": {
+      "post": {
+        "operationId": "disclose_v1_recognition_sessions__identifier__profile_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identifier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Reference"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceActorToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Disclose",
+        "tags": [
+          "optional-face-identity"
+        ]
+      }
+    },
+    "/v1/recognition/sessions/{identifier}/result": {
+      "get": {
+        "operationId": "result_v1_recognition_sessions__identifier__result_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identifier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-organization-id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Organization-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": true,
+            "schema": {
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecognitionReply"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "FaceActorToken": [],
+            "Organization": []
+          }
+        ],
+        "summary": "Result",
+        "tags": [
+          "optional-face-identity"
         ]
       }
     },
@@ -5282,6 +9608,676 @@
         "summary": "Review Image",
         "tags": [
           "review"
+        ]
+      }
+    },
+    "/v1/verification-sessions": {
+      "post": {
+        "operationId": "create_v1_verification_sessions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 8,
+                  "pattern": "^[A-Za-z0-9._:-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/verification-sessions/{session_id}": {
+      "delete": {
+        "operationId": "erase_v1_verification_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Erase",
+        "tags": [
+          "integrations"
+        ]
+      },
+      "get": {
+        "operationId": "status_v1_verification_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Status",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/verification-sessions/{session_id}/capture-context": {
+      "get": {
+        "operationId": "capture_context_v1_verification_sessions__session_id__capture_context_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
+        "summary": "Capture Context",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/verification-sessions/{session_id}/capture-status": {
+      "get": {
+        "operationId": "capture_status_v1_verification_sessions__session_id__capture_status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "Organization": [],
+            "SessionClientToken": []
+          }
+        ],
+        "summary": "Capture Status",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/verification-sessions/{session_id}/result": {
+      "get": {
+        "operationId": "result_v1_verification_sessions__session_id__result_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Result",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/verification-sessions/{session_id}/sandbox-result": {
+      "post": {
+        "operationId": "simulate_v1_verification_sessions__session_id__sandbox_result_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Simulation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Simulate",
+        "tags": [
+          "integrations"
         ]
       }
     },
@@ -5951,6 +10947,105 @@
           }
         },
         "summary": "Deliveries",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/v1/webhooks/{endpoint_id}/deliveries/{delivery_id}/attempts": {
+      "get": {
+        "operationId": "attempts_v1_webhooks__endpoint_id__deliveries__delivery_id__attempts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpoint_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Endpoint Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "delivery_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Delivery Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Organization-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Organization-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attempts",
         "tags": [
           "webhooks"
         ]

@@ -284,6 +284,12 @@ class KeyRotationTests(WebhookCase):
             db.add(BarcodeResult(organization_id=self.org, session_id=session_id, document_id=document_id,
                                  symbology="QR_CODE", decoded=True, data_consistency={"side": "BACK"},
                                  payload_ciphertext=payload, key_version=version))
+            from kyc.db.models import VerificationDecision
+            snapshot_context = f"field/{self.org}/{session_id}/{document_id}/full_name/normalized"
+            sealed, key = self.cipher.seal("SOK SOPHEA", snapshot_context)
+            db.add(VerificationDecision(organization_id=self.org, session_id=session_id, result_version=1,
+                outcome="MANUAL_REVIEW", encrypted_fields={"full_name": {"value": base64.b64encode(sealed).decode(),
+                    "key": key, "context": snapshot_context}}, identity_delete_after=datetime.now(timezone.utc) + timedelta(days=30)))
         created = await self.endpoint()   # sealed with the PII keyring (no webhook keyring yet)
         factory = sessionmaker(self.engine, expire_on_commit=False)
 
@@ -321,6 +327,9 @@ class KeyRotationTests(WebhookCase):
         only_bio = BiometricCipher(f"biometric-test-v2:{base64.b64encode(new_bio.keys['biometric-test-v2']).decode()}")
         only_store = LocalEncryptedCaptureStore(old_store.root, "capture-test-v2", {"capture-test-v2": new_store.keys["capture-test-v2"]})
         with Session(self.engine) as db:
+            decision = db.scalar(sa.select(VerificationDecision).where(VerificationDecision.organization_id == self.org))
+            envelope = decision.encrypted_fields["full_name"]
+            self.assertEqual(only_pii.open(base64.b64decode(envelope["value"]), envelope["key"], envelope["context"]), "SOK SOPHEA")
             for field in db.scalars(sa.select(DocumentField).where(DocumentField.organization_id == self.org)):
                 value = only_pii.open(field.normalized_value_ciphertext, field.key_version,
                                       f"field/{self.org}/{field.session_id}/{field.document_id}/{field.field_name}/normalized")

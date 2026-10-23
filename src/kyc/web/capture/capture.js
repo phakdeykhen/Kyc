@@ -1,4 +1,6 @@
 "use strict";
+const HOSTED = typeof location !== "undefined" && location.pathname.startsWith("/verify/");
+let hostedContext = null;
 
 // Development capture client. Live hints are advisory only; the API's quality gate decides.
 const TEXT = {
@@ -46,10 +48,14 @@ const frontCamera = () => state.mode === "selfie" || state.mode === "liveness";
 const wait = (ms) => (ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve());
 
 function headers() {
+  if (HOSTED) return { Authorization: `Bearer ${state.captureToken}`, "X-Organization-ID": state.orgId };
   return { "X-API-Key": state.apiKey, "X-Organization-ID": state.orgId };
 }
 
 async function api(path, options = {}) {
+  if (HOSTED && state.session && path === `/v1/kyc/${state.session.session_id}`) {
+    path = `/v1/verification-sessions/${state.session.session_id}/capture-status`;
+  }
   try {
     const response = await fetch(path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
     let body = null;
@@ -70,8 +76,10 @@ function updateButtons() {
   $("liveness-start").disabled = state.busy || state.mode !== "liveness" || !state.stream;
   $("liveness-start").hidden = !!state.live;
   $("liveness-cancel").hidden = !state.live;
-  $("resume-session").disabled = state.busy || state.polling;
-  $("session-form").querySelector('button[type="submit"]').disabled = state.busy || state.polling;
+  if (!HOSTED) {
+    $("resume-session").disabled = state.busy || state.polling;
+    $("session-form").querySelector('button[type="submit"]').disabled = state.busy || state.polling;
+  }
   $("refresh-session").disabled = state.polling || state.busy;
 }
 
@@ -119,12 +127,15 @@ function resetSession() {
 }
 
 function sessionInfo() {
+  if (HOSTED) return;
   $("session-info").hidden = false;
   $("session-info").textContent = `Session ${state.session.session_id} · expires ${new Date(state.session.expires_at).toLocaleTimeString()}`;
 }
 
 // Final outcomes for the person. Reason codes stay with the integrating service, never on this page.
 const OUTCOMES = {
+  TECHNICAL_ERROR: { css: "retry", text: "Verification could not be completed", next: "A technical problem interrupted verification. Contact the service for a new link." },
+  EXPIRED: { css: "retry", text: "Session expired", next: "Ask the service for a new verification link." },
   VERIFIED: { css: "ok", text: "Identity verified", next: "You are done. You can close this page." },
   MANUAL_REVIEW: { css: "retry", text: "Your details are being reviewed",
     next: "A member of staff will check your verification. You can close this page." },
@@ -173,10 +184,10 @@ async function startSession(event) {
 
 async function prepareDocument(documentType = state.session.expected_document_type) {
   const session = state.session;
-  const types = await api("/v1/document-types");
+  const types = HOSTED ? { ok: false } : await api("/v1/document-types");
   if (session !== state.session) return;
   const entry = types.ok && types.body.document_types.find((item) => item.type === documentType);
-  state.sides = entry ? entry.required_sides : (documentType.includes("PASSPORT") ? ["DATA_PAGE"] : ["FRONT", "BACK"]);
+  state.sides = HOSTED ? hostedContext.required_sides : entry ? entry.required_sides : (documentType.includes("PASSPORT") ? ["DATA_PAGE"] : ["FRONT", "BACK"]);
   state.current = state.sides[0];
   $("frame").style.setProperty("--doc-ratio", state.sides[0] === "DATA_PAGE" ? "1.42" : "1.586");
   setMode("document");
@@ -231,8 +242,8 @@ async function followSession() {
     stopCamera();
     state.current = null;
     setMode("processing");
-    $("processing-info").textContent = "Next, read your passport chip with the mobile app. Hold the passport against the back of your phone when the app asks.";
-    $("next").textContent = "Chip reading needs the mobile app. Use Check progress after the app has finished.";
+    $("processing-info").textContent = "This workflow requires a passport chip read. This browser cannot read ePassport chips. Continue on an authorized NFC capture device or contact the service that sent you here.";
+    $("next").textContent = "Chip verification remains required. Use Check progress after an authorized device has finished.";
   } else if (status === "DOCUMENT_PROCESSING") {
     stopCamera();
     setMode("processing");
@@ -253,7 +264,7 @@ async function followSession() {
     stopCamera();
     state.current = null;
     setMode("done");
-    const result = await api(`/v1/kyc/${state.session.session_id}/result`);
+    const result = HOSTED ? { ok: true, body: {} } : await api(`/v1/kyc/${state.session.session_id}/result`);
     if (session !== state.session) return;
     if (!result.ok) return showError(result);
     $("result").hidden = false;
@@ -264,6 +275,14 @@ async function followSession() {
     $("instructions").replaceChildren();
     $("scores").replaceChildren();
     $("next").textContent = outcome ? outcome.next : "Additional verification or review is still required before an identity decision.";
+    if (HOSTED) {
+      $("setup").hidden = true;
+      $("hosted-recovery").hidden = true;
+      if (hostedContext.return_url) {
+        $("return-link").href = hostedContext.return_url;
+        $("return-link").hidden = false;
+      }
+    }
   }
 }
 
@@ -780,19 +799,20 @@ function showError(result) {
   }
 }
 
-$("session-form").addEventListener("submit", startSession);
+if (!HOSTED) $("session-form").addEventListener("submit", startSession);
 
 // Development convenience: a link ending in #key=…&org=… pre-fills the form (e.g. from a QR code on
 // the operator's screen). The fragment is never sent to any server, and it is removed from the
 // address bar and this history entry at once.
 (function prefillFromFragment() {
+  if (HOSTED) return;
   if (typeof location === "undefined" || !location.hash || location.hash.length < 2) return;
   const params = new URLSearchParams(location.hash.slice(1));
   if (params.get("key")) $("api-key").value = params.get("key");
   if (params.get("org")) $("org-id").value = params.get("org");
   if (typeof history !== "undefined" && history.replaceState) history.replaceState(null, "", location.pathname);
 })();
-$("resume-session").addEventListener("click", resumeSession);
+if (!HOSTED) $("resume-session").addEventListener("click", resumeSession);
 $("refresh-session").addEventListener("click", refreshSession);
 $("biometric-consent").addEventListener("change", updateButtons);
 $("document-consent").addEventListener("change", updateButtons);
@@ -813,3 +833,50 @@ $("selfie-file").addEventListener("change", (event) => {
   if (file) submitSelfie(file);
 });
 window.addEventListener("pagehide", () => { stopPolling(); stopCamera(); });
+
+if (HOSTED) (async function loadHostedSession() {
+  const identifier = location.pathname.split("/").filter(Boolean).at(-1);
+  if (!/^[0-9a-f-]{36}$/i.test(identifier)) return showError({ status: 404, body: { detail: "Verification session not found." } });
+  const storageKey = `kyc-capture/${identifier}`;
+  try {
+    const fragment = new URLSearchParams(location.hash.slice(1));
+    const saved = JSON.parse(sessionStorage.getItem(storageKey) || "null");
+    const token = fragment.get("token") || saved?.token;
+    const organization = fragment.get("organization") || saved?.organization;
+    if (!token?.startsWith("kst_") || !organization) throw new Error("Open the verification link provided by your service.");
+    state.captureToken = token;
+    state.orgId = organization;
+    sessionStorage.setItem(storageKey, JSON.stringify({ token, organization }));
+    history.replaceState(null, "", location.pathname);
+    const context = await api(`/v1/verification-sessions/${identifier}/capture-context`);
+    if (!context.ok) throw new Error(context.status === 401 ? "This link has expired. Ask the service for a new verification link." : "Unable to load this verification. Try again.");
+    hostedContext = context.body;
+    document.documentElement.lang = hostedContext.locale;
+    $("tenant-name").textContent = hostedContext.branding.display_name;
+    document.documentElement.style.setProperty("--accent", hostedContext.branding.color);
+    $("environment-label").textContent = hostedContext.sandbox ? "SANDBOX · simulation" : "Identity verification";
+    $("hosted-notice").textContent = hostedContext.sandbox
+      ? "Sandbox: use synthetic test images only. Results here are simulations and cannot be used as production verification."
+      : hostedContext.locale === "km" ? "សូមផ្តល់ការយល់ព្រម រួចថតឯកសារ និងមុខរបស់អ្នក។" : "Give your consent, then capture your document and face.";
+    if (hostedContext.locale === "km") {
+      const labels = { "selfie-title": "ថតរូបមុខរបស់អ្នក", "liveness-title": "បញ្ជាក់ថាអ្នកកំពុងនៅទីនេះ",
+        "processing-title": "កំពុងពិនិត្យឯកសាររបស់អ្នក", "result-title": "លទ្ធផល", "shoot": "ថតរូបឯកសារ",
+        "selfie-shoot": "ថតរូបមុខ", "liveness-start": "ខ្ញុំរួចរាល់ហើយ", "liveness-cancel": "បោះបង់",
+        "refresh-session": "ពិនិត្យស្ថានភាព", "return-link": "ត្រឡប់ទៅប្រព័ន្ធដើម", "liveness-restart": "ចាប់ផ្តើមម្តងទៀត",
+        "hosted-recovery": "ប្រសិនបើការតភ្ជាប់ដាច់ សូមផ្ទុកទំព័រនេះឡើងវិញ ដើម្បីបន្តមុនពេលតំណផុតកំណត់។" };
+      for (const [id, label] of Object.entries(labels)) $(id).textContent = label;
+      $("document-consent").parentElement.querySelector("span").textContent = "ខ្ញុំយល់ព្រមឱ្យប្រើរូបថតឯកសារ និងព័ត៌មានក្នុងឯកសារ ដើម្បីផ្ទៀងផ្ទាត់អត្តសញ្ញាណរបស់ខ្ញុំ។ ទិន្នន័យត្រូវបានអ៊ិនគ្រីប និងរក្សាទុកតាមគោលការណ៍របស់វគ្គនេះ។";
+      $("biometric-consent").parentElement.querySelector("span").textContent = "ខ្ញុំយល់ព្រមឱ្យប្រើរូបថតមុខ និងទិន្នន័យជីវមាត្រដែលបានអ៊ិនគ្រីប ដើម្បីប្រៀបធៀបមុខរបស់ខ្ញុំជាមួយឯកសារអត្តសញ្ញាណ។";
+      OUTCOMES.VERIFIED = { css: "ok", text: "អត្តសញ្ញាណត្រូវបានផ្ទៀងផ្ទាត់", next: "បានបញ្ចប់។ អ្នកអាចត្រឡប់ទៅប្រព័ន្ធដើមបាន។" };
+      OUTCOMES.MANUAL_REVIEW = { css: "retry", text: "ព័ត៌មានរបស់អ្នកកំពុងត្រូវបានត្រួតពិនិត្យ", next: "បុគ្គលិកនឹងពិនិត្យការផ្ទៀងផ្ទាត់របស់អ្នក។" };
+      OUTCOMES.REJECTED = { css: "retry", text: "មិនអាចផ្ទៀងផ្ទាត់អត្តសញ្ញាណបានទេ", next: "សូមទាក់ទងប្រព័ន្ធដែលបានផ្ញើតំណនេះឱ្យអ្នក។" };
+    }
+    const response = await api(`/v1/verification-sessions/${identifier}/capture-status`);
+    if (!response.ok) throw new Error("This verification is unavailable or expired. Ask the service for a new link.");
+    state.session = response.body;
+    await followSession();
+  } catch (error) {
+    stopCamera();
+    showError({ status: 0, body: { detail: error.message || "Unable to continue this verification." } });
+  }
+})();

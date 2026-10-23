@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     webhook_secret_overlap_hours: int = Field(default=24, ge=0, le=168)
     webhook_delivery_retention_days: int = Field(default=30, ge=1, le=365)
     session_ttl_seconds: int = Field(default=900, ge=60, le=3600)
+    integration_public_base_url: str = "https://kyc.example.invalid"
+    integration_capture_ttl_seconds: int = Field(default=600, ge=60, le=900)
+    # Independent release gate; face identification still requires its signed calibration policy.
+    integration_kyc_production_enabled: bool = False
     db_pool_size: int = Field(default=5, ge=1, le=20)
     db_max_overflow: int = Field(default=5, ge=0, le=20)
     # Phase 18 admission control: API requests in flight per process (0: pool capacity minus a
@@ -65,6 +69,14 @@ class Settings(BaseSettings):
     max_liveness_bytes: int = Field(default=16 * 1024 * 1024, ge=500_000, le=64 * 1024 * 1024)
     liveness_policy_version: str = Field(default="ACTIVE-GEOMETRY-2026.10.22", min_length=1, max_length=80)
     liveness_calibrated: bool = False
+    # Optional 1:N identity is independently disabled, keyed, provisioned and approved.
+    face_recognition_enabled: bool = False
+    face_recognition_database_url: SecretStr | None = None
+    face_recognition_keys: SecretStr | None = None
+    face_recognition_policy: Path | None = None
+    face_recognition_approval_key: Path | None = None
+    face_recognition_ledger_path: Path | None = None
+    face_recognition_ledger_key: SecretStr | None = None
     # Phase 11 ePassport chip. Directory of trusted CSCA certificates (PEM/DER), e.g. from the ICAO PKD.
     nfc_csca_trust_store: Path | None = None
     nfc_challenge_ttl_seconds: int = Field(default=120, ge=30, le=600)
@@ -97,6 +109,17 @@ class Settings(BaseSettings):
     gcs_capture_bucket: str | None = None
     gcs_biometric_bucket: str | None = None
     pubsub_topic: str | None = None
+
+    @field_validator("integration_public_base_url")
+    @classmethod
+    def public_origin(cls, value):
+        from urllib.parse import urlsplit
+        parts = urlsplit(value)
+        if (parts.scheme != "https" or not parts.hostname or parts.username or parts.password
+                or parts.query or parts.fragment or parts.path not in ("", "/")
+                or any(ord(c) <= 32 for c in value) or "\\" in value):
+            raise ValueError("INTEGRATION_PUBLIC_BASE_URL must be an HTTPS origin without credentials, path or query.")
+        return value.rstrip("/")
 
     @field_validator("face_match_calibration_reference", mode="before")
     @classmethod

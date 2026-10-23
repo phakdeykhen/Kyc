@@ -1,0 +1,39 @@
+{
+  "locked_at": "REPLACE_WITH_PREDECLARED_UTC_TIMESTAMP",
+  "policy": {
+    "version": "REPLACE_AFTER_DEVELOPMENT_CALIBRATION",
+    "populations": ["STAFF", "CUSTOMER"],
+    "model_name": "OpenCV SFace",
+    "model_version": "2021dec",
+    "model_sha256": "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79",
+    "identification_threshold": null,
+    "ambiguity_margin": null,
+    "duplicate_threshold": null,
+    "verification_threshold": null,
+    "movement": null,
+    "max_population": null,
+    "retention_days": null,
+    "backup_retention_days": null,
+    "notice_version": "REPLACE_WITH_APPROVED_BILINGUAL_NOTICE",
+    "visibility_provider": "REPLACE_WITH_VALIDATED_PROVIDER",
+    "session_seconds": 120
+  },
+  "minimum_independent_trials": null,
+  "maximum_error_rates": {
+    "fpir": null,
+    "fnir": null,
+    "ambiguity_rate": null,
+    "retry_rate": null,
+    "pad_attack_acceptance": null,
+    "pad_genuine_rejection": null,
+    "verification_false_acceptance": null,
+    "verification_false_rejection": null
+  },
+  "maximum_end_to_end_p95_ms": null,
+  "supported_conditions": {
+    "camera": [],
+    "lighting": [],
+    "appearance": [],
+    "user_group": []
+  }
+}

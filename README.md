@@ -5,6 +5,20 @@ and verification evidence are recorded in the [correctness review](docs/kyc-revi
 and [production readiness report](docs/production-readiness-2026-10-07.md).
 Production readiness remains **NOT_READY** pending the release gates in those reports.
 
+External integrations now have application credentials, configured workflows and callbacks,
+hosted capture at `/verify/{id}`, versioned `/v1/verification-sessions` results, scoped
+webhooks, quotas, registered devices and optional face-session APIs. See the
+[integration quick start, backend/receiver examples and release blockers](docs/integration-service.md).
+Production KYC and face identification keep independent, closed release gates.
+
+Optional face enrollment and future 1:N recognition are implemented behind a separate,
+disabled readiness gate. See [face identity setup, APIs, privacy and readiness](docs/face-identity.md).
+Enrollment requires an authenticated account linked to a final VERIFIED KYC result;
+it never uses the original selfie without fresh consent/capture. The existing detector
+does not verify occlusion, and no approved identification calibration is supplied,
+so production recognition remains blocked. User and device screens are `/face/enroll`,
+`/face/scan` and `/face/kiosk`. No recognition event changes a KYC verdict.
+
 Phase 1 implements the architecture contracts, a 17-table PostgreSQL schema with
 tenant policies, a frozen Alembic migration, and the KYC session state machine.
 

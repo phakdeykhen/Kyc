@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Verify your identity</title>
+  <link rel="stylesheet" href="/verify-assets/capture.css">
+</head>
+<body>
+  <header class="bar">
+    <strong id="tenant-name">Identity verification</strong>
+    <span id="environment-label" class="tag">Secure capture</span>
+  </header>
+
+  <main class="layout">
+<section class="panel" id="setup"><h1>Verify your identity</h1><p id="hosted-notice" role="status">Loading secure session…</p></section>
+    <section class="panel" id="selfie" aria-labelledby="selfie-title" hidden>
+      <h1 id="selfie-title">3. Capture your face</h1>
+      <p class="muted">Use a recent photo of yourself. Face the camera, keep both eyes visible, remove anything covering your face, and use even light.</p>
+      <div class="stage selfie-stage">
+        <video id="selfie-video" playsinline muted></video>
+        <div class="frame face-frame" id="selfie-frame" aria-hidden="true"><span></span></div>
+        <p class="hint" id="selfie-hint" role="status">Starting camera…</p>
+      </div>
+      <label class="consent">
+        <input type="checkbox" id="biometric-consent">
+        <span>I consent to processing my face photo and creating encrypted biometric templates to compare my selfie with my identity document. The photo and templates are subject to this session's retention policy.</span>
+      </label>
+      <div class="actions">
+        <button type="button" class="primary" id="selfie-shoot" disabled>Take selfie</button>
+        <label class="secondary file" id="selfie-upload-label">Upload a selfie<input type="file" id="selfie-file" accept="image/jpeg,image/png,image/webp" disabled></label>
+      </div>
+      <p class="muted small">The outline helps you position your face. Photo quality and face comparison are checked after submission.</p>
+    </section>
+
+    <section class="panel" id="liveness" aria-labelledby="liveness-title" hidden>
+      <h1 id="liveness-title">4. Show that you are present</h1>
+      <div class="tips" id="liveness-tips">
+        <p class="muted">You'll be asked to move your head in a few directions, one at a time. Each step moves on as soon as you've done it. Photos from this step are checked and then discarded.</p>
+        <ul>
+          <li>Look at your camera and hold the phone at eye level.</li>
+          <li>Use light that isn't too dim or too bright.</li>
+          <li>Keep your eyes, nose and mouth visible: no sunglasses, mask or hat.</li>
+          <li>Make sure nobody else, and no photo of a face, is in view.</li>
+          <li>Move your head, not the phone.</li>
+        </ul>
+      </div>
+      <ol class="step-dots" id="liveness-dots" aria-label="Progress" hidden></ol>
+      <div class="stage selfie-stage">
+        <video id="liveness-video" playsinline muted></video>
+        <div class="frame face-frame" id="liveness-frame" aria-hidden="true"><span></span></div>
+        <div class="cue" id="liveness-cue" aria-hidden="true" hidden></div>
+        <div class="step-meter" id="liveness-meter" aria-hidden="true" hidden><i id="liveness-meter-fill"></i></div>
+        <p class="hint" id="liveness-hint" role="status">Starting camera…</p>
+      </div>
+      <p class="liveness-step" id="liveness-step" aria-live="assertive"></p>
+      <p class="liveness-coach muted" id="liveness-coach" aria-live="polite"></p>
+      <div class="help-card" id="liveness-help" role="alertdialog" aria-labelledby="liveness-help-title" hidden>
+        <h2 id="liveness-help-title">Having trouble?</h2>
+        <ul id="liveness-help-tips"></ul>
+        <div class="actions">
+          <button type="button" class="primary" id="liveness-retry-step">Try this step again</button>
+          <button type="button" class="secondary" id="liveness-restart">Start over</button>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="primary" id="liveness-start" disabled>I'm ready</button>
+        <button type="button" class="secondary" id="liveness-cancel" hidden>Cancel</button>
+      </div>
+    </section>
+
+    <section class="panel" id="processing" aria-labelledby="processing-title" hidden>
+      <h1 id="processing-title">Checking your document</h1>
+      <p id="processing-info" class="muted" role="status">Please wait while your document is processed.</p>
+      <button type="button" class="secondary" id="refresh-session">Check progress</button>
+    </section>
+
+    <section class="panel" id="capture" aria-labelledby="capture-title" hidden>
+      <h1 id="capture-title">2. Capture <span id="side-label">FRONT</span></h1>
+      <ol class="sides" id="sides"></ol>
+      <div class="stage">
+        <video id="video" playsinline muted></video>
+        <div class="frame" id="frame" aria-hidden="true"><span></span></div>
+        <p class="hint" id="hint" role="status">Starting camera…</p>
+      </div>
+      <label class="consent">
+        <input type="checkbox" id="document-consent">
+        <span>I consent to processing photos of my identity document and the details read from it to verify my identity. They are encrypted and subject to this session's retention policy.</span>
+      </label>
+      <div class="actions">
+        <button type="button" class="primary" id="shoot" disabled>Take photo</button>
+        <label class="secondary file">Upload a photo<input type="file" id="file" accept="image/jpeg,image/png,image/webp"></label>
+      </div>
+      <p class="muted small">Place the document on a plain, darker surface. Keep all four corners inside the frame, avoid glare, and hold the phone parallel to the document.</p>
+    </section>
+
+    <section class="panel" id="result" aria-labelledby="result-title" hidden>
+      <h1 id="result-title">Result</h1>
+      <div id="verdict" class="verdict" role="status"></div>
+      <ul id="instructions" class="instructions"></ul>
+      <dl id="scores" class="scores"></dl>
+      <p id="next" class="muted"></p>
+    </section>
+  </main>
+  <p class="panel" id="hosted-recovery">Connection lost? Reload this page to continue while your capture token is valid.</p><a class="panel" id="return-link" hidden>Return to the service</a><script src="/verify-assets/capture.js"></script>
+</body>
+</html>

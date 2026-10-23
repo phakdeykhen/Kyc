@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 
 from kyc.db.models import BiometricTemplate, DocumentImage, FaceQualityCheck, IdentityDocument, SelfieCapture, WebhookDelivery
+from kyc.db.models import VerificationDecision, IntegrationUsage
 from kyc.db.session import set_tenant
 from kyc.storage.captures import CaptureStore
 
@@ -54,6 +55,10 @@ def purge_organization(factory: sessionmaker, store: CaptureStore, organization_
         deliveries = db.execute(sa.delete(WebhookDelivery).where(
             WebhookDelivery.organization_id == organization_id, WebhookDelivery.status != "PENDING",
             WebhookDelivery.created_at <= now - webhook_retention)).rowcount
+        db.execute(sa.update(VerificationDecision).where(VerificationDecision.organization_id == organization_id,
+            VerificationDecision.identity_delete_after <= now).values(encrypted_fields={}))
+        db.execute(sa.delete(IntegrationUsage).where(IntegrationUsage.organization_id == organization_id,
+                                                   IntegrationUsage.expires_at <= now))
         db.flush()
         live = set(db.scalars(sa.select(DocumentImage.encrypted_object_ref)
                               .where(DocumentImage.organization_id == organization_id)).all())

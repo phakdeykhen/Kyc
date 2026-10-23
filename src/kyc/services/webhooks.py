@@ -26,6 +26,7 @@ def _aware(value: datetime | None) -> datetime | None:
 
 def endpoint_view(row: WebhookEndpoint) -> dict:
     return {"id": row.id, "url": row.url, "description": row.description, "event_types": sorted(row.event_types),
+            "application_id": row.application_id,
             "active": row.active, "created_at": _aware(row.created_at), "disabled_at": _aware(row.disabled_at),
             "consecutive_failures": row.consecutive_failures,
             "previous_secret_expires_at": _aware(row.previous_secret_expires_at)}
@@ -78,7 +79,8 @@ def list_endpoints(db: Session, organization_id: UUID, include_deleted: bool = F
 
 
 def create_endpoint(db: Session, tenant: TenantContext, url: str, event_types: list[str], description: str | None,
-                    cipher: WebhookSecretCipher | None, allow_private: bool, request_id: UUID) -> tuple[WebhookEndpoint, str]:
+                    cipher: WebhookSecretCipher | None, allow_private: bool, request_id: UUID,
+                    application_id: UUID | None = None) -> tuple[WebhookEndpoint, str]:
     cipher = _require_cipher(cipher)
     count = db.scalar(sa.select(sa.func.count()).select_from(WebhookEndpoint).where(
         WebhookEndpoint.organization_id == tenant.organization_id, WebhookEndpoint.active.is_(True)))
@@ -88,7 +90,7 @@ def create_endpoint(db: Session, tenant: TenantContext, url: str, event_types: l
     secret = new_signing_secret()
     row = WebhookEndpoint(id=uuid4(), organization_id=tenant.organization_id, url=url, description=description,
                           event_types=_check_events(event_types), active=True, created_by=tenant.actor_id,
-                          created_at=datetime.now(timezone.utc))
+                          created_at=datetime.now(timezone.utc), application_id=application_id)
     row.secret_ciphertext, row.key_version = _seal(cipher, row, secret)
     db.add(row)
     db.flush()
@@ -103,6 +105,10 @@ def update_endpoint(db: Session, tenant: TenantContext, endpoint_id: UUID, chang
     if not row.active:
         raise HTTPException(409, detail="This endpoint was deleted; create a new one.")
     if "url" in changes:
+        if row.application_id is not None:
+            from kyc.integrations.service import destination
+            destination(changes["url"])
+            allow_private = False
         _check_target(changes["url"], allow_private)
         row.url = changes["url"]
     if "event_types" in changes:

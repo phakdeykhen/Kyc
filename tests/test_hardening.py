@@ -566,7 +566,11 @@ class WebhookKeyringTests(unittest.TestCase):
 
 class PrivilegeMatrixTests(unittest.TestCase):
     def test_every_table_is_declared_and_append_only_tables_stay_append_only(self):
-        self.assertEqual(set(Base.metadata.tables), set(TABLE_PRIVILEGES) - {"alembic_version"})
+        from kyc.db.privileges import FACE_TABLE_PRIVILEGES
+        self.assertEqual(set(Base.metadata.tables), (set(TABLE_PRIVILEGES) | set(FACE_TABLE_PRIVILEGES)) - {"alembic_version"})
+        self.assertNotIn("face_templates", TABLE_PRIVILEGES)
+        self.assertNotIn("face_capture_sessions", TABLE_PRIVILEGES)
+        self.assertEqual(FACE_TABLE_PRIVILEGES["face_recognition_events"], "SELECT INSERT")
         for table in APPEND_ONLY:
             self.assertFalse({"UPDATE", "DELETE", "TRUNCATE"} & TABLE_PRIVILEGES[table], table)
             self.assertNotIn(table, COLUMN_UPDATES)

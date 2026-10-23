@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from kyc.api.dependencies import TenantContext
 from kyc.api.schemas import DocumentCaptureFeedback, SessionCreate, SessionResponse
-from kyc.db.models import AuditLog, KYCSession, Organization
+from kyc.db.models import AuditLog, KYCSession, Organization, VerificationBinding
 from kyc.domain.enums import SessionStatus
 from kyc.domain.state_machine import Event, TERMINAL_STATUSES, VerificationEvidence, can_expire, transition
 from kyc.tenancy.keys import CLIENT_TOKEN_PREFIX, new_secret
@@ -108,6 +108,10 @@ def get_session(db: Session, tenant: TenantContext, session_id: UUID, request_id
     when they must record the session's expiry (Phase 18: status polls no longer queue on the
     row lock behind uploads and processing)."""
     query = sa.select(KYCSession).where(KYCSession.id == session_id, KYCSession.organization_id == tenant.organization_id)
+    if tenant.application_id is not None:
+        query = query.where(sa.exists(sa.select(VerificationBinding.id).where(
+            VerificationBinding.organization_id == tenant.organization_id,
+            VerificationBinding.session_id == KYCSession.id, VerificationBinding.application_id == tenant.application_id)))
     record = db.scalar(query.with_for_update() if lock else query)
     if record is None:
         raise HTTPException(404, detail="Session not found.")
@@ -126,6 +130,10 @@ def apply_event(db: Session, record: KYCSession, tenant: TenantContext, event: E
     """Internal orchestrator operation; callers must load the row under FOR UPDATE."""
     if record.organization_id != tenant.organization_id:
         raise HTTPException(404, detail="Session not found.")
+    binding = db.scalar(sa.select(VerificationBinding).where(VerificationBinding.organization_id == record.organization_id,
+                                                            VerificationBinding.session_id == record.id))
+    if binding and binding.technical_error and event != Event.EXPIRE:
+        raise HTTPException(409, detail="Verification closed with TECHNICAL_ERROR.")
     previous = record.status
     if event != Event.EXPIRE and is_expired(record):
         # The worker transaction owner must commit this EXPIRE event and stop processing.

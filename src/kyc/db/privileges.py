@@ -37,17 +37,51 @@ TABLE_PRIVILEGES: dict[str, frozenset[str]] = {name: frozenset(privileges.split(
     "api_keys": "SELECT INSERT",                      # Phase 15; + column UPDATE below
     "webhook_endpoints": "SELECT INSERT UPDATE",      # Phase 16
     "webhook_deliveries": "SELECT INSERT UPDATE DELETE",
+    "webhook_attempts": "SELECT INSERT",
+    "applications": "SELECT INSERT UPDATE",
+    "external_subjects": "SELECT INSERT UPDATE",
+    "verification_bindings": "SELECT INSERT UPDATE",
+    "verification_decisions": "SELECT INSERT",  # encryption envelopes may only be cleared/resealed
+    "integration_usage": "SELECT INSERT UPDATE DELETE",
+    "registered_devices": "SELECT INSERT UPDATE",
+    "integration_face_sessions": "SELECT INSERT UPDATE",
+    # Only metadata needed by scoped KYC erasure, never enrollment/sample ciphertext.
+    "face_subjects": "SELECT",
+    "face_enrollments": "SELECT",
 }.items()}
 
 # Column-level UPDATE where the row is otherwise immutable for the API.
 COLUMN_UPDATES: dict[str, tuple[str, ...]] = {
+    "verification_decisions": ("encrypted_fields",),
     "api_keys": ("last_used_at", "revoked_at"),
     "consents": ("revoked_at", "user_id"),            # Phase 17: revocation and pseudonymised erasure
 }
 
 # Records that must never be rewritten or removed by the API role.
 APPEND_ONLY = ("audit_logs", "risk_assessments", "manual_reviews")
-SECURITY_DEFINER_FUNCTIONS = ("erase_review_notes(uuid)",)
+SECURITY_DEFINER_FUNCTIONS = ("erase_review_notes(uuid)", "erase_face_identity(uuid)")
+
+# A separate login/connection for the biometric service; never a client credential.
+FACE_ROLE = "kyc_biometrics"
+FACE_TABLE_PRIVILEGES = {
+    "verification_bindings": "SELECT",
+    "organizations": "SELECT", "kyc_sessions": "SELECT", "biometric_templates": "SELECT",
+    "face_subjects": "SELECT INSERT UPDATE", "face_actors": "SELECT INSERT UPDATE",
+    "face_consents": "SELECT INSERT UPDATE", "face_enrollments": "SELECT INSERT UPDATE",
+    "face_templates": "SELECT INSERT UPDATE DELETE", "face_capture_sessions": "SELECT INSERT UPDATE DELETE",
+    "face_sample_receipts": "SELECT INSERT DELETE", "face_recognition_events": "SELECT INSERT",
+    "face_deletions": "SELECT INSERT UPDATE",
+}
+
+
+def face_grant_statements(role=FACE_ROLE, schema="public"):
+    namespace, target = _identifier(schema), _identifier(role)
+    statements = [f'REVOKE ALL ON ALL TABLES IN SCHEMA {namespace} FROM {target}',
+                  f'REVOKE CREATE ON SCHEMA {namespace} FROM {target}',
+                  f'GRANT USAGE ON SCHEMA {namespace} TO {target}']
+    for table, permissions in FACE_TABLE_PRIVILEGES.items():
+        statements.append(f'GRANT {", ".join(permissions.split())} ON {namespace}.{_identifier(table)} TO {target}')
+    return statements
 
 
 def _identifier(value: str) -> str:

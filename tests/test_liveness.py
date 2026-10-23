@@ -912,7 +912,8 @@ class LivenessAPITests(BiometricAPICase):
             self.assertEqual(db.scalar(sa.select(LivenessChallenge.organization_id)), self.org)
 
 
-FIXTURE = Path(os.environ.get("KYC_FACE_NATIVE_FIXTURE", "/private/tmp/kyc-opencv-face-smoke.jpg"))
+FIXTURE = Path(os.environ.get("KYC_LIVENESS_NATIVE_FIXTURE",
+    os.environ.get("KYC_FACE_NATIVE_FIXTURE", "/private/tmp/kyc-opencv-face-smoke.jpg")))
 MODELS = Path("var/models")
 
 

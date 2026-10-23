@@ -23,7 +23,7 @@ from fastapi import Depends, Header, HTTPException, Request
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from kyc.db.models import ApiKey, KYCSession, Organization
+from kyc.db.models import ApiKey, Application, KYCSession, Organization, VerificationBinding
 from kyc.db.session import set_tenant, tenant_transaction
 from kyc.domain.state_machine import NO_EXPIRY_STATUSES
 from kyc.tenancy.keys import ALL_SCOPES, API_KEY_PREFIX, CLIENT_SCOPE, CLIENT_TOKEN_PREFIX, MAX_CREDENTIAL_LENGTH, digest
@@ -44,6 +44,7 @@ class TenantContext:
     rate_limit: int | None = None
     allowed_networks: tuple[str, ...] = ()  # the API key's network allow-list (Phase 17)
     expires_at: datetime | None = None     # child keys cannot outlive their creator
+    application_id: UUID | None = None
 
     @property
     def credential_type(self) -> str:
@@ -90,6 +91,20 @@ def _provisioned_key(request: Request, api_key: str, organization_id: UUID) -> T
         if row.revoked_at is not None or (row.expires_at is not None and _aware(row.expires_at) <= now):
             raise refuse(request, 401, "API_KEY_REVOKED_OR_EXPIRED", "Valid credentials are required.")
         _active_organization(request, db, organization_id)
+        if row.application_id is not None:
+            application = db.scalar(sa.select(Application).where(Application.organization_id == organization_id,
+                Application.id == row.application_id, Application.active.is_(True)))
+            if application is None:
+                raise refuse(request, 401, "APPLICATION_DISABLED", "Valid credentials are required.")
+            # Application keys cannot reach tenant administration or legacy result APIs.
+            if not request.url.path.startswith(("/v1/verification-sessions", "/v1/face-enrollment-sessions",
+                                                "/v1/recognition-sessions", "/v1/integration/")):
+                raise refuse(request, 403, "APPLICATION_OUT_OF_SCOPE", "Use the application integration API.")
+            from kyc.integrations.service import consume_counter
+            consume_counter(db, organization_id, f"rate/{application.id}/{now:%Y%m%d%H%M}",
+                            application.rate_limit_per_minute, now.replace(second=0, microsecond=0) + timedelta(minutes=1))
+            consume_counter(db, organization_id, f"key-rate/{row.id}/{now:%Y%m%d%H%M}", row.rate_limit_per_minute,
+                            now.replace(second=0, microsecond=0) + timedelta(minutes=1))
         networks = tuple(row.allowed_cidrs or ())
         if not address_allowed(request.client.host if request.client else None, networks):
             raise refuse(request, 403, "API_KEY_NETWORK_DENIED", "This API key is not allowed from this network.")
@@ -97,7 +112,8 @@ def _provisioned_key(request: Request, api_key: str, organization_id: UUID) -> T
             row.last_used_at = now
         return TenantContext(organization_id, actor_id=f"api_key:{row.id}", scopes=frozenset(row.scopes) & ALL_SCOPES,
                              credential_id=row.id, rate_limit=row.rate_limit_per_minute, allowed_networks=networks,
-                             expires_at=_aware(row.expires_at) if row.expires_at else None)
+                             expires_at=_aware(row.expires_at) if row.expires_at else None,
+                             application_id=row.application_id)
 
 
 def _path_session(request: Request) -> UUID | None:
@@ -119,8 +135,20 @@ def _client_token(request: Request, token: str, organization_id: UUID) -> Tenant
                 or (row.status not in NO_EXPIRY_STATUSES and _aware(row.expires_at) <= datetime.now(timezone.utc)):
             raise refuse(request, 401, "CLIENT_TOKEN_INVALID", "Valid credentials are required.")
         _active_organization(request, db, organization_id)
+        binding = db.scalar(sa.select(VerificationBinding).where(VerificationBinding.organization_id == organization_id,
+                                                                VerificationBinding.session_id == session_id))
+        application_id = None
+        if binding is not None:
+            application_id = binding.application_id
+            application = db.get(Application, application_id)
+            technical_status_read = request.method == "GET" and request.url.path in {
+                f"/v1/verification-sessions/{session_id}/capture-context", f"/v1/verification-sessions/{session_id}/capture-status"}
+            if (application is None or not application.active or binding.technical_error and not technical_status_read
+                    or _aware(binding.capture_expires_at) <= datetime.now(timezone.utc)):
+                raise refuse(request, 401, "CAPTURE_EXPIRED_OR_REVOKED", "Capture token expired or revoked.")
     return TenantContext(organization_id, actor_id=f"session_client:{session_id}", scopes=frozenset({CLIENT_SCOPE}),
-                         session_id=session_id, rate_limit=request.app.state.settings.client_token_rate_limit_per_minute)
+                         session_id=session_id, application_id=application_id,
+                         rate_limit=request.app.state.settings.client_token_rate_limit_per_minute)
 
 
 def authenticate_tenant(
@@ -144,7 +172,7 @@ def authenticate_tenant(
         tenant = _provisioned_key(request, api_key, organization_id)
     else:
         tenant = _development_key(request, state.settings, api_key, organization_id)
-    bucket = str(tenant.session_id or tenant.credential_id or "development")
+    bucket = f"{tenant.organization_id}/{tenant.session_id or tenant.credential_id or 'development'}"
     wait = state.rate_limiter.hit(bucket, tenant.rate_limit or state.settings.api_rate_limit_per_minute)
     if wait is not None:
         raise refuse(request, 429, "RATE_LIMITED", "Rate limit exceeded for this credential.",

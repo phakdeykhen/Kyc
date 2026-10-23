@@ -1,0 +1,45 @@
+{
+  "synthetic": true,
+  "scenarios": [
+    {
+      "scenario": "document",
+      "result": "PASS",
+      "requests": 4
+    },
+    {
+      "scenario": "selfie",
+      "result": "PASS",
+      "requests": 2
+    },
+    {
+      "scenario": "verified",
+      "result": "PASS",
+      "requests": 2
+    },
+    {
+      "scenario": "review",
+      "result": "PASS",
+      "requests": 2
+    },
+    {
+      "scenario": "technical_error",
+      "result": "PASS",
+      "requests": 2
+    },
+    {
+      "scenario": "expired_token",
+      "result": "PASS",
+      "requests": 1
+    },
+    {
+      "scenario": "camera_denied",
+      "result": "PASS",
+      "requests": 4
+    },
+    {
+      "scenario": "khmer",
+      "result": "PASS",
+      "requests": 4
+    }
+  ]
+}

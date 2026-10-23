@@ -1,0 +1,68 @@
+{
+  "synthetic": true,
+  "results": [
+    {
+      "scenario": "matched",
+      "passed": true,
+      "frames": 8,
+      "completed": 1,
+      "disclosed": 1
+    },
+    {
+      "scenario": "ambiguous",
+      "passed": true,
+      "frames": 8,
+      "completed": 1,
+      "disclosed": 0
+    },
+    {
+      "scenario": "not_ready",
+      "passed": true,
+      "frames": 0,
+      "completed": 0,
+      "disclosed": 0
+    },
+    {
+      "scenario": "khmer",
+      "passed": true,
+      "frames": 0,
+      "completed": 0,
+      "disclosed": 0
+    },
+    {
+      "scenario": "enrollment_consent",
+      "passed": true,
+      "frames": 8,
+      "completed": 1,
+      "disclosed": 0
+    },
+    {
+      "scenario": "camera_denied",
+      "passed": true,
+      "frames": 0,
+      "completed": 0,
+      "disclosed": 0
+    },
+    {
+      "scenario": "stale_response",
+      "passed": true,
+      "frames": 1,
+      "completed": 0,
+      "disclosed": 0
+    },
+    {
+      "scenario": "kyc_verified",
+      "passed": true,
+      "frames": 0,
+      "completed": 0,
+      "disclosed": 0
+    },
+    {
+      "scenario": "kyc_review",
+      "passed": true,
+      "frames": 0,
+      "completed": 0,
+      "disclosed": 0
+    }
+  ]
+}

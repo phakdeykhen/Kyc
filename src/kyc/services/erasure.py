@@ -55,7 +55,7 @@ class ErasureReport:
 
 
 def erase_session(db: Session, tenant: TenantContext, record: KYCSession, request_id: UUID,
-                  reason: str = "DATA_SUBJECT_REQUEST") -> ErasureReport:
+                  reason: str = "DATA_SUBJECT_REQUEST", face_ledger=None) -> ErasureReport:
     """Callers load `record` FOR UPDATE inside the tenant's transaction."""
     if record.organization_id != tenant.organization_id or tenant.session_id not in (None, record.id):
         raise HTTPException(404, detail="Session not found.")
@@ -88,7 +88,18 @@ def erase_session(db: Session, tenant: TenantContext, record: KYCSession, reques
     record.erased_at = now
     record.updated_at = now
     record.version += 1
+    from kyc.db.models import VerificationBinding, VerificationDecision, IntegrationFaceSession
+    for link in db.scalars(sa.select(VerificationBinding).filter_by(**scope)):
+        link.reference = None
+        link.idempotency_key = None
+        link.return_url = ""
+        link.request_fingerprint = "ERASED"
+    db.execute(sa.update(VerificationDecision).filter_by(**scope).values(encrypted_fields={}))
+    db.execute(sa.update(IntegrationFaceSession).where(IntegrationFaceSession.organization_id == record.organization_id,
+        IntegrationFaceSession.verification_session_id == record.id).values(capture_token_hash="REVOKED", expires_at=now))
     db.flush()
+    from kyc.face_identity.lifecycle import erase_kyc_identity
+    deleted["face_enrollments"] = erase_kyc_identity(db, record, face_ledger)
     if db.get_bind().dialect.name == "postgresql":
         # The API role cannot edit decision history. This function only removes notes for
         # this tenant's erased session and preserves the immutable decision and reason code.
@@ -102,6 +113,8 @@ def erase_session(db: Session, tenant: TenantContext, record: KYCSession, reques
                     from_status=record.status.value, to_status=record.status.value,
                     event_metadata={key: value for key, value in deleted.items() if value}))
     db.flush()
+    from kyc.integrations.service import snapshot
+    snapshot(db, record)  # PII removal is a new result version, with an atomic notification.
     return ErasureReport(record.id, now, False, {key: value for key, value in deleted.items() if value}, refs)
 
 

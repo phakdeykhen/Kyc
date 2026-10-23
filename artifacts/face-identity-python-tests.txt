@@ -1,0 +1,11 @@
+Local backend software validation — 2026-10-23
+PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -t .
+Optional PostgreSQL tests used a disposable database ending _test.
+Both native fixtures were enabled; see face-identity-validation.json.
+
+Ran 578 tests in 67.365s
+
+OK
+
+This summary does not establish biometric accuracy or production readiness.
+Complete local run log SHA-256: 6c96045558f5b75263b48319c8b0b4e6643df0d5048424d4223579b3abcc2d87

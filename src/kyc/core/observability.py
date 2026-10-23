@@ -19,7 +19,7 @@ from uuid import UUID
 SECURITY_LOGGER = "kyc.security"
 _PATTERNS = (
     # Platform credentials and webhook secrets: keep the type, drop the secret.
-    (re.compile(r"\b(kyc|kst|rvw|whsec)_[A-Za-z0-9_\-]{8,}"), r"\1_[REDACTED]"),
+    (re.compile(r"\b(kyc|kst|rvw|whsec|fri)_[A-Za-z0-9_\-]{8,}"), r"\1_[REDACTED]"),
     (re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=\-]{8,}"), "Bearer [REDACTED]"),
     # Passwords inside database URLs.
     (re.compile(r"(\w+(?:\+\w+)?://[^:/@\s]+:)[^@\s]+@"), r"\1[REDACTED]@"),

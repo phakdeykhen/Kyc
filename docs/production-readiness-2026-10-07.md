@@ -2,6 +2,8 @@
 
 **Readiness: NOT_READY for production.** The camera flow and Khmer extraction fixes are implemented and exercised locally. Real-device biometric validation, calibrated OCR/face/PAD performance, a secure mobile claim flow, and production infrastructure remain release blockers.
 
+**23 October 2026 addendum — optional face identification:** the implementation now includes separately authenticated enrollment/recognition sessions, forced tenant RLS, a restricted biometric-service database role, independently encrypted templates, consent/deletion/restore controls, minimal profile disclosure and English/Khmer user/kiosk screens. This feature has its own readiness gate and remains disabled. VERIFIED KYC does not approve it. Its [separate readiness matrix](face-identity.md#readiness-matrix) identifies the missing validated occlusion provider, real 1:N/PAD/camera/group/population measurements, production account/device integration and deployed backup/restore evidence. Software-only results are in `artifacts/face-identity-validation.json`; no biometric accuracy is claimed. The historical KYC evidence and release blockers below remain unchanged.
+
 Scope: the existing platform and the [approved master prompt](<approved/MASTER PROMPT — PRODUCTION-GRADE KYC PLATFORM.md>). This report distinguishes implementation, automated checks, local document samples, calibration, and production evidence. Existing working services were preserved.
 
 The subsequent [correctness review](kyc-review-2026-10-07.md) fixes additional camera request limits,

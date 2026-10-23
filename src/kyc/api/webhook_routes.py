@@ -6,6 +6,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field
+import sqlalchemy as sa
+from kyc.db.models import WebhookAttempt, WebhookDelivery
+from fastapi import HTTPException
 
 from kyc.api.dependencies import Database, WebhookManager
 from kyc.services import webhooks as service
@@ -32,6 +35,7 @@ class EndpointUpdate(BaseModel):
 
 class EndpointView(BaseModel):
     id: UUID
+    application_id: UUID | None = None
     url: str
     description: str | None
     event_types: list[str]
@@ -125,3 +129,16 @@ def deliveries(endpoint_id: UUID, tenant: WebhookManager, db: Database,
              status_code=status.HTTP_202_ACCEPTED)
 def redeliver(endpoint_id: UUID, delivery_id: UUID, request: Request, tenant: WebhookManager, db: Database):
     return service.delivery_view(service.redeliver(db, tenant, endpoint_id, delivery_id, request.state.request_id))
+
+
+@router.get("/{endpoint_id}/deliveries/{delivery_id}/attempts")
+def attempts(endpoint_id: UUID, delivery_id: UUID, tenant: WebhookManager, db: Database):
+    service.get_endpoint(db, tenant.organization_id, endpoint_id)
+    delivery = db.scalar(sa.select(WebhookDelivery).where(WebhookDelivery.organization_id == tenant.organization_id,
+        WebhookDelivery.endpoint_id == endpoint_id, WebhookDelivery.id == delivery_id))
+    if delivery is None:
+        raise HTTPException(404, detail="Delivery not found.")
+    return [{"id": row.id, "attempt_number": row.attempt_number, "status_code": row.status_code,
+             "error": row.error, "created_at": row.created_at} for row in db.scalars(sa.select(WebhookAttempt).where(
+        WebhookAttempt.organization_id == tenant.organization_id, WebhookAttempt.delivery_id == delivery_id)
+        .order_by(WebhookAttempt.created_at.desc()).limit(100))]

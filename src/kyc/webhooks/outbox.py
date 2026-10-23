@@ -81,12 +81,16 @@ def materialize(db: Session) -> set[UUID]:
     organizations: set[UUID] = set()
     endpoints_by_org: dict[UUID, list[WebhookEndpoint]] = {}
     now = datetime.now(timezone.utc)
+    db.flush()
     for item in pending:
+        from kyc.integrations.service import snapshot
+        record = db.get(KYCSession, item.session_id)
+        snapshot(db, record)
         if item.organization_id not in endpoints_by_org:
             endpoints_by_org[item.organization_id] = list(db.scalars(sa.select(WebhookEndpoint).where(
                 WebhookEndpoint.organization_id == item.organization_id, WebhookEndpoint.active.is_(True))))
         subscribed = [endpoint for endpoint in endpoints_by_org[item.organization_id]
-                      if not endpoint.event_types or item.event_type in endpoint.event_types]
+                      if endpoint.application_id is None and (not endpoint.event_types or item.event_type in endpoint.event_types)]
         if not subscribed:
             continue
         payload = _payload(db, item)
@@ -102,6 +106,8 @@ def materialize(db: Session) -> set[UUID]:
 
 @sa.event.listens_for(Session, "before_commit")
 def _before_commit(db: Session) -> None:
+    if db.in_nested_transaction():
+        return
     if db.info.get(PENDING_KEY):
         for organization_id in materialize(db):
             notify_after_commit(db, organization_id)
@@ -109,6 +115,8 @@ def _before_commit(db: Session) -> None:
 
 @sa.event.listens_for(Session, "after_commit")
 def _after_commit(db: Session) -> None:
+    if db.in_nested_transaction():
+        return
     organizations = db.info.pop(NOTIFY_KEY, None)
     dispatcher = db.info.get(DISPATCHER_KEY)
     if organizations and dispatcher is not None:

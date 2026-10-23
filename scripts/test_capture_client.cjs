@@ -189,7 +189,7 @@ const enqueue = (body, status = 200) => queue.push({ body, status });
   enqueue(session('NFC_REQUIRED'));
   await run('resumeSession()');
   assert.equal(run('state.mode'), 'processing');
-  assert.match(elements['processing-info'].textContent, /mobile app/, 'Chip step is handed to the mobile app');
+  assert.match(elements['processing-info'].textContent, /browser cannot read ePassport chips.*authorized NFC capture device/, 'Chip step explains the browser limitation and authorized-device handoff');
   enqueue(session('PROCESSING'));
   await run('resumeSession()');
   assert.equal(run('state.mode'), 'processing', 'Waiting for the risk decision keeps polling');

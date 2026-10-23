@@ -1,0 +1,35 @@
+{
+  "synthetic": true,
+  "biometric_accuracy_measured": false,
+  "production_ready": false,
+  "scope": "CPU_ONLY_ENCRYPTED_GALLERY_DECRYPT_DESERIALIZE_EXACT_COMPARE",
+  "machine": "arm64",
+  "excludes": [
+    "database",
+    "HTTP",
+    "camera",
+    "quality/PAD",
+    "authorization",
+    "real biometric accuracy"
+  ],
+  "results": [
+    {
+      "population": 100,
+      "repetitions": 20,
+      "p50_ms": 2.504,
+      "p95_ms": 2.634
+    },
+    {
+      "population": 1000,
+      "repetitions": 20,
+      "p50_ms": 25.478,
+      "p95_ms": 25.97
+    },
+    {
+      "population": 10000,
+      "repetitions": 20,
+      "p50_ms": 260.643,
+      "p95_ms": 265.604
+    }
+  ]
+}

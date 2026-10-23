@@ -64,6 +64,7 @@ class Organization(Record, Base):
     template_retention_hours: Mapped[int] = mapped_column(default=24, server_default="24")
     # A suspended organization's API keys, client tokens and reviewers stop working (Phase 15).
     active: Mapped[bool] = mapped_column(sa.Boolean, default=True, server_default=sa.true())
+    daily_session_quota: Mapped[int] = mapped_column(default=10000, server_default="10000")
     __table_args__ = (sa.CheckConstraint("pii_retention_days > 0 AND capture_retention_hours > 0 AND template_retention_hours > 0", name="retention_positive"),)
 
 
@@ -379,7 +380,9 @@ class ApiKey(Record, Base):
     last_used_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     # Phase 17: CIDR allow-list; empty means any network.
     allowed_cidrs: Mapped[list] = mapped_column(JSON_VALUE, default=list, server_default="[]")
+    application_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
     __table_args__ = (sa.UniqueConstraint("key_sha256", name="uq_api_keys_key_sha256"),
+                      sa.ForeignKeyConstraint(["organization_id", "application_id"], ["applications.organization_id", "applications.id"], name="fk_api_keys_application", ondelete="RESTRICT"),
                       sa.UniqueConstraint("organization_id", "id", name="uq_api_keys_scope_id"),
                       sa.CheckConstraint("length(key_sha256) = 64", name="key_hash_length"),
                       sa.CheckConstraint("rate_limit_per_minute BETWEEN 1 AND 100000", name="rate_limit_range"),
@@ -404,7 +407,9 @@ class WebhookEndpoint(Record, Base):
     created_by: Mapped[str] = mapped_column(sa.String(128))
     disabled_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     consecutive_failures: Mapped[int] = mapped_column(sa.Integer, default=0, server_default="0")
+    application_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
     __table_args__ = (sa.UniqueConstraint("organization_id", "id", name="uq_webhook_endpoints_scope_id"),
+                      sa.ForeignKeyConstraint(["organization_id", "application_id"], ["applications.organization_id", "applications.id"], name="fk_webhook_endpoints_application", ondelete="RESTRICT"),
                       sa.CheckConstraint("previous_secret_ciphertext IS NULL OR previous_key_version IS NOT NULL",
                                          name="previous_key_required"),
                       sa.Index("ix_webhook_endpoints_org_active", "organization_id", "active"))
@@ -429,6 +434,7 @@ class WebhookDelivery(Record, Base):
     last_error: Mapped[str | None] = mapped_column(sa.String(40))
     delivered_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     __table_args__ = (
+        sa.UniqueConstraint("organization_id", "id", name="uq_webhook_deliveries_scope_id"),
         sa.ForeignKeyConstraint(["organization_id", "endpoint_id"], ["webhook_endpoints.organization_id", "webhook_endpoints.id"],
                                 ondelete="CASCADE", name="fk_webhook_deliveries_endpoint"),
         sa.UniqueConstraint("endpoint_id", "event_id", name="uq_webhook_deliveries_endpoint_event"),
@@ -462,3 +468,294 @@ class AuditLog(Record, Base):
     request_id: Mapped[UUID] = mapped_column(sa.Uuid)
     event_metadata: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
     __table_args__ = (sa.Index("ix_audit_logs_org_session_created", "organization_id", "session_id", "created_at"),)
+
+
+# Optional face identity deliberately has no FK to ordinary KYC biometric templates.
+# Enrollment always supplies fresh, independently consented evidence and independent keys.
+def face_scope(table, *extra):
+    return (sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="RESTRICT"),
+            sa.UniqueConstraint("organization_id", "id", name=f"uq_{table}_scope_id"), *extra)
+
+
+def face_link(table, column, target):
+    return sa.ForeignKeyConstraint(["organization_id", column],
+                                   [f"{target}.organization_id", f"{target}.id"], ondelete="RESTRICT")
+
+
+class FaceSubject(Record, Base):
+    __tablename__ = "face_subjects"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    kyc_session_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    population: Mapped[str] = mapped_column(sa.String(16), default="CUSTOMER", server_default="CUSTOMER")
+    active: Mapped[bool] = mapped_column(sa.Boolean, default=True, server_default=sa.true())
+    profile_ciphertext: Mapped[bytes | None] = mapped_column(sa.LargeBinary)
+    profile_key_version: Mapped[str | None] = mapped_column(sa.String(64))
+    profile_expires_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = face_scope(__tablename__, face_link(__tablename__, "kyc_session_id", "kyc_sessions"),
+        sa.UniqueConstraint("organization_id", "kyc_session_id"),
+        sa.CheckConstraint("population IN ('STAFF', 'CUSTOMER')", name="subject_population"),
+        sa.Index("ix_face_subjects_population", "organization_id", "population", "active"))
+
+
+class FaceActor(Record, Base):
+    __tablename__ = "face_actors"
+    application_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    subject_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
+    kind: Mapped[str] = mapped_column(sa.String(16))
+    token_hash: Mapped[str] = mapped_column(sa.String(64))
+    purposes: Mapped[list] = mapped_column(JSON_VALUE)
+    populations: Mapped[list] = mapped_column(JSON_VALUE, default=lambda: ["CUSTOMER"], server_default='["CUSTOMER"]')
+    profile_fields: Mapped[list] = mapped_column(JSON_VALUE)
+    branch: Mapped[str | None] = mapped_column(sa.String(64))
+    expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = face_scope(__tablename__, face_link(__tablename__, "subject_id", "face_subjects"),
+        sa.ForeignKeyConstraint(["organization_id", "application_id"], ["applications.organization_id", "applications.id"], name="fk_face_actors_application", ondelete="RESTRICT"),
+        sa.UniqueConstraint("organization_id", "token_hash"),
+        sa.CheckConstraint("kind IN ('PERSON', 'KIOSK', 'OPERATOR')", name="actor_kind"),
+        sa.CheckConstraint("(kind = 'PERSON' AND subject_id IS NOT NULL) OR (kind <> 'PERSON' AND subject_id IS NULL)", name="actor_subject"),
+        sa.Index("ix_face_actors_subject", "organization_id", "subject_id"))
+
+
+class FaceConsent(Record, Base):
+    __tablename__ = "face_consents"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    subject_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    actor_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    purpose: Mapped[str] = mapped_column(sa.String(40), default="FUTURE_FACE_RECOGNITION")
+    notice_version: Mapped[str] = mapped_column(sa.String(80))
+    withdrawn_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = face_scope(__tablename__, face_link(__tablename__, "subject_id", "face_subjects"),
+        face_link(__tablename__, "actor_id", "face_actors"),
+        sa.Index("ix_face_consents_subject", "organization_id", "subject_id"))
+
+
+class FaceEnrollment(Record, Base):
+    __tablename__ = "face_enrollments"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    subject_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    consent_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    status: Mapped[str] = mapped_column(sa.String(24))
+    model_version: Mapped[str] = mapped_column(sa.String(160))
+    policy_version: Mapped[str] = mapped_column(sa.String(80))
+    resolution_key: Mapped[str | None] = mapped_column(sa.String(64))
+    resolution_fingerprint: Mapped[str | None] = mapped_column(sa.String(64))
+    expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = face_scope(__tablename__, face_link(__tablename__, "subject_id", "face_subjects"),
+        face_link(__tablename__, "consent_id", "face_consents"),
+        sa.CheckConstraint("status IN ('ACTIVE', 'DUPLICATE_REVIEW', 'REVOKED', 'EXPIRED', 'SUPERSEDED', 'REJECTED')", name="enrollment_status"),
+        sa.Index("ix_face_enrollments_population", "organization_id", "model_version", "status", "expires_at"),
+        sa.Index("ix_face_enrollments_subject", "organization_id", "subject_id"),
+        sa.Index("uq_face_enrollments_active_subject", "organization_id", "subject_id", unique=True,
+                 postgresql_where=sa.text("status = 'ACTIVE'"), sqlite_where=sa.text("status = 'ACTIVE'")))
+
+
+class FaceTemplate(Record, Base):
+    __tablename__ = "face_templates"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    enrollment_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    ciphertext: Mapped[bytes] = mapped_column(sa.LargeBinary)
+    key_version: Mapped[str] = mapped_column(sa.String(64))
+    quality_metadata: Mapped[dict] = mapped_column(JSON_VALUE)
+    __table_args__ = face_scope(__tablename__, face_link(__tablename__, "enrollment_id", "face_enrollments"),
+        sa.UniqueConstraint("organization_id", "enrollment_id"))
+
+
+class FaceCaptureSession(Record, Base):
+    __tablename__ = "face_capture_sessions"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    actor_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    consent_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
+    kind: Mapped[str] = mapped_column(sa.String(16))
+    purpose: Mapped[str] = mapped_column(sa.String(40))
+    policy_version: Mapped[str] = mapped_column(sa.String(80))
+    steps: Mapped[list] = mapped_column(JSON_VALUE)
+    step_index: Mapped[int] = mapped_column(default=0, server_default="0")
+    ticket_hash: Mapped[str] = mapped_column(sa.String(64))
+    ticket_issued_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(sa.String(24), default="CAPTURING")
+    sample_ciphertext: Mapped[bytes | None] = mapped_column(sa.LargeBinary)
+    sample_key_version: Mapped[str | None] = mapped_column(sa.String(64))
+    last_frame_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    frame_count: Mapped[int] = mapped_column(default=0, server_default="0")
+    completion_key: Mapped[str | None] = mapped_column(sa.String(128))
+    result: Mapped[dict | None] = mapped_column(JSON_VALUE)
+    matched_enrollment_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
+    reference_hash: Mapped[str | None] = mapped_column(sa.String(64))
+    reference_expires_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    disclosure_key: Mapped[str | None] = mapped_column(sa.String(128))
+    __table_args__ = face_scope(__tablename__, face_link(__tablename__, "actor_id", "face_actors"),
+        face_link(__tablename__, "consent_id", "face_consents"),
+        face_link(__tablename__, "matched_enrollment_id", "face_enrollments"),
+        sa.CheckConstraint("kind IN ('ENROLLMENT', 'RECOGNITION')", name="capture_kind"),
+        sa.Index("ix_face_capture_sessions_actor", "organization_id", "actor_id", "created_at"),
+        sa.Index("ix_face_capture_sessions_expiry", "organization_id", "expires_at"))
+
+
+class FaceSampleReceipt(Record, Base):
+    __tablename__ = "face_sample_receipts"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    digest: Mapped[str] = mapped_column(sa.String(64))
+    expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = face_scope(__tablename__, sa.UniqueConstraint("organization_id", "digest"),
+        sa.Index("ix_face_sample_receipts_expiry", "organization_id", "expires_at"))
+
+
+class FaceRecognitionEvent(Record, Base):
+    __tablename__ = "face_recognition_events"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    actor_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    capture_session_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
+    outcome: Mapped[str] = mapped_column(sa.String(40))
+    reason_codes: Mapped[list] = mapped_column(JSON_VALUE)
+    purpose: Mapped[str] = mapped_column(sa.String(40))
+    policy_version: Mapped[str] = mapped_column(sa.String(80))
+    model_version: Mapped[str] = mapped_column(sa.String(160))
+    evidence_ciphertext: Mapped[bytes | None] = mapped_column(sa.LargeBinary)
+    evidence_key_version: Mapped[str | None] = mapped_column(sa.String(64))
+    __table_args__ = face_scope(__tablename__, face_link(__tablename__, "actor_id", "face_actors"),
+        sa.Index("ix_face_recognition_events_session", "organization_id", "capture_session_id", "created_at"))
+
+
+class FaceDeletion(Record, Base):
+    __tablename__ = "face_deletions"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    enrollment_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    reason: Mapped[str] = mapped_column(sa.String(40))
+    ledger_synced: Mapped[bool] = mapped_column(sa.Boolean, default=False, server_default=sa.false())
+    __table_args__ = face_scope(__tablename__, sa.UniqueConstraint("organization_id", "enrollment_id"))
+
+
+class Application(Record, Base):
+    __tablename__ = "applications"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid, sa.ForeignKey("organizations.id", ondelete="RESTRICT"))
+    name: Mapped[str] = mapped_column(sa.String(120))
+    mode: Mapped[str] = mapped_column(sa.String(16), default="sandbox")
+    active: Mapped[bool] = mapped_column(default=True, server_default=sa.true())
+    workflows: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
+    return_urls: Mapped[list] = mapped_column(JSON_VALUE, default=list)
+    branding: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
+    identity_fields: Mapped[list] = mapped_column(JSON_VALUE, default=list)
+    check_fields: Mapped[list] = mapped_column(JSON_VALUE, default=list)
+    populations: Mapped[list] = mapped_column(JSON_VALUE, default=list)
+    purposes: Mapped[list] = mapped_column(JSON_VALUE, default=list)
+    profile_fields: Mapped[list] = mapped_column(JSON_VALUE, default=list)
+    daily_session_quota: Mapped[int] = mapped_column(default=1000, server_default="1000")
+    rate_limit_per_minute: Mapped[int] = mapped_column(default=120, server_default="120")
+    __table_args__ = (
+        sa.UniqueConstraint("organization_id", "id", name="uq_applications_scope_id"),
+        sa.CheckConstraint("mode IN ('sandbox', 'production')", name="application_mode"),
+        sa.CheckConstraint("daily_session_quota > 0 AND rate_limit_per_minute > 0", name="application_limits"),
+    )
+
+
+class ExternalSubject(Record, Base):
+    __tablename__ = "external_subjects"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid, sa.ForeignKey("organizations.id", ondelete="RESTRICT"))
+    external_id: Mapped[str] = mapped_column(sa.String(128))
+    erased_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = (sa.UniqueConstraint("organization_id", "id", name="uq_external_subjects_scope_id"),
+                      sa.UniqueConstraint("organization_id", "external_id", name="uq_external_subjects_external_id"))
+
+
+def application_link():
+    return sa.ForeignKeyConstraint(["organization_id", "application_id"],
+        ["applications.organization_id", "applications.id"], ondelete="RESTRICT")
+
+
+class VerificationBinding(SessionArtifact, Base):
+    __tablename__ = "verification_bindings"
+    application_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    subject_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    workflow_id: Mapped[str] = mapped_column(sa.String(80))
+    reference: Mapped[str | None] = mapped_column(sa.String(128))
+    return_url: Mapped[str] = mapped_column(sa.String(2048))
+    locale: Mapped[str] = mapped_column(sa.String(8))
+    mode: Mapped[str] = mapped_column(sa.String(16))
+    idempotency_key: Mapped[str | None] = mapped_column(sa.String(128))
+    request_fingerprint: Mapped[str] = mapped_column(sa.String(64))
+    capture_expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    technical_error: Mapped[bool] = mapped_column(default=False, server_default=sa.false())
+    __table_args__ = artifact_constraints(__tablename__, application_link(),
+        sa.ForeignKeyConstraint(["organization_id", "subject_id"], ["external_subjects.organization_id", "external_subjects.id"], ondelete="RESTRICT"),
+        sa.UniqueConstraint("organization_id", "session_id"),
+        sa.UniqueConstraint("organization_id", "application_id", "idempotency_key", name="uq_verification_bindings_idempotency"),
+        sa.Index("ix_verification_bindings_application_created", "organization_id", "application_id", "created_at"),
+        sa.Index("ix_verification_bindings_subject", "organization_id", "subject_id"))
+
+
+class VerificationDecision(SessionArtifact, Base):
+    """Immutable outcome/check snapshot. Identity values remain encrypted under original AAD."""
+    __tablename__ = "verification_decisions"
+    result_version: Mapped[int] = mapped_column()
+    outcome: Mapped[str] = mapped_column(sa.String(24))
+    checks: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
+    encrypted_fields: Mapped[dict] = mapped_column(JSON_VALUE, default=dict)
+    identity_delete_after: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    event_id: Mapped[UUID] = mapped_column(sa.Uuid, default=uuid4)
+    __table_args__ = artifact_constraints(__tablename__,
+        sa.UniqueConstraint("organization_id", "session_id", "result_version"),
+        sa.CheckConstraint("outcome IN ('VERIFIED', 'MANUAL_REVIEW', 'REJECTED', 'EXPIRED', 'TECHNICAL_ERROR')", name="verification_outcome"))
+
+
+class IntegrationUsage(Record, Base):
+    """Shared database counters; quota/rate enforcement works across API processes."""
+    __tablename__ = "integration_usage"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid, sa.ForeignKey("organizations.id", ondelete="RESTRICT"))
+    bucket: Mapped[str] = mapped_column(sa.String(160))
+    count: Mapped[int] = mapped_column(default=0)
+    expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = (sa.UniqueConstraint("organization_id", "bucket"),)
+
+
+class RegisteredDevice(Record, Base):
+    __tablename__ = "registered_devices"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid, sa.ForeignKey("organizations.id", ondelete="RESTRICT"))
+    application_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    name: Mapped[str] = mapped_column(sa.String(120))
+    token_hash: Mapped[str] = mapped_column(sa.String(64))
+    populations: Mapped[list] = mapped_column(JSON_VALUE, default=list)
+    purposes: Mapped[list] = mapped_column(JSON_VALUE, default=list)
+    expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = (application_link(), sa.UniqueConstraint("organization_id", "id", name="uq_registered_devices_scope_id"),
+                      sa.UniqueConstraint("organization_id", "token_hash"))
+
+
+class IntegrationFaceSession(Record, Base):
+    """Authorization envelope; biometric material stays in the separate biometric service."""
+    __tablename__ = "integration_face_sessions"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid, sa.ForeignKey("organizations.id", ondelete="RESTRICT"))
+    application_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    subject_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
+    verification_session_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
+    device_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
+    kind: Mapped[str] = mapped_column(sa.String(16))
+    purpose: Mapped[str] = mapped_column(sa.String(40))
+    population: Mapped[str] = mapped_column(sa.String(16))
+    capture_token_hash: Mapped[str] = mapped_column(sa.String(64))
+    actor_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
+    face_session_id: Mapped[UUID | None] = mapped_column(sa.Uuid)
+    expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    __table_args__ = (application_link(),
+        sa.ForeignKeyConstraint(["organization_id", "subject_id"], ["external_subjects.organization_id", "external_subjects.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["organization_id", "verification_session_id"], ["kyc_sessions.organization_id", "kyc_sessions.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["organization_id", "device_id"], ["registered_devices.organization_id", "registered_devices.id"], ondelete="RESTRICT"),
+        sa.CheckConstraint("kind IN ('ENROLLMENT', 'RECOGNITION')", name="integration_face_kind"),
+        sa.UniqueConstraint("organization_id", "id", name="uq_integration_face_sessions_scope_id"))
+
+
+class WebhookAttempt(Record, Base):
+    __tablename__ = "webhook_attempts"
+    organization_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    delivery_id: Mapped[UUID] = mapped_column(sa.Uuid)
+    attempt_number: Mapped[int] = mapped_column()
+    status_code: Mapped[int | None] = mapped_column()
+    error: Mapped[str | None] = mapped_column(sa.String(40))
+    __table_args__ = (
+        sa.ForeignKeyConstraint(["organization_id", "delivery_id"], ["webhook_deliveries.organization_id", "webhook_deliveries.id"], ondelete="CASCADE"),
+        sa.Index("ix_webhook_attempts_delivery", "organization_id", "delivery_id", "created_at"),
+    )

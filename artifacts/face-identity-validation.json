@@ -1,0 +1,225 @@
+{
+  "date": "2026-10-23",
+  "scope": "LOCAL_SOFTWARE_VALIDATION_AND_SYNTHETIC_CPU_BENCHMARK",
+  "production_ready": false,
+  "enabled_by_default": false,
+  "user_database_migrated": false,
+  "biometric_accuracy_approved": false,
+  "backend": {
+    "command": "PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -t .",
+    "tests_run": 578,
+    "passed": 578,
+    "failed": 0,
+    "skipped": 0,
+    "duration_seconds": 67.365,
+    "complete_local_log_sha256": "6c96045558f5b75263b48319c8b0b4e6643df0d5048424d4223579b3abcc2d87",
+    "new_feature_tests": {
+      "lifecycle_security_and_api": 36,
+      "evaluation_contracts": 5,
+      "postgres_privileges_rls_and_scoped_erasure": 1,
+      "total": 42
+    },
+    "postgres": {
+      "version": 17,
+      "disposable_database": true,
+      "user_database_used": false,
+      "checks": [
+        "migration upgrade/downgrade and metadata parity",
+        "separate restricted API/biometric role catalogs",
+        "forced tenant RLS and cross-tenant foreign keys",
+        "API cannot select enrollment templates or capture evidence",
+        "scoped KYC erasure",
+        "withdrawal and simulated restored-row denial"
+      ]
+    },
+    "native_fixtures": {
+      "face_engine": {
+        "source": "OpenCV 4.10.0 samples/data/lena.jpg",
+        "sha256": "7de7ed51a1594fff247f4cae2301eceacf5313d6011e37b4a4c8733f7bb72c07"
+      },
+      "liveness_photo_attack": "realtime-face-liveness-detector/misc/face.jpg",
+      "thresholds_relaxed": false
+    }
+  },
+  "browser": {
+    "synthetic": true,
+    "mocked_face_provider": true,
+    "new_feature_scenarios_passed": 9,
+    "existing_kyc_scenarios_passed": 11,
+    "total_passed": 20,
+    "new_feature_artifact": "artifacts/face-identity-browser.json",
+    "khmer_screenshot": "artifacts/face-identity-khmer.png",
+    "existing_kyc_results": [
+      {
+        "scenario": "complete",
+        "passed": true,
+        "positioned": 4,
+        "challenges": 1,
+        "submitted": 1,
+        "sessionReads": 2
+      },
+      {
+        "scenario": "successful_capture",
+        "passed": true,
+        "positioned": 4,
+        "challenges": 1,
+        "submitted": 1,
+        "sessionReads": 2
+      },
+      {
+        "scenario": "exhausted",
+        "passed": true,
+        "positioned": 1,
+        "challenges": 0,
+        "submitted": 0,
+        "sessionReads": 2
+      },
+      {
+        "scenario": "camera_denied",
+        "passed": true,
+        "positioned": 0,
+        "challenges": 0,
+        "submitted": 0,
+        "sessionReads": 2
+      },
+      {
+        "scenario": "cancel_positioning",
+        "passed": true,
+        "positioned": 1,
+        "challenges": 0,
+        "submitted": 0,
+        "sessionReads": 2
+      },
+      {
+        "scenario": "position_body_timeout",
+        "passed": true,
+        "positioned": 0,
+        "challenges": 0,
+        "submitted": 0,
+        "sessionReads": 2
+      },
+      {
+        "scenario": "challenge_body_timeout",
+        "passed": true,
+        "positioned": 4,
+        "challenges": 0,
+        "submitted": 0,
+        "sessionReads": 2
+      },
+      {
+        "scenario": "cancel_challenge",
+        "passed": true,
+        "positioned": 4,
+        "challenges": 0,
+        "submitted": 0,
+        "sessionReads": 2
+      },
+      {
+        "scenario": "camera_interrupted",
+        "passed": true,
+        "positioned": 4,
+        "challenges": 1,
+        "submitted": 0,
+        "sessionReads": 2
+      },
+      {
+        "scenario": "challenge_expired_offline",
+        "passed": true,
+        "positioned": 4,
+        "challenges": 1,
+        "submitted": 0,
+        "sessionReads": 2
+      },
+      {
+        "scenario": "poll_recovery",
+        "passed": true,
+        "positioned": 0,
+        "challenges": 0,
+        "submitted": 0,
+        "sessionReads": 4
+      }
+    ],
+    "physical_camera_or_biometric_accuracy_evidence": false
+  },
+  "other_checks": {
+    "typescript_sdk_tests_passed": 6,
+    "liveness_feedback_checks_passed": 31,
+    "existing_capture_client_smoke": "PASSED",
+    "frontend_type_check": "PASSED",
+    "targeted_frontend_eslint": "PASSED",
+    "frontend_build": "PASSED",
+    "frontend_build_warning": "Vite reports a JavaScript chunk exceeding 500 kB; no production latency claim.",
+    "python_compile": "PASSED",
+    "openapi_route_and_security_alignment": "PASSED",
+    "git_diff_check": "PASSED"
+  },
+  "operations_smoke": {
+    "disposable_database": true,
+    "migration_revision": "0013_face_identity",
+    "person_bound_to_verified_kyc_and_staff_population": "PASSED",
+    "registered_kiosk_staff_scope_and_revocation": "PASSED",
+    "restricted_biometric_role": "PASSED",
+    "only_credential_hash_persisted": "PASSED",
+    "temporary_setup_preserves_existing_env_and_is_idempotent": "PASSED",
+    "temporary_setup_file_mode": "0600",
+    "real_user_env_changed": false
+  },
+  "cpu_benchmark": {
+    "artifact": "artifacts/face-identity-search-benchmark.json",
+    "synthetic": true,
+    "scope": "CPU_ONLY_ENCRYPTED_GALLERY_DECRYPT_DESERIALIZE_EXACT_COMPARE",
+    "machine": "arm64",
+    "results": [
+      {
+        "population": 100,
+        "repetitions": 20,
+        "p50_ms": 2.504,
+        "p95_ms": 2.634
+      },
+      {
+        "population": 1000,
+        "repetitions": 20,
+        "p50_ms": 25.478,
+        "p95_ms": 25.97
+      },
+      {
+        "population": 10000,
+        "repetitions": 20,
+        "p50_ms": 260.643,
+        "p95_ms": 265.604
+      }
+    ],
+    "excludes": [
+      "database",
+      "HTTP",
+      "camera",
+      "quality/PAD",
+      "authorization",
+      "real biometric accuracy"
+    ],
+    "approves_population_capacity": false
+  },
+  "not_measured": [
+    "real-world FPIR and FNIR",
+    "real-world ambiguity and retry rates",
+    "physical PAD attack acceptance and genuine-user rejection",
+    "enrollment 1:1 verification accuracy",
+    "supported camera, lighting, appearance and user-group accuracy",
+    "production end-to-end latency and throughput",
+    "deployed backup deletion/expiry and immutable-checkpoint restore drills"
+  ],
+  "release_blockers": [
+    "Integrate and validate an occlusion/eye-visibility capture provider. The existing YuNet five-landmark engine does not satisfy this gate; a flag or signed file alone cannot implement it.",
+    "Predeclare acceptance criteria, run identity-disjoint development and held-out evaluation for every authorized population, and approve signed 1:N, enrollment 1:1, PAD, device and visibility evidence. No measured thresholds or approval bundle is supplied.",
+    "Integrate production account/SSO and registered-device credential delivery. The trusted CLI provisions credentials but is not a public authentication integration.",
+    "Validate deployment TLS, independent managed keys, restricted database role, distributed abuse monitoring and operational capacity.",
+    "Configure external backup retention, independent immutable deletion checkpoints, scheduled maintenance and tested deployment restore/expiry procedures.",
+    "Retain all existing KYC and deployment release gates. A VERIFIED KYC result never approves face identification."
+  ],
+  "limitations": [
+    "Profile photos and sensitive records are not disclosed by this module.",
+    "Staff-assisted recovery links to the existing authorized console; QR issuance/redemption requires a separate integration.",
+    "Attendance is not implemented and recognition does not create attendance records.",
+    "Software tests and synthetic benchmarks do not measure biometric accuracy or provide release approval."
+  ]
+}

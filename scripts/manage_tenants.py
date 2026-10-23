@@ -54,6 +54,9 @@ org.add_parser("list")
 retention = org.add_parser("retention")
 retention.add_argument("organization", type=UUID)
 retention_options(retention, (None, None, None))
+quota = org.add_parser("quota")
+quota.add_argument("organization", type=UUID)
+quota.add_argument("--daily-sessions", type=int, required=True)
 key = groups.add_parser("key").add_subparsers(dest="command", required=True)
 key_create = key.add_parser("create")
 key_create.add_argument("organization", type=UUID)
@@ -115,6 +118,11 @@ try:
                     if getattr(args, field) is not None:
                         setattr(row, field, getattr(args, field))
                 tenancy.audit(db, row.id, ADMIN, "ORGANIZATION_RETENTION_CHANGED", request_id)
+            elif args.command == "quota":
+                if not 1 <= args.daily_sessions <= 10_000_000:
+                    raise SystemExit("--daily-sessions must be between 1 and 10000000")
+                row.daily_session_quota = args.daily_sessions
+                tenancy.audit(db, row.id, ADMIN, "ORGANIZATION_QUOTA_CHANGED", request_id)
             db.flush()
             show(tenancy.organization_view(row))
         else:

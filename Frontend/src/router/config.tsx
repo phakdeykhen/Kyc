@@ -13,6 +13,7 @@ import ReviewSession from "../pages/review/session/page";
 import Developers from "../pages/developers/page";
 import SessionDetail from "../pages/sessions/page";
 import HomePage from "../pages/home/page";
+import FaceIdentityPage from "../pages/face/page";
 
 // Routes are grouped by who uses them, because each group holds a different credential:
 //   staff (reviewer token, signed in at /signin)   /console, /review, /sessions, /developers, /verify/new
@@ -24,6 +25,9 @@ import HomePage from "../pages/home/page";
 const routes: RouteObject[] = [
   { path: "/", element: <HomePage /> },
   { path: "/signin", element: <SignInPage /> },
+  { path: "/face/enroll", element: <FaceIdentityPage /> },
+  { path: "/face/scan", element: <FaceIdentityPage /> },
+  { path: "/face/kiosk", element: <FaceIdentityPage /> },
   {
     element: <RequireStaff />,
     children: [

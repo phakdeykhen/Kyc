@@ -26,7 +26,11 @@ def configuration(organization_id, **extra):
                 "face_match_policy_version": "SFACE-COSINE-UNCALIBRATED-2026.10.1",
                 "face_match_pass_threshold": 0.363, "face_match_fail_threshold": 0.20,
                 "document_processing_mode": "inline", "tesseract_cmd": "tesseract", "ocr_languages": "khm,eng",
-                "webhook_delivery_mode": "worker", "webhook_allow_private_targets": False}
+                "webhook_delivery_mode": "worker", "webhook_allow_private_targets": False,
+                "face_recognition_enabled": False, "face_recognition_keys": None,
+                "face_recognition_database_url": None, "face_recognition_policy": None,
+                "face_recognition_approval_key": None, "face_recognition_ledger_path": None,
+                "face_recognition_ledger_key": None}
     return Settings(_env_file=None, environment="test", database_url="sqlite://",
                     development_api_key=TEST_KEY, development_organization_id=organization_id, **(hermetic | extra))
 

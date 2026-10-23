@@ -24,6 +24,8 @@ from kyc.db.models import KYCSession  # noqa: E402
 from kyc.db.session import build_engine, set_tenant  # noqa: E402
 from kyc.main import build_capture_store  # noqa: E402
 from kyc.services.erasure import delete_objects, erase_session, subject_sessions  # noqa: E402
+from kyc.face_identity.ledger import DeletionLedger
+from kyc.core.crypto import decode_key
 
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("organization", type=UUID)
@@ -38,6 +40,9 @@ settings = get_settings()
 engine = build_engine(settings)
 factory = sessionmaker(engine, expire_on_commit=False)
 store = build_capture_store(settings)
+face_ledger = (DeletionLedger(settings.face_recognition_ledger_path,
+               decode_key(settings.face_recognition_ledger_key.get_secret_value()))
+               if settings.face_recognition_ledger_path and settings.face_recognition_ledger_key else None)
 actor = TenantContext(args.organization, actor_id="administrator")
 request_id = uuid4()
 reports = []
@@ -52,7 +57,7 @@ try:
         if not sessions:
             raise SystemExit("No matching session in this organization (already erased sessions no longer carry the user_id).")
         for record in sessions:
-            reports.append((erase_session(db, actor, record, request_id, args.reason), record.status.value))
+            reports.append((erase_session(db, actor, record, request_id, args.reason, face_ledger=face_ledger), record.status.value))
     removed = sum(delete_objects(store, report) for report, _ in reports) if store is not None else 0
     print(json.dumps({"organization_id": args.organization, "request_id": request_id, "objects_deleted": removed,
                       "sessions": [report.view(status) for report, status in reports]}, indent=2, default=str))

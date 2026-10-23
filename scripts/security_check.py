@@ -29,9 +29,13 @@ def _policy(expression: str | None) -> str:
     return re.sub(r"[\s()]", "", expression or "").replace("::text", "")
 
 
-def catalog_checks(db: sa.Connection, role: str = API_ROLE, schema: str = "public") -> list[dict]:
+def catalog_checks(db: sa.Connection, role: str = API_ROLE, schema: str = "public", *,
+                   table_privileges=None, column_updates=None, definer_functions=None) -> list[dict]:
     """Read actual PostgreSQL permissions, including PUBLIC and inheritance."""
     params = {"role": role, "schema": schema}
+    table_privileges = TABLE_PRIVILEGES if table_privileges is None else table_privileges
+    column_updates = COLUMN_UPDATES if column_updates is None else column_updates
+    definer_functions = SECURITY_DEFINER_FUNCTIONS if definer_functions is None else definer_functions
     checks = []
 
     def check(name, ok, detail=None):
@@ -96,10 +100,10 @@ def catalog_checks(db: sa.Connection, role: str = API_ROLE, schema: str = "publi
     actual = {}
     for namespace, table, privilege in granted:
         actual.setdefault(table if namespace == schema else f"{namespace}.{table}", set()).add(privilege)
-    extra = {table: sorted(values - TABLE_PRIVILEGES.get(table, frozenset()))
-             for table, values in actual.items() if values - TABLE_PRIVILEGES.get(table, frozenset())}
+    extra = {table: sorted(values - table_privileges.get(table, frozenset()))
+             for table, values in actual.items() if values - table_privileges.get(table, frozenset())}
     missing = {table: sorted(values - actual.get(table, set()))
-               for table, values in TABLE_PRIVILEGES.items() if values - actual.get(table, set())}
+               for table, values in table_privileges.items() if values - actual.get(table, set())}
     check("no_privileges_beyond_matrix", not extra, extra or None)
     check("matrix_privileges_present", not missing, missing or None)
     columns = db.execute(sa.text("""SELECT n.nspname, c.relname, a.attname, privilege_type FROM pg_class c
@@ -114,9 +118,9 @@ def catalog_checks(db: sa.Connection, role: str = API_ROLE, schema: str = "publi
     columns = [(table if namespace == schema else f"{namespace}.{table}", column, privilege)
                for namespace, table, column, privilege in columns]
     column_extra = sorted(f"{table}.{column}:{privilege}" for table, column, privilege in columns
-                          if privilege not in TABLE_PRIVILEGES.get(table, frozenset())
-                          and not (privilege == "UPDATE" and column in COLUMN_UPDATES.get(table, ())))
-    column_missing = sorted(f"{table}.{column}" for table, allowed in COLUMN_UPDATES.items() for column in allowed
+                          if privilege not in table_privileges.get(table, frozenset())
+                          and not (privilege == "UPDATE" and column in column_updates.get(table, ())))
+    column_missing = sorted(f"{table}.{column}" for table, allowed in column_updates.items() for column in allowed
                             if (table, column, "UPDATE") not in columns)
     check("no_column_privileges_beyond_matrix", not column_extra, column_extra or None)
     check("matrix_column_updates_present", not column_missing, column_missing or None)
@@ -135,7 +139,7 @@ def catalog_checks(db: sa.Connection, role: str = API_ROLE, schema: str = "publi
         FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE p.prosecdef AND n.nspname NOT LIKE 'pg_%' AND n.nspname <> 'information_schema'
         ORDER BY n.nspname, signature"""), params).mappings().all()
-    allowed = set(SECURITY_DEFINER_FUNCTIONS)
+    allowed = set(definer_functions)
     unexpected = [f"{row['nspname']}.{row['signature']}" for row in functions
                   if row["executable"] and not (row["nspname"] == schema and row["signature"] in allowed)]
     check("no_unexpected_executable_security_definer_functions", not unexpected, unexpected or None)

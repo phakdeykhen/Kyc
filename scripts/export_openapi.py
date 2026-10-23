@@ -17,7 +17,10 @@ document["components"]["securitySchemes"] = {
     "ApiKey": {"type": "apiKey", "in": "header", "name": "X-API-Key", "description": "Server-side API key (kyc_…)."},
     "Organization": {"type": "apiKey", "in": "header", "name": "X-Organization-ID", "description": "Organization UUID; required on every request."},
     "SessionClientToken": {"type": "http", "scheme": "bearer", "description": "Session client token (kst_…) for capture and status of one session."},
+    "FaceCaptureToken": {"type": "http", "scheme": "bearer", "description": "Short-lived face capture token (fct_…) bound to one application, purpose, subject/device and capture session."},
+    "DeviceToken": {"type": "apiKey", "in": "header", "name": "X-Device-Token", "description": "Required alongside a face capture token for registered-device captures."},
     "ReviewerToken": {"type": "http", "scheme": "bearer", "description": "Expiring reviewer token (rvw_…), separate from client credentials."},
+    "FaceActorToken": {"type": "http", "scheme": "bearer", "description": "Person-bound account or registered device credential (fri_…). KYC applicant links and API keys are not accepted."},
 }
 server_security = {"ApiKey": [], "Organization": []}
 device_security = {"SessionClientToken": [], "Organization": []}
@@ -30,6 +33,13 @@ for path, operations in document["paths"].items():
             continue
         if path.startswith("/health/"):
             operation["security"] = []
+        elif path.startswith(("/v1/face-enrollment-sessions/", "/v1/recognition-sessions/")) and not path.endswith("/result"):
+            operation["security"] = [{"FaceCaptureToken": [], "Organization": []},
+                                      {"FaceCaptureToken": [], "DeviceToken": [], "Organization": []}]
+        elif path.startswith("/v1/verification-sessions/") and path.endswith(("/capture-context", "/capture-status")):
+            operation["security"] = [device_security]
+        elif path.startswith(("/v1/face-enrollments/", "/v1/face-recognition/", "/v1/recognition/", "/v1/me/face-enrollment")):
+            operation["security"] = [{"FaceActorToken": [], "Organization": []}]
         elif path.startswith("/v1/review/"):
             operation["security"] = [{"ReviewerToken": [], "Organization": []}]
         elif path.startswith("/v1/kyc/{session_id}") and path.removeprefix("/v1/kyc/{session_id}") in capture_suffixes:

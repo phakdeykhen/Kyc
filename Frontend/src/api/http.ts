@@ -5,7 +5,8 @@
 export type Credential =
   | { kind: "reviewer"; organizationId: string; token: string }
   | { kind: "apiKey"; organizationId: string; key: string }
-  | { kind: "client"; organizationId: string; token: string };
+  | { kind: "client"; organizationId: string; token: string }
+  | { kind: "face"; organizationId: string; token: string };
 
 export class ApiError extends Error {
   readonly status: number;

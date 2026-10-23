@@ -4,6 +4,7 @@ from kyc.domain.enums import SessionStatus as S
 from kyc.domain.state_machine import Event
 
 EVENT_TYPES = {
+    "verification.result.updated": "A versioned application verification result is available through the API.",
     "kyc.processing": "All evidence is in; the risk engine is deciding.",
     "kyc.document.accepted": "The document was read and accepted.",
     "kyc.selfie.required": "The person should take a selfie next.",

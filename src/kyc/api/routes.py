@@ -106,7 +106,8 @@ def erase(session_id: UUID, request: Request, tenant: Eraser, db: Database, back
     Repeating the call is harmless.
     """
     record = get_session(db, tenant, session_id, request.state.request_id)
-    report = erase_session(db, tenant, record, request.state.request_id)
+    report = erase_session(db, tenant, record, request.state.request_id,
+                           face_ledger=request.app.state.face_identity.ledger)
     # Commit explicitly before registering destructive storage work. This guarantee must
     # not depend on when a FastAPI version tears down dependencies that yield.
     db.commit()

@@ -8,7 +8,7 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.formparsers import MultiPartParser
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -44,6 +44,10 @@ from kyc.webhooks.delivery import HTTPSender
 from kyc.webhooks.dispatcher import WebhookDispatcher
 from kyc.webhooks.outbox import DISPATCHER_KEY
 from kyc.webhooks.secrets import build_webhook_cipher
+from kyc.face_identity.routes import router as face_identity_router
+from kyc.face_identity.service import FaceIdentityService
+from kyc.integrations.routes import router as integration_router
+from kyc.integrations.face import router as integration_face_router
 
 UPLOAD_PATH = re.compile(r"^/v1/kyc/[^/]+/documents(/front|/back)?$")
 SELFIE_PATH = re.compile(r"^/v1/kyc/[^/]+/selfie$")
@@ -75,6 +79,8 @@ log = logging.getLogger("kyc.api")
 def apply_security_headers(response, request: Request):
     path = request.url.path
     response.headers["X-Request-ID"] = str(request.state.request_id)
+    if path.startswith("/v1/"):
+        response.headers["KYC-API-Version"] = "v1"
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
@@ -83,13 +89,13 @@ def apply_security_headers(response, request: Request):
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
     if request.app.state.settings.environment == "production":
         response.headers["Strict-Transport-Security"] = HSTS
-    if not path.startswith(("/review", "/capture") + DOC_PAGES) or response.status_code >= 400:
+    if not path.startswith(("/review", "/capture", "/verify/", "/verify-assets/") + DOC_PAGES) or response.status_code >= 400:
         response.headers["Content-Security-Policy"] = API_CSP
     if path.startswith("/review") and response.status_code < 400:
         response.headers["Content-Security-Policy"] = REVIEW_PAGE_CSP
-    if path.startswith("/capture") and response.status_code < 400:
+    if path.startswith(("/capture", "/verify/", "/verify-assets/")) and response.status_code < 400:
         response.headers["Content-Security-Policy"] = CAPTURE_PAGE_CSP
-    response.headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()" if path.startswith("/capture") and response.status_code < 400 else "camera=(), microphone=(), geolocation=()"
+    response.headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()" if path.startswith(("/capture", "/verify/")) and response.status_code < 400 else "camera=(), microphone=(), geolocation=()"
     return response
 
 
@@ -180,6 +186,7 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
             fail_threshold=configuration.face_match_fail_threshold,
             calibrated=configuration.face_match_calibrated,
             calibration_reference=configuration.face_match_calibration_reference)
+        application.state.face_identity = FaceIdentityService(configuration, application.state)
         application.state.document_processor = build_document_processor(
             configuration, application.state.session_factory, application.state.capture_store, application.state.field_cipher)
         application.state.fraud_analyzer = build_fraud_analyzer(
@@ -190,6 +197,8 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
         try:
             yield
         finally:
+            if application.state.face_identity.engine is not None:
+                application.state.face_identity.engine.dispose()
             application.state.webhook_dispatcher.close()
             if database_engine is None:
                 engine.dispose()
@@ -217,6 +226,8 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
                 limit = frame_limit * (2 if feedback[1] == "guide" else 1) + MULTIPART_OVERHEAD
             elif NFC_PATH.match(request.url.path):
                 limit = request.app.state.settings.max_nfc_bytes + MULTIPART_OVERHEAD
+            elif re.fullmatch(r"/v1/((face-enrollments|recognition)/sessions|face-enrollment-sessions|recognition-sessions)/[^/]+/frames", request.url.path):
+                limit = request.app.state.settings.max_selfie_bytes + MULTIPART_OVERHEAD
             else:
                 limit = request.app.state.settings.max_capture_bytes + MULTIPART_OVERHEAD if upload else JSON_BODY_LIMIT
             length = request.headers.get("content-length")
@@ -317,10 +328,28 @@ def create_app(settings: Settings | None = None, database_engine: sa.Engine | No
         except sa.exc.SQLAlchemyError:
             return JSONResponse(status_code=503, content={"status": "not_ready"})
 
+    @application.get("/health/face-recognition", tags=["health"])
+    def face_recognition_ready():
+        status = application.state.face_identity.readiness()
+        return JSONResponse(status_code=200 if status["ready"] else 503, content=status)
+
     application.include_router(router)
     application.include_router(review_router)
     application.include_router(tenant_router)
     application.include_router(webhook_router)
+    application.include_router(face_identity_router)
+    application.include_router(integration_router)
+    application.include_router(integration_face_router)
+    @application.get("/verify/{session_id}", include_in_schema=False)
+    def hosted_verification(session_id: str):
+        return FileResponse(CAPTURE_PAGE.parent / "hosted" / "index.html")
+
+    # Shared, audited capture client; the hosted page never asks for a partner API secret.
+    @application.get("/verify-assets/{asset}", include_in_schema=False)
+    def hosted_asset(asset: str):
+        if asset not in {"capture.css", "capture.js"}:
+            raise HTTPException(404, detail="Not Found")
+        return FileResponse(CAPTURE_PAGE / asset)
     # Development capture client; the server-side gate stays authoritative.
     application.mount("/capture", StaticFiles(directory=CAPTURE_PAGE, html=True), name="capture")
     # Reviewer dashboard: static shell; every case, image and decision goes through the reviewer API.

@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 from kyc import __version__
 from kyc.db.models import WebhookDelivery, WebhookEndpoint
 from kyc.db.session import set_tenant
-from kyc.webhooks.delivery import SendResult
+from kyc.webhooks.delivery import HTTPSender, SendResult
 from kyc.webhooks.secrets import WebhookSecretCipher
 from kyc.webhooks.signing import SIGNATURE_HEADER, sign
 
@@ -61,6 +61,8 @@ class Claim:
     url: str
     body: bytes
     headers: dict[str, str]
+    attempt_number: int
+    public_only: bool = False
 
 
 class WebhookDispatcher:
@@ -96,7 +98,10 @@ class WebhookDispatcher:
             return 0
         claims = self._claim(organization_id, now or datetime.now(timezone.utc))
         for claim in claims:
-            result = self.sender.send(claim.url, claim.body, claim.headers)
+            sender = self.sender
+            if claim.public_only and isinstance(sender, HTTPSender) and sender.allow_private:
+                sender = HTTPSender(sender.timeout, False, sender.context)
+            result = sender.send(claim.url, claim.body, claim.headers)
             self._record(organization_id, claim, result)
         return len(claims)
 
@@ -114,6 +119,13 @@ class WebhookDispatcher:
                 if endpoint is None or not endpoint.active:
                     row.status, row.last_error = "ABANDONED", "ENDPOINT_DISABLED"
                     continue
+                if endpoint.application_id is not None:
+                    from kyc.db.models import Application
+                    app = db.scalar(sa.select(Application).where(Application.organization_id == organization_id,
+                        Application.id == endpoint.application_id, Application.active.is_(True)))
+                    if app is None:
+                        row.status, row.last_error = "ABANDONED", "APPLICATION_DISABLED"
+                        continue
                 row.attempts += 1
                 row.last_attempt_at = now
                 row.next_attempt_at = now + LEASE
@@ -122,7 +134,7 @@ class WebhookDispatcher:
                            "KYC-Event-ID": str(row.event_id), "KYC-Event-Type": row.event_type,
                            "KYC-Delivery-ID": str(row.id), "KYC-Delivery-Attempt": str(row.attempts),
                            SIGNATURE_HEADER: sign(endpoint_secrets(self.cipher, endpoint, now), body)}
-                claims.append(Claim(row.id, endpoint.id, endpoint.url, body, headers))
+                claims.append(Claim(row.id, endpoint.id, endpoint.url, body, headers, row.attempts, endpoint.application_id is not None))
         return claims
 
     def _record(self, organization_id: UUID, claim: Claim, result: SendResult) -> None:
@@ -133,7 +145,12 @@ class WebhookDispatcher:
                                                              WebhookDelivery.id == claim.delivery_id).with_for_update())
             endpoint = db.scalar(sa.select(WebhookEndpoint).where(WebhookEndpoint.organization_id == organization_id,
                                                                   WebhookEndpoint.id == claim.endpoint_id))
-            if row is None or row.status != "PENDING":
+            if row is None:
+                return
+            from kyc.db.models import WebhookAttempt
+            db.add(WebhookAttempt(organization_id=organization_id, delivery_id=row.id, attempt_number=claim.attempt_number,
+                                  status_code=result.status_code, error=result.error))
+            if row.status != "PENDING":
                 return
             row.last_status_code, row.last_error = result.status_code, result.error
             if result.delivered:

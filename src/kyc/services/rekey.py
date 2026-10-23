@@ -11,6 +11,7 @@ between the file and the row update leaves both readable.
 """
 
 from collections import Counter
+import base64
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from uuid import UUID
@@ -19,12 +20,12 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from kyc.db.models import (BarcodeResult, BiometricTemplate, DocumentField, DocumentImage, ManualReview, SelfieCapture,
-                           WebhookEndpoint)
+                           VerificationDecision, WebhookEndpoint)
 from kyc.db.session import set_tenant
 from kyc.webhooks.dispatcher import secret_context
 
 CLASSES = ("document_fields", "barcode_payloads", "review_notes", "webhook_secrets", "biometric_templates",
-           "capture_objects")
+           "capture_objects", "verification_results")
 
 
 @dataclass
@@ -169,13 +170,25 @@ def rekey_organization(factory: sessionmaker, organization_id: UUID, keys: Keyri
         report = reports[name] = ClassReport()
         with factory() as db, db.begin():
             set_tenant(db, organization_id)
-            if name in ("document_fields", "barcode_payloads", "review_notes"):
+            if name in ("document_fields", "barcode_payloads", "review_notes", "verification_results"):
                 cipher = keys.field_cipher
                 if cipher is None:
                     report.skipped = "PII_ENCRYPTION_KEYS not configured"
                     continue
                 report.active = cipher.active
-                if name == "document_fields":
+                if name == "verification_results":
+                    for row in _rows(db, VerificationDecision, organization_id, apply):
+                        fields = dict(row.encrypted_fields)
+                        for field, sealed in fields.items():
+                            report.before[sealed["key"]] += 1
+                            if apply and sealed["key"] != cipher.active:
+                                value = cipher.open(base64.b64decode(sealed["value"]), sealed["key"], sealed["context"])
+                                ciphertext, version = cipher.seal(value, sealed["context"])
+                                fields[field] = {**sealed, "value": base64.b64encode(ciphertext).decode(), "key": version}
+                                report.resealed += 1
+                        if apply:
+                            row.encrypted_fields = fields
+                elif name == "document_fields":
                     rows = _rows(db, DocumentField, organization_id, apply,
                                  sa.or_(DocumentField.raw_value_ciphertext.is_not(None),
                                         DocumentField.normalized_value_ciphertext.is_not(None)))

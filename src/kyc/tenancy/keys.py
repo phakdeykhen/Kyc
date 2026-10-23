@@ -14,6 +14,13 @@ CLIENT_TOKEN_PREFIX = "kst_"
 MAX_CREDENTIAL_LENGTH = 200
 
 SCOPES = {
+    "applications:manage": "Configure tenant applications and application credentials.",
+    "devices:manage": "Register and revoke application capture devices.",
+    "usage:read": "Read tenant or application usage and delivery dashboard.",
+    "results:checks": "Read explicitly permitted verification check details.",
+    "enrollments:write": "Create separately consented face enrollment sessions.",
+    "recognition:write": "Create live recognition sessions for authorized subjects/devices.",
+    "recognition:read": "Read authorized recognition outcomes and permitted profile fields.",
     "sessions:write": "Create sessions, upload evidence, issue client tokens and request a decision.",
     "sessions:read": "Read session status and results (identity fields masked).",
     "results:identity": "See unmasked identity fields in results.",

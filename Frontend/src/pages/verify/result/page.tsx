@@ -86,6 +86,12 @@ export default function VerificationResult() {
   return (
     <ApplicantShell>
       <ApplicantMessage icon={outcome.icon} tone={outcome.tone} title={outcome.title} text={outcome.text} />
+      {session.status === "VERIFIED" && (
+        <div className="mt-5 rounded-lg border border-background-300 p-5">
+          <p className="mb-3 font-label text-sm">Optional: recognize yourself during future scans. Declining does not change your KYC result. Sign in to your own account to continue.</p>
+          <Link to="/face/enroll" className="inline-flex min-h-11 items-center rounded-md bg-primary-500 px-5 py-3 font-label font-medium text-background-50">Enable Face Recognition</Link>
+        </div>
+      )}
       <div className="mt-4">
         <ApplicantGovernmentVerification credential={credential} sessionId={sessionId} version={session.version} />
       </div>

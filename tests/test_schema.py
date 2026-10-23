@@ -49,6 +49,10 @@ class SchemaTests(unittest.TestCase):
             "face_comparisons", "liveness_checks", "fraud_signals", "risk_assessments", "manual_reviews",
             "consents", "audit_logs", "liveness_challenges", "nfc_challenges", "selfie_captures", "face_quality_checks", "reviewers",
             "api_keys", "webhook_endpoints", "webhook_deliveries",
+            "face_subjects", "face_actors", "face_consents", "face_enrollments", "face_templates",
+            "face_capture_sessions", "face_sample_receipts", "face_recognition_events", "face_deletions",
+            "applications", "external_subjects", "verification_bindings", "verification_decisions",
+            "integration_usage", "registered_devices", "integration_face_sessions", "webhook_attempts",
         })
 
     def test_cross_tenant_artifact_link_fails_at_database_layer(self):
@@ -101,8 +105,8 @@ class SchemaTests(unittest.TestCase):
         config.attributes["database_url"] = "postgresql+psycopg2://unused@localhost/kyc_test"
         command.upgrade(config, "head", sql=True)
         sql = output.getvalue()
-        self.assertEqual(sql.count("CREATE POLICY tenant_isolation"), 25)
-        self.assertEqual(sql.count("FORCE ROW LEVEL SECURITY"), 25)
+        self.assertEqual(sql.count("CREATE POLICY tenant_isolation"), 42)
+        self.assertEqual(sql.count("FORCE ROW LEVEL SECURITY"), 42)
         self.assertIn("TIMESTAMP WITH TIME ZONE", sql)
         self.assertIn("JSONB", sql)
         self.assertIn("UUID", sql)

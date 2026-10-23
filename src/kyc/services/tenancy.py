@@ -35,6 +35,7 @@ def key_view(row: ApiKey) -> dict:
 
 def organization_view(organization: Organization) -> dict:
     return {"organization_id": organization.id, "name": organization.name, "active": organization.active,
+            "daily_session_quota": organization.daily_session_quota,
             "retention": {"pii_retention_days": organization.pii_retention_days,
                           "capture_retention_hours": organization.capture_retention_hours,
                           "template_retention_hours": organization.template_retention_hours}}
@@ -47,7 +48,8 @@ def audit(db: Session, organization_id: UUID, actor_id: str, action: str, reques
 
 def create_key(db: Session, organization_id: UUID, name: str, scopes: list[str], actor_id: str, request_id: UUID,
                expires_in_days: int | None = None, rate_limit_per_minute: int = 600,
-               allowed_cidrs: list[str] | None = None, *, expires_at: datetime | None = None) -> tuple[ApiKey, str]:
+               allowed_cidrs: list[str] | None = None, *, expires_at: datetime | None = None,
+               application_id: UUID | None = None) -> tuple[ApiKey, str]:
     """Returns the row and the secret, which is never stored and cannot be shown again."""
     unknown = set(scopes) - ALL_SCOPES
     if unknown or not scopes:
@@ -68,7 +70,7 @@ def create_key(db: Session, organization_id: UUID, name: str, scopes: list[str],
     row = ApiKey(organization_id=organization_id, name=name, key_prefix=display_prefix(token), key_sha256=token_hash,
                  scopes=sorted(set(scopes)), rate_limit_per_minute=rate_limit_per_minute, created_by=actor_id,
                  allowed_cidrs=networks,
-                 created_at=now, expires_at=expiry)
+                 created_at=now, expires_at=expiry, application_id=application_id)
     db.add(row)
     db.flush()
     audit(db, organization_id, actor_id, "API_KEY_CREATED", request_id, key_id=row.id, scopes=",".join(row.scopes),
