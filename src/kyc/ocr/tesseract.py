@@ -37,7 +37,24 @@ class TesseractOCREngine:
 
     def available_languages(self) -> set[str]:
         lines = self._run([self.command, "--list-langs"], b"").splitlines()
+        installed = {line.strip() for line in lines[1:] if line.strip()}
+        # Script models install as script/Khmer (Homebrew, tessdata_best layout) or as Khmer (Debian/Ubuntu
+        # packages, used by the container image). Either answers to the script/ name.
+        return installed | {f"script/{name}" for name in installed if name[:1].isupper() and "/" not in name}
+
+    @cached_property
+    def _installed_names(self) -> set[str]:
+        lines = self._run([self.command, "--list-langs"], b"").splitlines()
         return {line.strip() for line in lines[1:] if line.strip()}
+
+    def _languages(self, languages: Sequence[str]) -> str:
+        """Join language names for -l, using the flat name of a script model where only that is installed."""
+        resolved = []
+        for name in languages:
+            if name.startswith("script/") and name not in self._installed_names:
+                name = name.removeprefix("script/")
+            resolved.append(name)
+        return "+".join(resolved)
 
     def is_available(self, languages: Sequence[str] = ("khm", "eng")) -> bool:
         if shutil.which(self.command) is None:
@@ -66,7 +83,7 @@ class TesseractOCREngine:
     def read_lines(self, image: Image.Image, languages: Sequence[str]) -> list[OCRLine]:
         buffer = BytesIO()
         image.save(buffer, "PNG")
-        tsv = self._run([self.command, "stdin", "stdout", "-l", "+".join(languages), "--psm", str(self.psm),
+        tsv = self._run([self.command, "stdin", "stdout", "-l", self._languages(languages), "--psm", str(self.psm),
                          "-c", "tessedit_create_tsv=1"],
                         buffer.getvalue())
         return self._lines_from_tsv(tsv, image.size)
@@ -107,7 +124,7 @@ class TesseractOCREngine:
                            min(width, round(bbox[2] * width) + pad), min(height, round(bbox[3] * height) + pad)))
         buffer = BytesIO()
         crop.save(buffer, "PNG")
-        tsv = self._run([self.command, "stdin", "stdout", "-l", "+".join(languages), "--psm", str(mode),
+        tsv = self._run([self.command, "stdin", "stdout", "-l", self._languages(languages), "--psm", str(mode),
                          "-c", f"tessedit_char_whitelist={alphabet}", "-c", "tessedit_create_tsv=1"], buffer.getvalue())
         words = [(parts[11].strip(), float(parts[10])) for parts in (row.split("\t") for row in tsv.splitlines()[1:])
                  if len(parts) == 12 and parts[0] == "5" and parts[11].strip() and float(parts[10]) >= 0]
@@ -124,7 +141,7 @@ class TesseractOCREngine:
         buffer = BytesIO()
         crop.save(buffer, "PNG")
         options = ["-c", f"tessedit_char_whitelist={alphabet}"] if alphabet else []
-        tsv = self._run([self.command, "stdin", "stdout", "-l", "+".join(languages), "--psm", str(mode), *options,
+        tsv = self._run([self.command, "stdin", "stdout", "-l", self._languages(languages), "--psm", str(mode), *options,
                          "-c", "tessedit_create_tsv=1"],
                         buffer.getvalue())
         lines = self._lines_from_tsv(tsv, crop.size)

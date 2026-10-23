@@ -364,6 +364,11 @@ class KhmerLabelAdapter:
 
         if layout.validity_label:
             raw, line, flags = values.get(layout.validity_label, (None, None, ()))
+            dedicated = next((item for item in front if f"FIELD_ROI:{layout.validity_label}" in item.notes), None)
+            if len(khmer.find_dates(raw or "")) < 2 and dedicated is not None:
+                # The validity label was unreadable or its dates incomplete; the row's own re-read agreed on both.
+                raw, line, flags = dedicated.text, dedicated, tuple(
+                    note for note in dedicated.notes if not note.startswith("FIELD_ROI:"))
             dates = khmer.find_dates(raw or "")
             for position, name in enumerate(("issue_date", "expiry_date")):
                 fields.append(self._field(name, dates[position][0], dates[position][1], line, primary_side, flags)
@@ -401,6 +406,8 @@ class KhmerLabelAdapter:
                 flags += ("CHECK_DIGITS_VALID",) if all(item["valid"] for item in parsed.check_digits.values()) else ("CHECK_DIGIT_FAILED",)
                 if all(parsed.check_digits.get(name, {}).get("valid") for name in mrz_parser.FIELD_CHECKS):
                     flags += ("MRZ_FIELDS_VERIFIED",)  # number, birth and expiry each match their check digit
+                if any("MRZ_COMPOSITE_REREAD" in line.notes for line in mrz_lines if clean_mrz(line.text) in parsed.lines):
+                    flags += ("MRZ_COMPOSITE_REREAD",)  # the composite digit came from a single-glyph re-read
             used = []
             for assembled in parsed.lines if parsed else ():
                 matching = [line for line in mrz_lines if clean_mrz(line.text) == assembled

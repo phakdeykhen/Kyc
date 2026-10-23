@@ -221,7 +221,54 @@ def _read_rows(ocr, image: Image.Image, adapter, lines: list[OCRLine]) -> list[O
                           all("KHMER_MULTIPASS_AGREED" in part.notes for part in found))
         tagged.append(OCRLine(text=" ".join(part.text for part in found), confidence=min(part.confidence for part in found),
                               bbox=bounds, notes=notes, raw_text="\n".join(part.raw_text or "" for part in found)))
-    return tagged
+    return tagged + _read_date_rows(ocr, image, assigned, languages, zone[0])
+
+
+DATE_ROWS = {"date_of_birth": 1, "validity": 2}  # row -> number of dates printed on it
+
+
+def _read_date_rows(ocr, image: Image.Image, assigned: dict, languages: set[str], zone_left: float) -> list[OCRLine]:
+    """Re-read the birth and validity rows on their own and keep dates that several passes agree on.
+
+    The printed labels on these rows are often misread (security pattern), which hides the dates from
+    label matching. A row's dates are reported only when at least two passes read the same full set;
+    otherwise nothing is added and label matching decides as before."""
+    models = [model for model in (("khm",), ("script/Khmer",)) if model[0] in languages]
+    alphabet = khmer.KHMER_DIGITS + "0123456789./ "
+    found = []
+    for name, expected in DATE_ROWS.items():
+        rows = assigned.get(name) or ()
+        if not rows:
+            continue
+        box = card_rows.glyph_box(rows[0], zone_left, image.size)
+        if box is None:
+            continue
+        readings = []
+        for variant, source in preprocessing_variants(card_rows.isolate(image, rows[0], box))[:5]:
+            for model in models:
+                text = " ".join(line.text for line in ocr.read_region(source, (0.0, 0.0, 1.0, 1.0), model, mode=7))
+                readings.append((variant, text))
+                if hasattr(ocr, "reread"):
+                    digits, _ = ocr.reread(source, (0.0, 0.0, 1.0, 1.0), model, alphabet, mode=7)
+                    readings.append((f"{variant}/digits", digits))
+        votes: dict[tuple[str, ...], int] = {}
+        for _, text in readings:
+            dates = tuple(parsed.value for _, parsed in khmer.find_dates(text) if parsed.value)
+            if len(dates) == expected:
+                votes[dates] = votes.get(dates, 0) + 1
+        if not votes:
+            continue
+        ranked = sorted(votes.items(), key=lambda item: -item[1])
+        winner, count = ranked[0]
+        if count < 2 or (len(ranked) > 1 and ranked[1][1] == count):
+            continue
+        agreed = count >= 3 and (len(ranked) == 1 or ranked[1][1] * 2 < count)
+        printed = " ".join(".".join(reversed(value.split("-"))) for value in winner)
+        found.append(OCRLine(text=printed, confidence=0.9 if agreed else 0.6, bbox=box,
+                             notes=(f"FIELD_ROI:{name}", "DATE_ROW_REREAD", "CARD_ROW_LAYOUT",
+                                    "DATE_PASSES_AGREED" if agreed else "FIELD_UNCERTAIN"),
+                             raw_text="\n".join(f"[{variant}] {text}" for variant, text in readings)))
+    return found
 
 
 def read_khmer_fields(ocr, image: Image.Image, adapter, lines: list[OCRLine], located: bool) -> list[OCRLine]:
