@@ -1,0 +1,108 @@
+name: KYC CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kyc-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  KYC_API_IMAGE: kyc-api:${{ github.sha }}
+  KYC_WEB_IMAGE: kyc-web:${{ github.sha }}
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+      - name: Install Tesseract (Khmer + Latin)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-khm tesseract-ocr-eng tesseract-ocr-script-khmr
+      - run: pip install -r requirements.lock
+      - name: Backend tests
+        run: python -m unittest discover -s tests
+        env:
+          PYTHONPATH: src
+      - run: npm ci
+        working-directory: Frontend
+      - run: npm run type-check
+        working-directory: Frontend
+      - run: npm run build
+        working-directory: Frontend
+
+  build_and_deploy:
+    name: build_smoke_deploy
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ env.KYC_API_IMAGE }}
+          provenance: false
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+      - name: Build website image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/web.Dockerfile
+          load: true
+          tags: ${{ env.KYC_WEB_IMAGE }}
+          provenance: false
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+      - name: Run smoke test
+        run: bash deploy/smoke-test.sh
+      - name: Configure dedicated deployment SSH key
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          DEPLOY_KEY: ${{ secrets.KYC_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.KYC_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_KEY"
+          test -n "$KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/kyc_deploy
+          chmod 600 ~/.ssh/kyc_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Deploy the exact smoke-tested images
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          docker save "$KYC_API_IMAGE" "$KYC_WEB_IMAGE" | gzip -1 | \
+            ssh -i ~/.ssh/kyc_deploy -o IdentitiesOnly=yes -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+              root@104.248.154.28 "deploy $GITHUB_SHA"
+      - name: Verify public HTTPS website and API
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          curl --fail --silent --show-error --retry 3 --max-time 40 https://kyc.opssolution.tech/healthz
+          curl --fail --silent --show-error --retry 3 --max-time 40 https://kyc.opssolution.tech/health/ready \
+            | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin)["status"] == "ready" else 1)'
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' https://kyc.opssolution.tech/v1/kyc/sessions)" = 401

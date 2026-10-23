@@ -1,0 +1,105 @@
+name: kyc
+# Production stack on the shared VM. Secrets live only in /opt/kyc/*.env (mode 600).
+# Nginx on the host terminates HTTPS for kyc.opssolution.tech and proxies to 127.0.0.1:3400.
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    env_file:
+      - /opt/kyc/postgres.env
+    # Production mode refuses a database link without TLS, even on the private Compose network.
+    command: ["postgres", "-c", "ssl=on", "-c", "ssl_cert_file=/tls/server.crt", "-c", "ssl_key_file=/tls/server.key",
+              "-c", "max_connections=40", "-c", "shared_buffers=128MB"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - /opt/kyc/postgres-init.sh:/docker-entrypoint-initdb.d/01-kyc-app.sh:ro
+      - /opt/kyc/pg-tls:/tls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kyc_migrator -d kyc"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+  migrate:
+    # Run by receive-release.sh before the API starts: Alembic upgrade + declared role grants.
+    image: ${KYC_API_IMAGE:?Set KYC_API_IMAGE to the tested API image}
+    profiles: [tools]
+    env_file:
+      - /opt/kyc/kyc.env
+    command: ["python", "scripts/bootstrap_local.py"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *logging
+  admin:
+    # One-off administration, e.g. scripts/manage_tenants.py and scripts/create_reviewer.py.
+    image: ${KYC_API_IMAGE:?Set KYC_API_IMAGE to the tested API image}
+    profiles: [tools]
+    env_file:
+      - /opt/kyc/kyc.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+  api:
+    image: ${KYC_API_IMAGE:?Set KYC_API_IMAGE to the tested API image}
+    restart: unless-stopped
+    env_file:
+      - /opt/kyc/kyc.env
+    environment:
+      CAPTURE_STORAGE_DIR: /var/lib/kyc/captures
+      FACE_MODELS_DIR: /var/lib/kyc/models
+      # The pinned tessdata_best khm/eng models used locally, not Debian's packaged models.
+      OCR_TESSDATA_DIR: /var/lib/kyc/models/tessdata-best
+      OCR_TIMEOUT_SECONDS: "40"
+      # Only the web container can reach the API; the public edge overwrites X-Forwarded-For.
+      FORWARDED_ALLOW_IPS: "*"
+    volumes:
+      - capture_data:/var/lib/kyc/captures
+      - /opt/kyc/models:/var/lib/kyc/models:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 1600m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/health/ready', timeout=10).status == 200 else 1)"]
+      interval: 30s
+      timeout: 12s
+      start_period: 60s
+      retries: 3
+    logging: *logging
+  webhooks:
+    # Persistent outbox retries; the API sends first attempts itself.
+    image: ${KYC_API_IMAGE:?Set KYC_API_IMAGE to the tested API image}
+    restart: unless-stopped
+    env_file:
+      - /opt/kyc/kyc.env
+    command: ["python", "scripts/deliver_webhooks.py", "--loop", "15"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 300m
+    logging: *logging
+  web:
+    image: ${KYC_WEB_IMAGE:?Set KYC_WEB_IMAGE to the tested web image}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3400:80"
+    logging: *logging
+volumes:
+  postgres_data:
+  capture_data:
